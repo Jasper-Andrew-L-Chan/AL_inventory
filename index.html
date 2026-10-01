@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>affordaLABS DIAGNOSTICS PLUS - Pharmacy POS & Inventory</title>
+  <link rel="icon" type="image/png" href="assets/affordalabs-logo-cropped.png" />
+  <link rel="stylesheet" href="css/style.css" />
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+</head>
+<body>
+  <div class="app-container">
+    <!-- Left Navigation Sidebar -->
+    <aside class="sidebar">
+      <div class="sidebar-header">
+        <a href="#home" onclick="window.appRouter.navigate('home')" class="brand-logo-wrapper" title="affordaLABS DIAGNOSTICS PLUS">
+          <img src="assets/affordalabs-logo-cropped.png" alt="affordaLABS DIAGNOSTICS PLUS" class="brand-logo-img" />
+          <div class="brand-tagline">PHARMACY POS & INVENTORY</div>
+        </a>
+      </div>
+
+      <nav class="sidebar-nav">
+        <div class="nav-item active" data-view="home" onclick="window.appRouter.navigate('home')">
+          <span class="icon">🏠</span>
+          <span>Home</span>
+        </div>
+
+        <div class="nav-item" data-view="dashboard" onclick="window.appRouter.navigate('dashboard')">
+          <span class="icon">⊞</span>
+          <span>Dashboard</span>
+        </div>
+
+        <div class="nav-item" data-view="pos" onclick="window.appRouter.navigate('pos')">
+          <span class="icon">⚡</span>
+          <span>POS Register</span>
+        </div>
+
+        <div class="nav-item" data-view="transactions" onclick="window.appRouter.navigate('transactions')">
+          <span class="icon">⇄</span>
+          <span>Transactions</span>
+        </div>
+
+        <div class="nav-item" data-view="reports" onclick="window.appRouter.navigate('reports')">
+          <span class="icon">📊</span>
+          <span>Reports</span>
+        </div>
+
+        <div class="nav-item" data-view="inventory" onclick="window.appRouter.navigate('inventory')">
+          <span class="icon">📦</span>
+          <span>Inventory</span>
+          <span id="inventoryBadge" class="badge-pill" style="display: none;">!</span>
+        </div>
+
+        <div class="nav-item" data-view="staff" onclick="window.appRouter.navigate('staff')">
+          <span class="icon">👤</span>
+          <span>Staff</span>
+        </div>
+
+        <div class="nav-item" data-view="cashdrawer" onclick="window.appRouter.navigate('cashdrawer')">
+          <span class="icon">💵</span>
+          <span>Cash Drawer</span>
+        </div>
+
+        <div class="nav-item" data-view="settings" onclick="window.appRouter.navigate('settings')">
+          <span class="icon">⚙</span>
+          <span>Settings</span>
+        </div>
+      </nav>
+
+      <div class="sidebar-footer">
+        <div class="nav-item" onclick="alert('AffordaLabs PharmaPOS v1.0.0 (Philippine FDA & BIR Compliant)')">
+          <span class="icon">❓</span>
+          <span>Help & Compliance</span>
+        </div>
+        <div class="nav-item" onclick="if(confirm('Are you sure you want to end shift and logout?')) alert('Logged out successfully.')">
+          <span class="icon">➔</span>
+          <span>Logout</span>
+        </div>
+      </div>
+    </aside>
+
+    <!-- Main Content Area -->
+    <main class="main-wrapper">
+      <!-- Top Navigation Header -->
+      <header class="topbar">
+        <div class="page-title-area">
+          <h1 class="page-title" id="pageTitle">Home</h1>
+          <div class="pharmacy-branch-badge">
+            <span class="branch-dot"></span>
+            <span>Main Branch - Pasig City</span>
+          </div>
+        </div>
+
+        <div class="topbar-actions">
+          <button class="quick-pos-btn" onclick="window.appRouter.navigate('pos')">
+            <span>⚡ Counter POS (F2)</span>
+          </button>
+
+          <button class="icon-btn" onclick="alert('Alerts: 2 medicines expiring in 60 days. 1 item reached low stock threshold.')" title="Notifications">
+            <span>🔔</span>
+            <span class="notif-dot"></span>
+          </button>
+
+          <div class="user-profile">
+            <div class="user-avatar">
+              <span>LS</span>
+            </div>
+            <div class="user-info">
+              <span class="user-name">Lionel Santos, RPh</span>
+              <span class="user-role">Licensed Pharmacist</span>
+            </div>
+          </div>
+        </div>
+      </header>
+
+      <!-- Scrollable Body Container -->
+      <section class="content-area" id="main-content">
+        <!-- Views are rendered dynamically here -->
+      </section>
+    </main>
+  </div>
+
+  <!-- Scripts -->
+  <script src="js/store.js"></script>
+  <script src="js/components/home.js"></script>
+  <script src="js/components/dashboard.js"></script>
+  <script src="js/components/inventory.js"></script>
+  <script src="js/components/pos.js"></script>
+  <script src="js/components/transactions.js"></script>
+  <script src="js/components/reports.js"></script>
+  <script src="js/components/staff.js"></script>
+  <script src="js/components/cashdrawer.js"></script>
+  <script src="js/components/settings.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
