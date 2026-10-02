@@ -7,6 +7,13 @@ function renderHomeView(container) {
   const settings = window.pharmacyStore.getSettings();
   const metrics = window.pharmacyStore.getDashboardMetrics();
 
+  const session = window.authStore ? window.authStore.getSession() : null;
+  const activeUserName = session ? session.fullName : settings.pharmacistInCharge;
+  const activeUserRole = session ? session.role : 'Pharmacist on Duty';
+  const activeUserLicense = session && session.prcLicense && session.prcLicense !== 'N/A' 
+    ? `License: ${session.prcLicense} (Active)` 
+    : (session ? session.role : `License: ${settings.prcLicense} (Active)`);
+
   container.innerHTML = `
     <!-- Top Hero Banner -->
     <div style="background: linear-gradient(135deg, #1E293B 0%, #0F172A 100%); border-radius: var(--radius-lg); padding: 2.2rem 2.5rem; color: white; margin-bottom: 1.5rem; position: relative; overflow: hidden; box-shadow: var(--shadow-lg); border: 1px solid rgba(255, 90, 0, 0.25);">
@@ -15,20 +22,20 @@ function renderHomeView(container) {
 
       <div style="max-width: 65%; position: relative; z-index: 2;">
         <div style="display: inline-flex; align-items: center; gap: 8px; background: rgba(255, 90, 0, 0.15); border: 1px solid rgba(255, 90, 0, 0.4); padding: 5px 14px; border-radius: 20px; font-size: 0.78rem; font-weight: 700; color: #FFA066; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.9rem;">
-          <span>🩺</span> affordaLABS DIAGNOSTICS PLUS • PHARMACY & CLINIC POS
+           AffordaLABS DIAGNOSTICS PLUS • PHARMACY
         </div>
         <h1 style="font-size: 2.1rem; font-weight: 900; line-height: 1.2; margin-bottom: 0.85rem; letter-spacing: -0.02em;">
-          Welcome to <span style="color: #FF5A00;">afforda</span><span style="font-weight: 300; -webkit-text-stroke: 1.5px #FF5A00; color: transparent;">LABS</span>
+          Welcome, <span style="color: #FF5A00;">${session ? session.firstName : 'Pharmacist'}</span>!
         </h1>
         <p style="font-size: 0.94rem; color: #CBD5E1; line-height: 1.6; margin-bottom: 1.5rem;">
-          Unified Pharmacy Point-of-Sale, Drug Formulary, and Clinical Inventory System. Engineered for Philippine regulatory compliance with generic mapping (RA 6675), automated 20% Senior/PWD discounts, batch lot expiry monitoring, and BIR official receipts.
+          Unified Pharmacy Clinical Inventory & Drug Formulary System. Engineered for Philippine regulatory compliance with generic mapping (RA 6675), batch lot expiry monitoring, stock movement tracking, and BIR/FDA audit readiness.
         </p>
         <div style="display: flex; gap: 0.85rem; flex-wrap: wrap;">
-          <button onclick="window.appRouter.navigate('pos')" style="background: var(--primary-gradient); color: white; border: none; padding: 0.7rem 1.4rem; border-radius: var(--radius-sm); font-weight: 700; font-size: 0.92rem; cursor: pointer; display: flex; align-items: center; gap: 0.5rem; box-shadow: 0 4px 14px rgba(255, 90, 0, 0.4); transition: transform 0.15s ease;">
-            <span>⚡ Open Counter POS (F2)</span>
+          <button onclick="window.appRouter.navigate('inventory')" style="background: var(--primary-gradient); color: white; border: none; padding: 0.7rem 1.4rem; border-radius: var(--radius-sm); font-weight: 700; font-size: 0.92rem; cursor: pointer; display: flex; align-items: center; gap: 0.5rem; box-shadow: 0 4px 14px rgba(255, 90, 0, 0.4); transition: transform 0.15s ease;">
+            <span>📦 Open Medicine Inventory</span>
           </button>
-          <button onclick="window.appRouter.navigate('inventory')" style="background: rgba(255,255,255,0.08); color: white; border: 1px solid rgba(255,255,255,0.2); padding: 0.7rem 1.4rem; border-radius: var(--radius-sm); font-weight: 600; font-size: 0.92rem; cursor: pointer; display: flex; align-items: center; gap: 0.5rem; backdrop-filter: blur(4px);">
-            <span>📦 Manage Formulary & Batches</span>
+          <button onclick="window.appRouter.navigate('dashboard')" style="background: rgba(255,255,255,0.08); color: white; border: 1px solid rgba(255,255,255,0.2); padding: 0.7rem 1.4rem; border-radius: var(--radius-sm); font-weight: 600; font-size: 0.92rem; cursor: pointer; display: flex; align-items: center; gap: 0.5rem; backdrop-filter: blur(4px);">
+            <span>📊 View Analytics Dashboard</span>
           </button>
         </div>
       </div>
@@ -36,13 +43,13 @@ function renderHomeView(container) {
       <!-- Right illustration placeholder / decorative badges -->
       <div style="position: absolute; right: 2.2rem; top: 50%; transform: translateY(-50%); display: flex; flex-direction: column; gap: 0.9rem; z-index: 2;" class="hide-mobile">
         <div style="background: rgba(15, 23, 42, 0.75); backdrop-filter: blur(12px); padding: 1rem 1.4rem; border-radius: 14px; border: 1px solid rgba(255, 90, 0, 0.3); text-align: right; box-shadow: var(--shadow-md);">
-          <div style="font-size: 0.72rem; color: #94A3B8; text-transform: uppercase; font-weight: 600; letter-spacing: 0.05em;">Pharmacist on Duty</div>
-          <div style="font-size: 1.05rem; font-weight: 800; color: #FFFFFF; margin-top: 2px;">${settings.pharmacistInCharge}</div>
-          <div style="font-size: 0.75rem; color: #FFA066; font-weight: 600; margin-top: 2px;">License: ${settings.prcLicense} (Active)</div>
+          <div style="font-size: 0.72rem; color: #94A3B8; text-transform: uppercase; font-weight: 600; letter-spacing: 0.05em;">Staff on Duty</div>
+          <div style="font-size: 1.05rem; font-weight: 800; color: #FFFFFF; margin-top: 2px;">${activeUserName}</div>
+          <div style="font-size: 0.75rem; color: #FFA066; font-weight: 600; margin-top: 2px;">${activeUserLicense}</div>
         </div>
         <div style="background: rgba(15, 23, 42, 0.75); backdrop-filter: blur(12px); padding: 1rem 1.4rem; border-radius: 14px; border: 1px solid rgba(255, 90, 0, 0.3); text-align: right; box-shadow: var(--shadow-md);">
-          <div style="font-size: 0.72rem; color: #94A3B8; text-transform: uppercase; font-weight: 600; letter-spacing: 0.05em;">Today's Net Dispensed Sales</div>
-          <div style="font-size: 1.45rem; font-weight: 900; color: #FF7828; margin-top: 2px;">₱${metrics.netSales.toLocaleString('en-PH', { minimumFractionDigits: 2 })}</div>
+          <div style="font-size: 0.72rem; color: #94A3B8; text-transform: uppercase; font-weight: 600; letter-spacing: 0.05em;">Active Formulary SKUs</div>
+          <div style="font-size: 1.45rem; font-weight: 900; color: #FF7828; margin-top: 2px;">${metrics.totalSKUs} Products</div>
         </div>
       </div>
     </div>
@@ -55,13 +62,13 @@ function renderHomeView(container) {
           <div style="font-size: 1.3rem; color: var(--primary);">💊</div>
           <div>
             <h4 style="font-size: 0.95rem; font-weight: 700; color: var(--text-main); margin-bottom: 0.25rem;">
-              Pharmacist Quick-Start Tutorial
+              Inventory Management Quick Guide
             </h4>
             <p style="font-size: 0.82rem; color: var(--text-muted); margin-bottom: 0.75rem;">
-              Learn how to dispense prescription drugs (Rx), record lot expiry, and print BIR-compliant receipts.
+              Learn how to add new medicine batches, track expiration dates, and use Shift+Click to quickly select and manage items.
             </p>
-            <button onclick="window.appRouter.navigate('pos')" style="background: var(--primary); color: white; border: none; padding: 0.45rem 1rem; border-radius: var(--radius-sm); font-size: 0.78rem; font-weight: 600; cursor: pointer; box-shadow: 0 2px 5px rgba(255, 90, 0, 0.25);">
-              Try POS Practice Mode
+            <button onclick="window.appRouter.navigate('inventory')" style="background: var(--primary); color: white; border: none; padding: 0.45rem 1rem; border-radius: var(--radius-sm); font-size: 0.78rem; font-weight: 600; cursor: pointer; box-shadow: 0 2px 5px rgba(255, 90, 0, 0.25);">
+              Manage Inventory
             </button>
           </div>
         </div>
@@ -73,13 +80,13 @@ function renderHomeView(container) {
           <div style="font-size: 1.3rem; color: #10b981;">🛵</div>
           <div>
             <h4 style="font-size: 0.95rem; font-weight: 700; color: var(--text-main); margin-bottom: 0.25rem;">
-              GrabMart & FoodPanda Pharmacy Delivery
+              Stock In &amp; Stock Out History
             </h4>
             <p style="font-size: 0.82rem; color: var(--text-muted); margin-bottom: 0.75rem;">
-              Branch online store is connected. Orders will automatically reflect in Transactions and deduct live stock.
+              Review automated audit logs for all medicine deliveries, batch arrivals, and dispensing movements.
             </p>
             <button onclick="window.appRouter.navigate('transactions')" style="background: #10b981; color: white; border: none; padding: 0.45rem 1rem; border-radius: var(--radius-sm); font-size: 0.78rem; font-weight: 600; cursor: pointer;">
-              View Online Orders
+              View In - Out Logs
             </button>
           </div>
         </div>
@@ -163,7 +170,7 @@ function renderHomeView(container) {
   `;
 }
 
-window.toggleAccordion = function(panelId) {
+window.toggleAccordion = function (panelId) {
   const panel = document.getElementById(panelId);
   const chevron = document.getElementById(panelId.replace('-panel', '-chevron'));
   if (panel) {

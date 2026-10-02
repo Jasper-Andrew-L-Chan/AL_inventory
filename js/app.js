@@ -19,7 +19,7 @@ class AppRouter {
     // Listen for custom store updates
     window.addEventListener('pharmacy:items-updated', () => {
       this.updateBadges();
-      if (this.currentView === 'inventory' || this.currentView === 'pos' || this.currentView === 'dashboard') {
+      if (this.currentView === 'inventory' || this.currentView === 'transactions' || this.currentView === 'dashboard') {
         this.renderCurrent();
       }
     });
@@ -30,12 +30,8 @@ class AppRouter {
       }
     });
 
-    // Keyboard shortcuts: F2 for Quick POS, Esc for modals
+    // Keyboard shortcuts: Esc for modals
     window.addEventListener('keydown', (e) => {
-      if (e.key === 'F2') {
-        e.preventDefault();
-        this.navigate('pos');
-      }
       if (e.key === 'Escape') {
         const modals = document.querySelectorAll('.modal-overlay.active');
         modals.forEach(m => m.classList.remove('active'));
@@ -59,9 +55,8 @@ class AppRouter {
     const titles = {
       home: 'Home',
       dashboard: 'Dashboard',
-      pos: 'Pharmacy POS Cashier Register',
       inventory: 'Medicine Inventory & Batches',
-      transactions: 'Transactions',
+      transactions: 'In - Out (Stock Movements & Logs)',
       reports: 'Reports & Analytics',
       staff: 'Pharmacy Staff',
       cashdrawer: 'Cash Drawer',
@@ -84,9 +79,6 @@ class AppRouter {
         break;
       case 'dashboard':
         renderDashboardView(this.contentEl);
-        break;
-      case 'pos':
-        renderPOSView(this.contentEl);
         break;
       case 'inventory':
         renderInventoryView(this.contentEl);
@@ -126,7 +118,44 @@ class AppRouter {
   }
 }
 
-document.addEventListener('DOMContentLoaded', () => {
-  window.appRouter = new AppRouter();
+// Global helper to update top navigation bar user profile dynamically
+window.updateUserProfileUI = function () {
+  const session = window.authStore ? window.authStore.getSession() : null;
+  const avatarEl = document.querySelector('.user-avatar span');
+  const nameEl = document.querySelector('.user-name');
+  const roleEl = document.querySelector('.user-role');
+
+  if (session) {
+    if (avatarEl) avatarEl.textContent = session.initials || session.firstName.slice(0, 2).toUpperCase();
+    if (nameEl) nameEl.textContent = session.fullName;
+    if (roleEl) roleEl.textContent = session.role;
+  } else {
+    if (avatarEl) avatarEl.textContent = '??';
+    if (nameEl) nameEl.textContent = 'Guest';
+    if (roleEl) roleEl.textContent = 'Not Logged In';
+  }
+};
+
+window.bootApp = function () {
+  window.updateUserProfileUI();
+  if (!window.appRouter) {
+    window.appRouter = new AppRouter();
+  }
   window.appRouter.init();
+};
+
+document.addEventListener('DOMContentLoaded', () => {
+  // Listen for auth session updates
+  window.addEventListener('pharmacy:auth-changed', () => {
+    window.updateUserProfileUI();
+  });
+
+  // Check if user is authenticated
+  if (window.authStore && !window.authStore.isLoggedIn()) {
+    renderLoginPage();
+  } else {
+    const overlay = document.getElementById('login-overlay');
+    if (overlay) overlay.style.display = 'none';
+    window.bootApp();
+  }
 });

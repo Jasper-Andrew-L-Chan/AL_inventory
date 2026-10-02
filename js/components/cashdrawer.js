@@ -5,6 +5,8 @@
 
 function renderCashDrawerView(container) {
   const drawer = window.pharmacyStore.getDrawer();
+  const session = window.authStore ? window.authStore.getSession() : null;
+  const currentOperator = session ? session.fullName : drawer.openedBy;
   const txns = window.pharmacyStore.getTransactions().filter(t => t.paymentMethod === 'Cash' && t.status !== 'Refunded');
   const cashSales = txns.reduce((sum, t) => sum + Number(t.netTotal), 0);
   const currentExpected = Number(drawer.openingFloat) + cashSales;
@@ -13,7 +15,7 @@ function renderCashDrawerView(container) {
     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
       <div>
         <h2 style="font-size: 1.35rem; font-weight: 700; color: #0d9488;">Cash Drawer & Shift Reconciliation</h2>
-        <div style="font-size: 0.8rem; color: var(--text-muted);">Current Shift: ${drawer.shiftDate} (Opened ${drawer.openedAt} by ${drawer.openedBy})</div>
+        <div style="font-size: 0.8rem; color: var(--text-muted);">Current Shift: ${drawer.shiftDate} (Operator: <strong style="color: var(--text-main);">${currentOperator}</strong>)</div>
       </div>
       <button onclick="handleZReading()" class="btn-primary" style="background: #e11d48;">
         🧾 Print End-of-Day Z-Reading

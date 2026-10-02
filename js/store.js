@@ -11,315 +11,9 @@ const STORAGE_KEYS = {
   DRAWER: 'al_pharmacy_drawer'
 };
 
-const INITIAL_MEDICINES = [
-  {
-    id: 'med-001',
-    brandName: 'Biogesic',
-    genericName: 'Paracetamol',
-    dosage: '500mg Tablet',
-    category: 'Analgesic & Antipyretic',
-    isRx: false,
-    unit: 'pcs',
-    costPrice: 4.20,
-    sellingPrice: 7.50,
-    beginningStock: 600,
-    addedStock: 100,
-    deductedStock: 45,
-    currentStock: 655,
-    reorderLevel: 100,
-    batchLot: 'LOT-PAR-26A',
-    expiryDate: '2027-08-31',
-    barcode: '4800016644211',
-    supplier: 'Unilab Pharma'
-  },
-  {
-    id: 'med-002',
-    brandName: 'Amoxil',
-    genericName: 'Amoxicillin',
-    dosage: '500mg Capsule',
-    category: 'Antibiotics',
-    isRx: true,
-    unit: 'capsule',
-    costPrice: 8.50,
-    sellingPrice: 15.00,
-    beginningStock: 350,
-    addedStock: 0,
-    deductedStock: 30,
-    currentStock: 320,
-    reorderLevel: 50,
-    batchLot: 'LOT-AMX-25F',
-    expiryDate: '2026-11-20', // Expiring soon!
-    barcode: '4800018899120',
-    supplier: 'GSK Philippines'
-  },
-  {
-    id: 'med-003',
-    brandName: 'Neozep Forte',
-    genericName: 'Phenylephrine HCl + Chlorphenamine Maleate + Paracetamol',
-    dosage: 'Tablet',
-    category: 'Cough & Cold',
-    isRx: false,
-    unit: 'pcs',
-    costPrice: 5.80,
-    sellingPrice: 10.00,
-    beginningStock: 400,
-    addedStock: 50,
-    deductedStock: 60,
-    currentStock: 390,
-    reorderLevel: 80,
-    batchLot: 'LOT-NZP-26C',
-    expiryDate: '2027-05-15',
-    barcode: '4800021133045',
-    supplier: 'Unilab Pharma'
-  },
-  {
-    id: 'med-004',
-    brandName: 'Ponstan',
-    genericName: 'Mefenamic Acid',
-    dosage: '500mg Capsule',
-    category: 'Analgesic & Antipyretic',
-    isRx: true,
-    unit: 'capsule',
-    costPrice: 16.00,
-    sellingPrice: 28.00,
-    beginningStock: 180,
-    addedStock: 0,
-    deductedStock: 15,
-    currentStock: 165,
-    reorderLevel: 40,
-    batchLot: 'LOT-PST-26B',
-    expiryDate: '2027-01-10',
-    barcode: '4800034455112',
-    supplier: 'Pfizer Philippines'
-  },
-  {
-    id: 'med-005',
-    brandName: 'Norvasc',
-    genericName: 'Amlodipine Besilate',
-    dosage: '5mg Tablet',
-    category: 'Cardiovascular',
-    isRx: true,
-    unit: 'pcs',
-    costPrice: 22.00,
-    sellingPrice: 38.50,
-    beginningStock: 250,
-    addedStock: 50,
-    deductedStock: 25,
-    currentStock: 275,
-    reorderLevel: 60,
-    batchLot: 'LOT-AML-26K',
-    expiryDate: '2027-10-31',
-    barcode: '4800045566778',
-    supplier: 'Viatris'
-  },
-  {
-    id: 'med-006',
-    brandName: 'Glucophage',
-    genericName: 'Metformin HCl',
-    dosage: '500mg Tablet',
-    category: 'Antidiabetic',
-    isRx: true,
-    unit: 'pcs',
-    costPrice: 9.00,
-    sellingPrice: 16.00,
-    beginningStock: 300,
-    addedStock: 0,
-    deductedStock: 40,
-    currentStock: 260,
-    reorderLevel: 50,
-    batchLot: 'LOT-MET-25L',
-    expiryDate: '2026-12-15', // Expiring in 2 months
-    barcode: '4800056677889',
-    supplier: 'Merck Healthcare'
-  },
-  {
-    id: 'med-007',
-    brandName: 'Enervon C',
-    genericName: 'Multivitamins + Vitamin C',
-    dosage: 'Tablet',
-    category: 'Vitamins & Supplements',
-    isRx: false,
-    unit: 'tablet',
-    costPrice: 6.20,
-    sellingPrice: 9.50,
-    beginningStock: 800,
-    addedStock: 200,
-    deductedStock: 95,
-    currentStock: 905,
-    reorderLevel: 150,
-    batchLot: 'LOT-ENV-26G',
-    expiryDate: '2028-02-28',
-    barcode: '4800067788990',
-    supplier: 'United Laboratories'
-  },
-  {
-    id: 'med-008',
-    brandName: 'Betadine 10%',
-    genericName: 'Povidone-Iodine Antiseptic Solution',
-    dosage: '60ml Bottle',
-    category: 'First Aid & Antiseptics',
-    isRx: false,
-    unit: 'bottle',
-    costPrice: 115.00,
-    sellingPrice: 165.00,
-    beginningStock: 25,
-    addedStock: 10,
-    deductedStock: 3,
-    currentStock: 32,
-    reorderLevel: 10,
-    batchLot: 'LOT-BET-26D',
-    expiryDate: '2027-11-12',
-    barcode: '4800078899001',
-    supplier: 'Mundipharma'
-  },
-  {
-    id: 'med-009',
-    brandName: 'Ventolin Inhaler',
-    genericName: 'Salbutamol Sulfate',
-    dosage: '100mcg/dose CFC-Free',
-    category: 'Respiratory',
-    isRx: true,
-    unit: 'box',
-    costPrice: 310.00,
-    sellingPrice: 420.00,
-    beginningStock: 15,
-    addedStock: 0,
-    deductedStock: 2,
-    currentStock: 13,
-    reorderLevel: 5,
-    batchLot: 'LOT-VNT-26H',
-    expiryDate: '2027-04-18',
-    barcode: '4800089900112',
-    supplier: 'GSK Philippines'
-  },
-  {
-    id: 'med-010',
-    brandName: 'Ascorbic Acid (Generic)',
-    genericName: 'Ascorbic Acid (Vitamin C)',
-    dosage: '500mg Tablet',
-    category: 'Vitamins & Supplements',
-    isRx: false,
-    unit: 'pcs',
-    costPrice: 1.80,
-    sellingPrice: 4.00,
-    beginningStock: 1500,
-    addedStock: 500,
-    deductedStock: 180,
-    currentStock: 1820,
-    reorderLevel: 250,
-    batchLot: 'LOT-ASC-26M',
-    expiryDate: '2027-09-30',
-    barcode: '4800091122334',
-    supplier: 'RiteMed'
-  }
-];
+const INITIAL_MEDICINES = [];
 
-const INITIAL_TRANSACTIONS = [
-  {
-    id: 'txn-2759',
-    receiptNo: 'OR-2759',
-    date: '2026-10-01',
-    time: '2:22 PM',
-    cashier: 'Lionel (Pharmacist)',
-    customerType: 'Senior Citizen',
-    customerId: 'SC-PASIG-2019-4402',
-    doctorRx: 'DR. SANTOS - LIC# 009124',
-    paymentMethod: 'Grab',
-    items: [
-      { id: 'med-001', name: 'Biogesic 500mg Tablet', qty: 20, price: 7.50, isRx: false },
-      { id: 'med-002', name: 'Amoxil 500mg Capsule (Rx)', qty: 21, price: 15.00, isRx: true },
-      { id: 'med-007', name: 'Enervon C Tablet', qty: 10, price: 9.50, isRx: false }
-    ],
-    subtotal: 560.00,
-    discountAmount: 30.00,
-    netTotal: 530.00,
-    status: 'Completed'
-  },
-  {
-    id: 'txn-2758',
-    receiptNo: 'OR-2758',
-    date: '2026-10-01',
-    time: '2:09 PM',
-    cashier: 'Lionel (Pharmacist)',
-    customerType: 'Regular',
-    paymentMethod: 'Cash',
-    items: [
-      { id: 'med-003', name: 'Neozep Forte Tablet', qty: 6, price: 10.00, isRx: false },
-      { id: 'med-001', name: 'Biogesic 500mg Tablet', qty: 6, price: 7.50, isRx: false }
-    ],
-    subtotal: 105.00,
-    discountAmount: 0.00,
-    netTotal: 105.00,
-    status: 'Completed'
-  },
-  {
-    id: 'txn-2757',
-    receiptNo: 'OR-2757',
-    date: '2026-10-01',
-    time: '1:52 PM',
-    cashier: 'Lionel (Pharmacist)',
-    customerType: 'Regular',
-    paymentMethod: 'Cash',
-    items: [
-      { id: 'med-001', name: 'Biogesic 500mg Tablet', qty: 10, price: 7.50, isRx: false }
-    ],
-    subtotal: 75.00,
-    discountAmount: 0.00,
-    netTotal: 75.00,
-    status: 'Completed'
-  },
-  {
-    id: 'txn-2756',
-    receiptNo: 'OR-2756',
-    date: '2026-10-01',
-    time: '1:36 PM',
-    cashier: 'Lionel (Pharmacist)',
-    customerType: 'PWD',
-    customerId: 'PWD-2023-88219',
-    paymentMethod: 'Maya',
-    items: [
-      { id: 'med-005', name: 'Norvasc 5mg Tablet (Rx)', qty: 6, price: 38.50, isRx: true }
-    ],
-    subtotal: 231.00,
-    discountAmount: 11.00,
-    netTotal: 220.00,
-    status: 'Completed'
-  },
-  {
-    id: 'txn-2755',
-    receiptNo: 'OR-2755',
-    date: '2026-10-01',
-    time: '12:45 PM',
-    cashier: 'Sarah (Pharmacy Asst)',
-    customerType: 'Regular',
-    paymentMethod: 'GCash',
-    items: [
-      { id: 'med-008', name: 'Betadine 10% 60ml Bottle', qty: 1, price: 165.00, isRx: false },
-      { id: 'med-010', name: 'Ascorbic Acid (Generic) 500mg', qty: 30, price: 4.00, isRx: false }
-    ],
-    subtotal: 285.00,
-    discountAmount: 0.00,
-    netTotal: 285.00,
-    status: 'Completed'
-  },
-  {
-    id: 'txn-2754',
-    receiptNo: 'OR-2754',
-    date: '2026-10-01',
-    time: '11:15 AM',
-    cashier: 'Sarah (Pharmacy Asst)',
-    customerType: 'Senior Citizen',
-    customerId: 'SC-PASIG-2015-1109',
-    paymentMethod: 'Cash',
-    items: [
-      { id: 'med-009', name: 'Ventolin Inhaler 100mcg', qty: 1, price: 420.00, isRx: true }
-    ],
-    subtotal: 420.00,
-    discountAmount: 84.00,
-    netTotal: 336.00,
-    status: 'Completed'
-  }
-];
+const INITIAL_TRANSACTIONS = [];
 
 const INITIAL_SETTINGS = {
   pharmacyName: 'AffordaLabs Pharmacy',
@@ -362,11 +56,22 @@ class PharmacyStore {
   }
 
   init() {
-    if (!localStorage.getItem(STORAGE_KEYS.ITEMS)) {
-      localStorage.setItem(STORAGE_KEYS.ITEMS, JSON.stringify(INITIAL_MEDICINES));
+    // If first time with cleared items or user wants fresh clean inventory
+    const existingClean = localStorage.getItem('al_pharmacy_items_cleared_v2');
+    if (!existingClean) {
+      localStorage.setItem(STORAGE_KEYS.ITEMS, JSON.stringify([]));
+      localStorage.setItem('al_pharmacy_items_cleared_v2', 'true');
+    } else if (!localStorage.getItem(STORAGE_KEYS.ITEMS)) {
+      localStorage.setItem(STORAGE_KEYS.ITEMS, JSON.stringify([]));
     }
-    if (!localStorage.getItem(STORAGE_KEYS.TRANSACTIONS)) {
-      localStorage.setItem(STORAGE_KEYS.TRANSACTIONS, JSON.stringify(INITIAL_TRANSACTIONS));
+
+    // Clear transactions as requested
+    const existingTxnsClean = localStorage.getItem('al_pharmacy_txns_cleared_v1');
+    if (!existingTxnsClean) {
+      localStorage.setItem(STORAGE_KEYS.TRANSACTIONS, JSON.stringify([]));
+      localStorage.setItem('al_pharmacy_txns_cleared_v1', 'true');
+    } else if (!localStorage.getItem(STORAGE_KEYS.TRANSACTIONS)) {
+      localStorage.setItem(STORAGE_KEYS.TRANSACTIONS, JSON.stringify([]));
     }
     if (!localStorage.getItem(STORAGE_KEYS.SETTINGS)) {
       localStorage.setItem(STORAGE_KEYS.SETTINGS, JSON.stringify(INITIAL_SETTINGS));
@@ -381,7 +86,11 @@ class PharmacyStore {
 
   // --- Medicine Item Methods ---
   getItems() {
-    return JSON.parse(localStorage.getItem(STORAGE_KEYS.ITEMS)) || [];
+    const items = JSON.parse(localStorage.getItem(STORAGE_KEYS.ITEMS)) || [];
+    return items.map(item => {
+      const name = this.formatItemName(item);
+      return { ...item, name };
+    });
   }
 
   getItemById(id) {
@@ -393,14 +102,39 @@ class PharmacyStore {
     window.dispatchEvent(new CustomEvent('pharmacy:items-updated'));
   }
 
+  // Helper to compute a standardized medicine display name (e.g. Biogesic, Lazartan)
+  formatItemName(item) {
+    if (!item) return 'Unnamed Medicine';
+    const brand = (item.brandName || '').trim();
+    const generic = (item.genericName || '').trim();
+    const dosage = (item.dosage && item.dosage !== 'Standard') ? item.dosage.trim() : '';
+
+    if (brand && generic) {
+      const detail = dosage ? `${generic} ${dosage}` : generic;
+      return `${brand} (${detail})`;
+    }
+    if (brand) {
+      return dosage ? `${brand} ${dosage}` : brand;
+    }
+    if (generic) {
+      return dosage ? `${generic} ${dosage}` : generic;
+    }
+    if (item.name && item.name.trim()) {
+      return item.name.trim();
+    }
+    return 'Unnamed Medicine';
+  }
+
   addItem(item) {
     const items = this.getItems();
+    const formattedName = this.formatItemName(item);
     const newItem = {
-      id: 'med-' + Date.now().toString(36),
-      beginningStock: Number(item.qty || 0),
+      id: 'med-' + Date.now().toString(36) + Math.random().toString(36).substring(2, 6),
+      name: formattedName,
+      beginningStock: Number(item.qty !== undefined ? item.qty : item.currentStock || 0),
       addedStock: 0,
       deductedStock: 0,
-      currentStock: Number(item.qty || 0),
+      currentStock: Number(item.qty !== undefined ? item.qty : item.currentStock || 0),
       reorderLevel: Number(item.reorderLevel || 20),
       batchLot: item.batchLot || 'LOT-' + new Date().getFullYear() + '-01',
       expiryDate: item.expiryDate || '2027-12-31',
@@ -408,7 +142,8 @@ class PharmacyStore {
       costPrice: Number(item.costPrice || 0),
       sellingPrice: Number(item.sellingPrice || 0),
       supplier: item.supplier || 'General Distributor',
-      ...item
+      ...item,
+      name: formattedName
     };
     items.unshift(newItem);
     this.saveItems(items);
@@ -419,11 +154,35 @@ class PharmacyStore {
     const items = this.getItems();
     const idx = items.findIndex(i => i.id === id);
     if (idx !== -1) {
-      items[idx] = { ...items[idx], ...updates };
+      const merged = { ...items[idx], ...updates };
+      merged.name = this.formatItemName(merged);
+      items[idx] = merged;
       this.saveItems(items);
       return items[idx];
     }
     return null;
+  }
+
+  deleteItem(id) {
+    const items = this.getItems();
+    const filtered = items.filter(i => i.id !== id);
+    if (filtered.length !== items.length) {
+      this.saveItems(filtered);
+      return true;
+    }
+    return false;
+  }
+
+  deleteItems(ids) {
+    const idSet = new Set(ids);
+    const items = this.getItems();
+    const filtered = items.filter(i => !idSet.has(i.id));
+    this.saveItems(filtered);
+    return items.length - filtered.length;
+  }
+
+  clearAllItems() {
+    this.saveItems([]);
   }
 
   adjustStock(id, changeAmount, reason = 'Adjustment') {
@@ -460,13 +219,15 @@ class PharmacyStore {
     
     const newTxn = {
       id: 'txn-' + Date.now(),
-      receiptNo: 'OR-' + receiptNum,
-      date: now.toISOString().split('T')[0],
-      time: now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-      cashier: txnData.cashier || 'Lionel (Pharmacist)',
+      receiptNo: txnData.receiptNo || 'IO-' + receiptNum,
+      customerName: txnData.customerName || 'Walk-in Customer',
+      budget: Number(txnData.budget || 0),
+      barangay: txnData.barangay || '',
+      date: txnData.date || now.toISOString().split('T')[0],
+      time: txnData.time || now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      cashier: txnData.cashier || (window.authStore && window.authStore.getSession() ? window.authStore.getSession().fullName : 'Staff'),
       customerType: txnData.customerType || 'Regular',
       customerId: txnData.customerId || '',
-      doctorRx: txnData.doctorRx || '',
       paymentMethod: txnData.paymentMethod || 'Cash',
       items: txnData.items || [],
       subtotal: Number(txnData.subtotal || 0),
@@ -478,23 +239,60 @@ class PharmacyStore {
     txns.unshift(newTxn);
     this.saveTransactions(txns);
 
-    // Deduct stock for each sold medicine
-    txnData.items.forEach(cartItem => {
-      this.adjustStock(cartItem.id, -cartItem.qty, 'POS Sale ' + newTxn.receiptNo);
+    // Deduct stock for each supplied medicine based on actual inventory item used
+    newTxn.items.forEach(item => {
+      const targetInvId = item.actualInventoryId || item.id;
+      if (targetInvId) {
+        this.adjustStock(targetInvId, -Math.abs(Number(item.qty || 0)), 'In-Out Issue ' + newTxn.receiptNo);
+      }
     });
-
-    // Update Cash Drawer if paid in Cash
-    if (newTxn.paymentMethod === 'Cash') {
-      const drawer = this.getDrawer();
-      drawer.currentCashInDrawer += newTxn.netTotal;
-      drawer.expectedCash += newTxn.netTotal;
-      this.saveDrawer(drawer);
-    }
 
     return newTxn;
   }
 
-  refundTransaction(txnId, reason = 'Customer Returned Unopened') {
+  updateTransaction(txnId, updatedData) {
+    const txns = this.getTransactions();
+    const txnIndex = txns.findIndex(t => t.id === txnId);
+    if (txnIndex === -1) return null;
+
+    const oldTxn = txns[txnIndex];
+
+    // 1. Restock the previously supplied medicines back to inventory (if not already refunded)
+    if (oldTxn.status !== 'Refunded' && Array.isArray(oldTxn.items)) {
+      oldTxn.items.forEach(item => {
+        const oldTargetId = item.actualInventoryId || item.id;
+        if (oldTargetId) {
+          this.adjustStock(oldTargetId, Math.abs(Number(item.qty || 0)), 'Restock before edit ' + oldTxn.receiptNo);
+        }
+      });
+    }
+
+    // 2. Prepare merged transaction data
+    const updatedTxn = {
+      ...oldTxn,
+      ...updatedData,
+      id: oldTxn.id,
+      receiptNo: updatedData.receiptNo !== undefined ? updatedData.receiptNo : oldTxn.receiptNo,
+      status: 'Completed',
+      editedAt: new Date().toISOString()
+    };
+
+    // 3. Deduct stock for the new/updated medicines
+    if (Array.isArray(updatedTxn.items)) {
+      updatedTxn.items.forEach(item => {
+        const newTargetId = item.actualInventoryId || item.id;
+        if (newTargetId) {
+          this.adjustStock(newTargetId, -Math.abs(Number(item.qty || 0)), 'Deduct edited ' + updatedTxn.receiptNo);
+        }
+      });
+    }
+
+    txns[txnIndex] = updatedTxn;
+    this.saveTransactions(txns);
+    return updatedTxn;
+  }
+
+  refundTransaction(txnId, reason = 'Void / Return') {
     const txns = this.getTransactions();
     const txn = txns.find(t => t.id === txnId);
     if (txn && txn.status !== 'Refunded') {
@@ -503,9 +301,12 @@ class PharmacyStore {
       txn.refundDate = new Date().toISOString();
       this.saveTransactions(txns);
 
-      // Return medicines to inventory
+      // Return actual medicines to inventory
       txn.items.forEach(item => {
-        this.adjustStock(item.id, item.qty, 'Refund Restock ' + txn.receiptNo);
+        const targetInvId = item.actualInventoryId || item.id;
+        if (targetInvId) {
+          this.adjustStock(targetInvId, Math.abs(Number(item.qty || 0)), 'Restock ' + txn.receiptNo);
+        }
       });
 
       return txn;

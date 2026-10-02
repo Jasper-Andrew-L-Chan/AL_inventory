@@ -1,11 +1,18 @@
 /**
  * Inventory View Component
  * Matches Image 2 layout with Philippine Pharmacy specific fields:
- * Generic Names, Batch/Lot Numbers, Expiration Dates, Rx Classification, and Stock Movements
+ * Generic Names, Batch/Lot Numbers, Expiration Dates, Rx Classification, and Stock Movements.
+ * Features:
+ * - Quick selection via Shift + Click (or Checkbox) with visual row highlight
+ * - Edit and Delete buttons on each row
+ * - Confirmation modal/prompt before permanent deletion
+ * - Bulk actions (Delete Selected, Edit Selected)
  */
 
 let inventorySearchQuery = '';
 let inventoryCurrentTab = 'inventory';
+let selectedInventoryItemIds = new Set();
+let lastClickedItemId = null;
 
 function renderInventoryView(container) {
   const items = window.pharmacyStore.getItems();
@@ -21,9 +28,11 @@ function renderInventoryView(container) {
   });
 
   const totalStockCount = items.reduce((acc, curr) => acc + (Number(curr.currentStock) || 0), 0);
+  const selectedCount = selectedInventoryItemIds.size;
+  const allFilteredSelected = filteredItems.length > 0 && filteredItems.every(i => selectedInventoryItemIds.has(i.id));
 
   container.innerHTML = `
-    <!-- Top Subtabs Bar (Ref Image 2) -->
+    <!-- Top Subtabs Bar -->
     <div class="subtabs-bar">
       <button class="subtab-btn ${inventoryCurrentTab === 'inventory' ? 'active' : ''}" onclick="switchInventoryTab('inventory')">
         INVENTORY
@@ -36,7 +45,7 @@ function renderInventoryView(container) {
       </button>
     </div>
 
-    <!-- Top Action Buttons (Ref Image 2) -->
+    <!-- Top Action Buttons -->
     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.25rem; flex-wrap: wrap; gap: 0.75rem;">
       <div style="display: flex; gap: 0.75rem;">
         <button onclick="document.getElementById('csvFileInput').click()" class="btn-primary" style="background: var(--brand-charcoal); display: flex; align-items: center; gap: 0.5rem; box-shadow: none;">
@@ -56,7 +65,7 @@ function renderInventoryView(container) {
       </div>
     </div>
 
-    <!-- Quick Add Medicine Bar (CREATE INGREDIENT style) -->
+    <!-- Quick Add Medicine Bar -->
     <div class="quick-add-bar">
       <div class="quick-add-title">CREATE MEDICINE / PRODUCT QUICK ENTRY</div>
       <form id="quickAddForm" onsubmit="handleQuickAdd(event)" class="quick-add-fields">
@@ -71,7 +80,30 @@ function renderInventoryView(container) {
       </form>
     </div>
 
-    <!-- Search Toolbar with Date filters and Stock Pill (Ref Image 2) -->
+    <!-- Selection Helper Banner (Shows when 1 or more items are selected) -->
+    ${selectedCount > 0 ? `
+      <div class="selected-count-banner">
+        <div style="display: flex; align-items: center; gap: 0.75rem;">
+          <span>✓ <strong>${selectedCount}</strong> item${selectedCount > 1 ? 's' : ''} selected</span>
+          <span style="font-size: 0.75rem; color: var(--text-muted); font-weight: normal;">(Tip: You can use <strong>Shift + Click</strong> on any row to select)</span>
+        </div>
+        <div style="display: flex; align-items: center; gap: 0.5rem;">
+          ${selectedCount === 1 ? `
+            <button onclick="editFirstSelected()" class="btn-action-edit">
+              ✏️ Edit Selected
+            </button>
+          ` : ''}
+          <button onclick="deleteSelectedItems()" class="btn-action-delete">
+            🗑️ Delete Selected (${selectedCount})
+          </button>
+          <button onclick="clearItemSelection()" class="btn-outline" style="padding: 2px 8px; font-size: 0.75rem;">
+            Deselect All
+          </button>
+        </div>
+      </div>
+    ` : ''}
+
+    <!-- Search Toolbar with Date filters and Stock Pill -->
     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem; flex-wrap: wrap; gap: 0.75rem;">
       <div style="display: flex; align-items: center; gap: 1rem;">
         <input 
@@ -82,15 +114,18 @@ function renderInventoryView(container) {
           class="form-input" 
           style="width: 300px; padding: 0.5rem 0.85rem;"
         />
+        <div style="font-size: 0.76rem; color: var(--text-muted); display: flex; align-items: center; gap: 4px;">
+          <kbd style="background: #e2e8f0; border-radius: 4px; padding: 2px 5px; font-size: 0.7rem; font-family: monospace;">Shift + Click</kbd>
+          <span>on any row to select</span>
+        </div>
       </div>
 
       <div style="display: flex; align-items: center; gap: 1.2rem;">
-        <!-- Date quick selectors from Image 2 -->
         <span style="font-size: 0.82rem; color: var(--text-muted); cursor: pointer;">29th Sep</span>
         <span style="font-size: 0.82rem; color: var(--text-muted); cursor: pointer;">Yesterday</span>
         <span style="font-size: 0.85rem; color: var(--primary); font-weight: 700; border-bottom: 2px solid var(--primary); padding-bottom: 2px; cursor: pointer;">Today</span>
 
-        <!-- Coral Pill Badge showing total ingredients/medicines count (Ref Image 2) -->
+        <!-- Total medicines count -->
         <div style="background: #e07a5f; color: white; padding: 0.4rem 1rem; border-radius: var(--radius-sm); font-size: 0.82rem; font-weight: 700; display: flex; align-items: center; gap: 0.4rem;">
           <span>📦</span>
           <span>${items.length} Medicines (${totalStockCount} units)</span>
@@ -100,10 +135,12 @@ function renderInventoryView(container) {
 
     <!-- Inventory Data Table matching Image 2 columns -->
     <div class="table-container">
-      <table class="data-table">
+      <table class="data-table" id="inventoryTable">
         <thead>
           <tr>
-            <th style="width: 35px;"><input type="checkbox" /></th>
+            <th style="width: 35px; text-align: center;">
+              <input type="checkbox" onchange="toggleSelectAllItems(this.checked)" ${allFilteredSelected ? 'checked' : ''} title="Select/Deselect All" />
+            </th>
             <th>Medicine Details & Generic Name</th>
             <th>Category / Rx</th>
             <th>Batch / Expiry</th>
@@ -112,15 +149,24 @@ function renderInventoryView(container) {
             <th style="text-align: right;">Deducted</th>
             <th style="text-align: right; color: var(--primary); font-weight: 700;">Current Stock</th>
             <th style="text-align: right;">Unit Price</th>
-            <th style="text-align: center; width: 150px;">Fast Adjust</th>
-            <th style="text-align: center;">Actions</th>
+            <th style="text-align: center; width: 140px;">Fast Adjust</th>
+            <th style="text-align: center; width: 160px;">Actions</th>
           </tr>
         </thead>
         <tbody>
           ${filteredItems.length === 0 ? `
             <tr>
-              <td colspan="11" style="text-align: center; padding: 2rem; color: var(--text-muted);">
-                No medicines found matching "${inventorySearchQuery}".
+              <td colspan="11" style="text-align: center; padding: 3rem 1rem; color: var(--text-muted);">
+                <div style="font-size: 2.2rem; margin-bottom: 0.5rem;">📦</div>
+                <div style="font-weight: 700; font-size: 1.05rem; color: var(--text-main); margin-bottom: 0.25rem;">
+                  ${inventorySearchQuery ? `No medicines matching "${inventorySearchQuery}"` : 'No medicines in inventory'}
+                </div>
+                <div style="font-size: 0.84rem; max-width: 420px; margin: 0 auto 1.25rem auto;">
+                  Your inventory is currently empty. Use the quick entry bar above or click the button below to add your first medicine batch.
+                </div>
+                <button onclick="openAddMedicineModal()" class="btn-primary" style="background: var(--primary);">
+                  + Add First Medicine
+                </button>
               </td>
             </tr>
           ` : filteredItems.map(item => {
@@ -129,10 +175,23 @@ function renderInventoryView(container) {
             const now = new Date();
             const daysToExpiry = Math.ceil((expDate - now) / (1000 * 60 * 60 * 24));
             const isExpiringSoon = daysToExpiry <= 90;
+            const isSelected = selectedInventoryItemIds.has(item.id);
 
             return `
-              <tr>
-                <td><input type="checkbox" /></td>
+              <tr 
+                id="inv-row-${item.id}"
+                class="${isSelected ? 'selected' : ''}" 
+                onclick="handleRowClick(event, '${item.id}')"
+                style="cursor: pointer; user-select: none;"
+                title="Shift + Click to select for Edit / Delete"
+              >
+                <td style="text-align: center;" onclick="event.stopPropagation()">
+                  <input 
+                    type="checkbox" 
+                    ${isSelected ? 'checked' : ''} 
+                    onchange="toggleItemSelection('${item.id}', this.checked)" 
+                  />
+                </td>
                 <td>
                   <div style="font-weight: 700; color: var(--text-main); font-size: 0.9rem;">
                     ${item.brandName} <span style="font-weight: normal; color: var(--text-muted);">[${item.unit}]</span>
@@ -161,35 +220,47 @@ function renderInventoryView(container) {
                   ${isLow ? '<span style="display: block; font-size: 0.68rem; color: #dc2626; font-weight: 600;">REORDER</span>' : ''}
                 </td>
                 <td style="text-align: right; font-weight: 600;">₱${Number(item.sellingPrice).toFixed(2)}</td>
-                <td style="text-align: center;">
-                  <!-- Image 2 fast inline adjustment input + green circle button -->
+                <td style="text-align: center;" onclick="event.stopPropagation()">
                   <div style="display: flex; align-items: center; justify-content: center; gap: 4px;">
                     <input 
                       type="number" 
                       id="adj-input-${item.id}" 
                       placeholder="Qty" 
-                      style="width: 55px; padding: 3px 6px; font-size: 0.8rem; border: 1px solid var(--border-color); border-radius: 4px; text-align: center;" 
+                      style="width: 50px; padding: 3px 5px; font-size: 0.8rem; border: 1px solid var(--border-color); border-radius: 4px; text-align: center;" 
                     />
                     <button 
                       onclick="fastAdjustStock('${item.id}', 1)" 
                       title="Add to Stock"
-                      style="width: 26px; height: 26px; border-radius: 50%; background: #10b981; color: white; border: none; font-size: 0.9rem; font-weight: 700; cursor: pointer; display: flex; align-items: center; justify-content: center;"
+                      style="width: 24px; height: 24px; border-radius: 50%; background: #10b981; color: white; border: none; font-size: 0.85rem; font-weight: 700; cursor: pointer; display: flex; align-items: center; justify-content: center;"
                     >
                       +
                     </button>
                     <button 
                       onclick="fastAdjustStock('${item.id}', -1)" 
                       title="Deduct Stock"
-                      style="width: 26px; height: 26px; border-radius: 50%; background: #ef4444; color: white; border: none; font-size: 0.9rem; font-weight: 700; cursor: pointer; display: flex; align-items: center; justify-content: center;"
+                      style="width: 24px; height: 24px; border-radius: 50%; background: #ef4444; color: white; border: none; font-size: 0.85rem; font-weight: 700; cursor: pointer; display: flex; align-items: center; justify-content: center;"
                     >
                       -
                     </button>
                   </div>
                 </td>
-                <td style="text-align: center;">
-                  <button onclick="openEditMedicineModal('${item.id}')" style="background: none; border: none; cursor: pointer; color: var(--primary); font-size: 0.82rem; font-weight: 600;">
-                    Edit
-                  </button>
+                <td style="text-align: center;" onclick="event.stopPropagation()">
+                  <div class="action-btn-group">
+                    <button 
+                      onclick="openEditMedicineModal('${item.id}')" 
+                      class="btn-action-edit"
+                      title="Edit this medicine"
+                    >
+                      ✏️ Edit
+                    </button>
+                    <button 
+                      onclick="confirmDeleteItem('${item.id}')" 
+                      class="btn-action-delete"
+                      title="Delete this medicine permanently"
+                    >
+                      🗑️ Delete
+                    </button>
+                  </div>
                 </td>
               </tr>
             `;
@@ -232,6 +303,7 @@ function renderInventoryView(container) {
                 <option value="First Aid & Antiseptics">First Aid & Antiseptics</option>
                 <option value="Respiratory">Respiratory</option>
                 <option value="Medical Supplies">Medical Supplies</option>
+                <option value="General Medicine">General Medicine</option>
               </select>
             </div>
             <div class="input-group">
@@ -280,7 +352,117 @@ function renderInventoryView(container) {
   `;
 }
 
-// Search and Tab Handlers
+// ── Quick Selection Shortcuts (Shift + Left Click) ───────────────────────────
+
+window.handleRowClick = function(event, itemId) {
+  // If user clicked with Shift key held down OR normal click on row
+  if (event.shiftKey) {
+    event.preventDefault();
+    const items = window.pharmacyStore.getItems();
+    
+    // Range selection if last clicked item exists
+    if (lastClickedItemId && lastClickedItemId !== itemId) {
+      const idx1 = items.findIndex(i => i.id === lastClickedItemId);
+      const idx2 = items.findIndex(i => i.id === itemId);
+      if (idx1 !== -1 && idx2 !== -1) {
+        const start = Math.min(idx1, idx2);
+        const end = Math.max(idx1, idx2);
+        for (let i = start; i <= end; i++) {
+          selectedInventoryItemIds.add(items[i].id);
+        }
+      }
+    } else {
+      if (selectedInventoryItemIds.has(itemId)) {
+        selectedInventoryItemIds.delete(itemId);
+      } else {
+        selectedInventoryItemIds.add(itemId);
+      }
+    }
+  } else {
+    // Normal single row selection toggle
+    if (selectedInventoryItemIds.has(itemId)) {
+      selectedInventoryItemIds.delete(itemId);
+    } else {
+      selectedInventoryItemIds.add(itemId);
+    }
+  }
+
+  lastClickedItemId = itemId;
+  renderInventoryView(document.getElementById('main-content'));
+};
+
+window.toggleItemSelection = function(itemId, isSelected) {
+  if (isSelected) {
+    selectedInventoryItemIds.add(itemId);
+  } else {
+    selectedInventoryItemIds.delete(itemId);
+  }
+  lastClickedItemId = itemId;
+  renderInventoryView(document.getElementById('main-content'));
+};
+
+window.toggleSelectAllItems = function(selectAll) {
+  const items = window.pharmacyStore.getItems();
+  if (selectAll) {
+    items.forEach(i => selectedInventoryItemIds.add(i.id));
+  } else {
+    selectedInventoryItemIds.clear();
+  }
+  renderInventoryView(document.getElementById('main-content'));
+};
+
+window.clearItemSelection = function() {
+  selectedInventoryItemIds.clear();
+  lastClickedItemId = null;
+  renderInventoryView(document.getElementById('main-content'));
+};
+
+window.editFirstSelected = function() {
+  const firstId = selectedInventoryItemIds.values().next().value;
+  if (firstId) {
+    openEditMedicineModal(firstId);
+  }
+};
+
+// ── Delete Confirmation & Execution ──────────────────────────────────────────
+
+window.confirmDeleteItem = function(itemId) {
+  const item = window.pharmacyStore.getItemById(itemId);
+  const name = item ? `${item.brandName} (${item.genericName})` : 'this item';
+
+  const confirmed = confirm(
+    `Are you sure you want to delete this item?\n\n` +
+    `• Product: ${name}\n` +
+    `• Batch: ${item ? item.batchLot : 'N/A'}\n\n` +
+    `This action cannot be undone and will permanently remove it from inventory.`
+  );
+
+  if (confirmed) {
+    window.pharmacyStore.deleteItem(itemId);
+    selectedInventoryItemIds.delete(itemId);
+    renderInventoryView(document.getElementById('main-content'));
+  }
+};
+
+window.deleteSelectedItems = function() {
+  const count = selectedInventoryItemIds.size;
+  if (count === 0) return;
+
+  const confirmed = confirm(
+    `Are you sure you want to delete these ${count} selected item(s)?\n\n` +
+    `This action will permanently delete all selected items from the database.`
+  );
+
+  if (confirmed) {
+    window.pharmacyStore.deleteItems(Array.from(selectedInventoryItemIds));
+    selectedInventoryItemIds.clear();
+    lastClickedItemId = null;
+    renderInventoryView(document.getElementById('main-content'));
+  }
+};
+
+// ── Search & Subtabs ─────────────────────────────────────────────────────────
+
 window.handleInventorySearch = function(query) {
   inventorySearchQuery = query;
   renderInventoryView(document.getElementById('main-content'));
@@ -291,7 +473,8 @@ window.switchInventoryTab = function(tab) {
   renderInventoryView(document.getElementById('main-content'));
 };
 
-// Fast inline stock adjustment (+ / -)
+// ── Fast Adjustments (+ / -) ────────────────────────────────────────────────
+
 window.fastAdjustStock = function(itemId, multiplier) {
   const input = document.getElementById(`adj-input-${itemId}`);
   const val = Number(input.value) || 1;
@@ -300,7 +483,8 @@ window.fastAdjustStock = function(itemId, multiplier) {
   renderInventoryView(document.getElementById('main-content'));
 };
 
-// Quick Add Form Handler
+// ── Quick Add Form Handler ──────────────────────────────────────────────────
+
 window.handleQuickAdd = function(e) {
   e.preventDefault();
   const brandName = document.getElementById('quickBrandName').value.trim();
@@ -323,10 +507,18 @@ window.handleQuickAdd = function(e) {
     expiryDate: '2028-12-31'
   });
 
+  // Clear inputs
+  document.getElementById('quickBrandName').value = '';
+  document.getElementById('quickGenericName').value = '';
+  document.getElementById('quickUnit').value = '';
+  document.getElementById('quickQty').value = '';
+  document.getElementById('quickPrice').value = '';
+
   renderInventoryView(document.getElementById('main-content'));
 };
 
-// Detailed Modal
+// ── Detailed Modal ──────────────────────────────────────────────────────────
+
 window.openAddMedicineModal = function() {
   document.getElementById('medModalTitle').textContent = 'Add New Medicine';
   document.getElementById('modalMedId').value = '';
@@ -391,7 +583,8 @@ window.handleSaveDetailedMedicine = function(e) {
   renderInventoryView(document.getElementById('main-content'));
 };
 
-// CSV Export & Import
+// ── CSV Export & Import ──────────────────────────────────────────────────────
+
 window.exportInventoryToCSV = function() {
   const items = window.pharmacyStore.getItems();
   const headers = ['ID,Brand Name,Generic Name,Dosage,Category,Rx,Unit,Cost Price,Selling Price,Stock,Batch Lot,Expiry Date'];

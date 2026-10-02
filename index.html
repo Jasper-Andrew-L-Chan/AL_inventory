@@ -1,82 +1,96 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>affordaLABS DIAGNOSTICS PLUS - Pharmacy POS & Inventory</title>
+  <title>affordaLABS DIAGNOSTICS PLUS </title>
   <link rel="icon" type="image/png" href="assets/affordalabs-logo-cropped.png" />
   <link rel="stylesheet" href="css/style.css" />
+  <link rel="stylesheet" href="css/login.css" />
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+  <link
+    href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@500;700&display=swap"
+    rel="stylesheet">
+  <!-- Lucide Icons - clean modern SVG icon set -->
+  <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
 </head>
+
 <body>
   <div class="app-container">
     <!-- Left Navigation Sidebar -->
     <aside class="sidebar">
       <div class="sidebar-header">
-        <a href="#home" onclick="window.appRouter.navigate('home')" class="brand-logo-wrapper" title="affordaLABS DIAGNOSTICS PLUS">
-          <img src="assets/affordalabs-logo-cropped.png" alt="affordaLABS DIAGNOSTICS PLUS" class="brand-logo-img" />
-          <div class="brand-tagline">PHARMACY POS & INVENTORY</div>
+        <a href="#home" onclick="window.appRouter.navigate('home')" class="brand-logo-wrapper"
+          title="affordaMEDS - Medicines • Medical Supplies • Medical Devices">
+          <img src="assets/affordameds-logo.png" alt="affordaMEDS"
+            class="brand-logo-img brand-logo-full" />
+          <img src="assets/affordameds-icon.png" alt="affordaMEDS" class="brand-logo-img brand-logo-icon" />
+          <div class="brand-tagline">PHARMACY INVENTORY SYSTEM</div>
         </a>
+        <button class="sidebar-toggle" id="sidebarToggle" onclick="toggleSidebar()"
+          title="Collapse sidebar">&#8249;</button>
       </div>
 
       <nav class="sidebar-nav">
-        <div class="nav-item active" data-view="home" onclick="window.appRouter.navigate('home')">
-          <span class="icon">🏠</span>
-          <span>Home</span>
+        <div class="nav-item active" data-view="home" data-label="Home" onclick="window.appRouter.navigate('home')">
+          <span class="icon"><i data-lucide="house"></i></span>
+          <span class="nav-label">Home</span>
         </div>
 
-        <div class="nav-item" data-view="dashboard" onclick="window.appRouter.navigate('dashboard')">
-          <span class="icon">⊞</span>
-          <span>Dashboard</span>
+        <div class="nav-item" data-view="dashboard" data-label="Dashboard"
+          onclick="window.appRouter.navigate('dashboard')">
+          <span class="icon"><i data-lucide="layout-dashboard"></i></span>
+          <span class="nav-label">Dashboard</span>
         </div>
 
-        <div class="nav-item" data-view="pos" onclick="window.appRouter.navigate('pos')">
-          <span class="icon">⚡</span>
-          <span>POS Register</span>
+        <div class="nav-item" data-view="transactions" data-label="In - Out"
+          onclick="window.appRouter.navigate('transactions')">
+          <span class="icon"><i data-lucide="arrow-left-right"></i></span>
+          <span class="nav-label">In - Out</span>
         </div>
 
-        <div class="nav-item" data-view="transactions" onclick="window.appRouter.navigate('transactions')">
-          <span class="icon">⇄</span>
-          <span>Transactions</span>
+        <div class="nav-item" data-view="reports" data-label="Reports" onclick="window.appRouter.navigate('reports')">
+          <span class="icon"><i data-lucide="bar-chart-3"></i></span>
+          <span class="nav-label">Reports</span>
         </div>
 
-        <div class="nav-item" data-view="reports" onclick="window.appRouter.navigate('reports')">
-          <span class="icon">📊</span>
-          <span>Reports</span>
-        </div>
-
-        <div class="nav-item" data-view="inventory" onclick="window.appRouter.navigate('inventory')">
-          <span class="icon">📦</span>
-          <span>Inventory</span>
+        <div class="nav-item" data-view="inventory" data-label="Inventory"
+          onclick="window.appRouter.navigate('inventory')">
+          <span class="icon"><i data-lucide="package"></i></span>
+          <span class="nav-label">Inventory</span>
           <span id="inventoryBadge" class="badge-pill" style="display: none;">!</span>
         </div>
 
-        <div class="nav-item" data-view="staff" onclick="window.appRouter.navigate('staff')">
-          <span class="icon">👤</span>
-          <span>Staff</span>
+        <div class="nav-item" data-view="staff" data-label="Staff" onclick="window.appRouter.navigate('staff')">
+          <span class="icon"><i data-lucide="users"></i></span>
+          <span class="nav-label">Staff</span>
         </div>
 
-        <div class="nav-item" data-view="cashdrawer" onclick="window.appRouter.navigate('cashdrawer')">
-          <span class="icon">💵</span>
-          <span>Cash Drawer</span>
+        <div class="nav-item" data-view="cashdrawer" data-label="Cash Drawer"
+          onclick="window.appRouter.navigate('cashdrawer')">
+          <span class="icon"><i data-lucide="banknote"></i></span>
+          <span class="nav-label">Cash Drawer</span>
         </div>
 
-        <div class="nav-item" data-view="settings" onclick="window.appRouter.navigate('settings')">
-          <span class="icon">⚙</span>
-          <span>Settings</span>
+        <div class="nav-item" data-view="settings" data-label="Settings"
+          onclick="window.appRouter.navigate('settings')">
+          <span class="icon"><i data-lucide="settings"></i></span>
+          <span class="nav-label">Settings</span>
         </div>
       </nav>
 
       <div class="sidebar-footer">
-        <div class="nav-item" onclick="alert('AffordaLabs PharmaPOS v1.0.0 (Philippine FDA & BIR Compliant)')">
-          <span class="icon">❓</span>
-          <span>Help & Compliance</span>
+        <div class="nav-item" data-label="Help & Compliance"
+          onclick="alert('AffordaLabs PharmaPOS v1.0.0 (Philippine FDA & BIR Compliant)')">
+          <span class="icon"><i data-lucide="circle-help"></i></span>
+          <span class="nav-label">Help & Compliance</span>
         </div>
-        <div class="nav-item" onclick="if(confirm('Are you sure you want to end shift and logout?')) alert('Logged out successfully.')">
-          <span class="icon">➔</span>
-          <span>Logout</span>
+        <div class="nav-item" data-label="Logout"
+          onclick="handleLogout()">
+          <span class="icon"><i data-lucide="log-out"></i></span>
+          <span class="nav-label">Logout</span>
         </div>
       </div>
     </aside>
@@ -89,27 +103,26 @@
           <h1 class="page-title" id="pageTitle">Home</h1>
           <div class="pharmacy-branch-badge">
             <span class="branch-dot"></span>
-            <span>Main Branch - Pasig City</span>
+            <span>Pampang - Angeles City</span>
           </div>
         </div>
 
         <div class="topbar-actions">
-          <button class="quick-pos-btn" onclick="window.appRouter.navigate('pos')">
-            <span>⚡ Counter POS (F2)</span>
-          </button>
 
-          <button class="icon-btn" onclick="alert('Alerts: 2 medicines expiring in 60 days. 1 item reached low stock threshold.')" title="Notifications">
+          <button class="icon-btn"
+            onclick="alert('Alerts: 2 medicines expiring in 60 days. 1 item reached low stock threshold.')"
+            title="Notifications">
             <span>🔔</span>
             <span class="notif-dot"></span>
           </button>
 
           <div class="user-profile">
             <div class="user-avatar">
-              <span>LS</span>
+              <span>--</span>
             </div>
             <div class="user-info">
-              <span class="user-name">Lionel Santos, RPh</span>
-              <span class="user-role">Licensed Pharmacist</span>
+              <span class="user-name">Loading...</span>
+              <span class="user-role">Pharmacist</span>
             </div>
           </div>
         </div>
@@ -122,17 +135,45 @@
     </main>
   </div>
 
+  <!-- Full-screen Login Overlay -->
+  <div id="login-overlay" style="display: none;"></div>
+
   <!-- Scripts -->
+  <script src="js/auth.js"></script>
   <script src="js/store.js"></script>
+  <script src="js/components/login.js"></script>
   <script src="js/components/home.js"></script>
   <script src="js/components/dashboard.js"></script>
   <script src="js/components/inventory.js"></script>
-  <script src="js/components/pos.js"></script>
   <script src="js/components/transactions.js"></script>
   <script src="js/components/reports.js"></script>
   <script src="js/components/staff.js"></script>
   <script src="js/components/cashdrawer.js"></script>
   <script src="js/components/settings.js"></script>
   <script src="js/app.js"></script>
+  <script>
+    function toggleSidebar() {
+      const sidebar = document.querySelector('.sidebar');
+      const btn = document.getElementById('sidebarToggle');
+      const isCollapsed = sidebar.classList.toggle('collapsed');
+      btn.innerHTML = isCollapsed ? '&#8250;' : '&#8249;';
+      btn.title = isCollapsed ? 'Expand sidebar' : 'Collapse sidebar';
+      localStorage.setItem('sidebarCollapsed', isCollapsed);
+    }
+    // Restore sidebar state on load
+    document.addEventListener('DOMContentLoaded', function () {
+      // Render all Lucide icons
+      if (typeof lucide !== 'undefined') lucide.createIcons();
+
+      if (localStorage.getItem('sidebarCollapsed') === 'true') {
+        const sidebar = document.querySelector('.sidebar');
+        const btn = document.getElementById('sidebarToggle');
+        sidebar.classList.add('collapsed');
+        btn.innerHTML = '&#8250;';
+        btn.title = 'Expand sidebar';
+      }
+    });
+  </script>
 </body>
+
 </html>

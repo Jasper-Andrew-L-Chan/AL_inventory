@@ -123,8 +123,10 @@ function renderPOSView(container) {
       <div class="pos-cart">
         <div style="padding: 1rem 1.25rem; border-bottom: 1px solid var(--border-color); background: #f8fafc; display: flex; justify-content: space-between; align-items: center;">
           <div>
-            <h3 style="font-size: 1rem; font-weight: 700; color: var(--text-main);">Current Prescription Cart</h3>
-            <div style="font-size: 0.75rem; color: var(--text-muted);">${posCart.length} item(s) selected</div>
+            <h3 style="font-size: 1rem; font-weight: 700; color: var(--text-main);">Prescription &amp; OTC Cart</h3>
+            <div style="font-size: 0.75rem; color: var(--text-muted);">
+              Cashier: <strong style="color: var(--primary);">${window.authStore && window.authStore.getSession() ? window.authStore.getSession().fullName : 'Staff Pharmacist'}</strong>
+            </div>
           </div>
           <button onclick="clearPOSCart()" style="background: none; border: none; color: #ef4444; font-size: 0.78rem; font-weight: 600; cursor: pointer;">
             Clear Cart
@@ -397,8 +399,11 @@ window.addCashTender = function(amount, netTotal) {
 window.completePOSSale = function(subtotal, discount, netTotal) {
   if (posCart.length === 0) return;
 
+  const session = window.authStore ? window.authStore.getSession() : null;
+  const cashierName = session ? `${session.firstName} (${session.role})` : 'Lionel (Pharmacist)';
+
   const txn = window.pharmacyStore.addTransaction({
-    cashier: 'Lionel (Pharmacist)',
+    cashier: cashierName,
     customerType: posCustomerType,
     customerId: posSeniorId,
     doctorRx: posDoctorRx,

@@ -10,6 +10,11 @@ function renderDashboardView(container) {
   const timeStr = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   const dateStr = now.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', weekday: 'long' });
 
+  const session = window.authStore ? window.authStore.getSession() : null;
+  const userName = session ? session.firstName : 'Pharmacist';
+  const hour = now.getHours();
+  const greeting = hour < 12 ? 'Good morning' : (hour < 18 ? 'Good afternoon' : 'Good evening');
+
   container.innerHTML = `
     <!-- Top Sync Info Bar (Ref Image 5) -->
     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.25rem;">
@@ -18,7 +23,9 @@ function renderDashboardView(container) {
         <span style="cursor: pointer; color: var(--text-muted); font-size: 0.9rem;" title="Pharmacy Real-Time Business Dashboard">ⓘ</span>
       </div>
       <div style="display: flex; align-items: center; gap: 0.75rem; font-size: 0.78rem; color: var(--text-muted);">
-        <span>Last synced at ${dateStr}, ${timeStr}</span>
+        <span>Logged in: <strong style="color: var(--text-main);">${session ? session.fullName : 'System'}</strong></span>
+        <span>•</span>
+        <span>Synced at ${timeStr}</span>
         <button onclick="renderDashboardView(document.getElementById('main-content'))" style="background: none; border: none; cursor: pointer; color: var(--primary); font-weight: 600;">
           ↻ Refresh
         </button>
@@ -45,13 +52,13 @@ function renderDashboardView(container) {
         <div class="kpi-sub">Senior & PWD 20% Applied</div>
       </div>
 
-      <!-- 3. No. of Transactions -->
+      <!-- 3. In - Out Stock Movements -->
       <div class="kpi-card mint">
         <div class="kpi-header">
-          <span>🧾</span> No. of Transactions
+          <span>🔄</span> In - Out Movements
         </div>
         <div class="kpi-value">${metrics.transactionCount}</div>
-        <div class="kpi-sub">Average basket: ₱${metrics.transactionCount ? (metrics.netSales / metrics.transactionCount).toFixed(2) : '0.00'}</div>
+        <div class="kpi-sub">${metrics.transactionCount ? `${metrics.transactionCount} stock logs recorded` : 'No logs recorded today'}</div>
       </div>
 
       <!-- 4. Cost of Goods (COGS) -->
@@ -103,7 +110,7 @@ function renderDashboardView(container) {
     <!-- Branch Subheader & Date Picker -->
     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.25rem; flex-wrap: wrap; gap: 0.75rem;">
       <h3 style="font-size: 1.1rem; font-weight: 800; color: var(--text-main);">
-        Good afternoon, <span style="color: var(--primary);">${settings.pharmacyName.toUpperCase()}</span> - ${settings.branch.toUpperCase()}!
+        ${greeting}, <span style="color: var(--primary);">${userName}</span>! Welcome to <span style="color: var(--text-muted); font-weight: 600;">${settings.pharmacyName} (${settings.branch})</span>
       </h3>
       <div style="background: white; border: 1px solid var(--border-color); border-radius: var(--radius-sm); padding: 0.4rem 0.85rem; display: flex; align-items: center; gap: 0.5rem; font-size: 0.82rem; color: var(--text-muted); box-shadow: var(--shadow-sm);">
         <span>Date Filter:</span>
@@ -282,7 +289,7 @@ function renderDashboardView(container) {
   `;
 }
 
-window.setChartPeriod = function(btn, period) {
+window.setChartPeriod = function (btn, period) {
   document.querySelectorAll('.chart-tab').forEach(b => {
     b.classList.remove('active');
     b.style.borderColor = '#cbd5e1';
