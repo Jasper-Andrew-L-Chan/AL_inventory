@@ -65,7 +65,7 @@ function renderPOSView(container) {
         <div style="margin-bottom: 0.75rem; display: flex; gap: 0.5rem;">
           <input 
             type="text" 
-            placeholder="🔍 Scan barcode or search brand/generic (e.g. Paracetamol, Biogesic)..." 
+            placeholder="Scan barcode or search brand/generic (e.g. Paracetamol, Biogesic)..." 
             value="${posSearchQuery}" 
             oninput="handlePOSSearch(this.value)" 
             class="form-input" 
@@ -192,7 +192,7 @@ function renderPOSView(container) {
         <div style="flex: 1; overflow-y: auto; padding: 0.75rem 1.25rem;">
           ${posCart.length === 0 ? `
             <div style="text-align: center; padding: 2.5rem 1rem; color: var(--text-muted);">
-              <div style="font-size: 2.5rem; margin-bottom: 0.5rem; opacity: 0.4;">🛒</div>
+              <div style="margin-bottom: 0.5rem; opacity: 0.4; display: flex; justify-content: center;"><i data-lucide="shopping-cart" style="width: 40px; height: 40px;"></i></div>
               <div style="font-weight: 600; font-size: 0.9rem;">Cart is Empty</div>
               <div style="font-size: 0.78rem;">Click medicines from the left to dispense</div>
             </div>
@@ -286,9 +286,9 @@ function renderPOSView(container) {
           <button 
             onclick="completePOSSale(${subtotal}, ${discountAmount}, ${netTotal})" 
             ${posCart.length === 0 ? 'disabled' : ''}
-            style="width: 100%; padding: 0.75rem; background: var(--primary); color: white; border: none; border-radius: var(--radius-sm); font-weight: 700; font-size: 0.95rem; cursor: pointer; box-shadow: var(--shadow-md); opacity: ${posCart.length === 0 ? '0.5' : '1'};"
+            style="width: 100%; padding: 0.75rem; background: var(--primary); color: white; border: none; border-radius: var(--radius-sm); font-weight: 700; font-size: 0.95rem; cursor: pointer; box-shadow: var(--shadow-md); opacity: ${posCart.length === 0 ? '0.5' : '1'}; display: flex; align-items: center; justify-content: center; gap: 6px;"
           >
-            ✓ Complete Sale & Issue OR
+            <i data-lucide="check-circle" style="width: 17px; height: 17px;"></i> Complete Sale & Issue OR
           </button>
         </div>
       </div>
@@ -299,14 +299,14 @@ function renderPOSView(container) {
       <div class="modal-card" style="max-width: 420px;">
         <div class="modal-header">
           <h3 class="modal-title">BIR Official Receipt (OR)</h3>
-          <button onclick="closeReceiptModal()" style="background: none; border: none; font-size: 1.3rem; cursor: pointer;">✕</button>
+          <button onclick="closeReceiptModal()" style="background: none; border: none; cursor: pointer; display: flex; align-items: center; justify-content: center;"><i data-lucide="x" style="width: 18px; height: 18px;"></i></button>
         </div>
         <div class="modal-body" id="receiptModalContent">
           <!-- Populated dynamically on sale complete -->
         </div>
         <div class="modal-footer" style="justify-content: space-between;">
-          <button onclick="printReceipt()" class="btn-primary" style="background: #028090;">
-            🖨️ Print Receipt
+          <button onclick="printReceipt()" class="btn-primary" style="background: #028090; display: inline-flex; align-items: center; gap: 6px;">
+            <i data-lucide="printer" style="width: 16px; height: 16px;"></i> Print Receipt
           </button>
           <button onclick="closeReceiptModal()" class="btn-outline">
             Done / Next Customer
@@ -315,6 +315,10 @@ function renderPOSView(container) {
       </div>
     </div>
   `;
+
+  if (typeof lucide !== 'undefined') {
+    lucide.createIcons();
+  }
 }
 
 window.handlePOSSearch = function(q) {

@@ -27,9 +27,30 @@ function renderInventoryView(container) {
     );
   });
 
+  const now = new Date();
+  const in90Days = new Date(now.getTime() + 90 * 24 * 60 * 60 * 1000);
+
+  const lowStockItems = items.filter(i => (Number(i.currentStock) || 0) <= (Number(i.reorderLevel) || 10));
+  const expiringItems = items.filter(i => {
+    if (!i.expiryDate) return false;
+    const exp = new Date(i.expiryDate);
+    return !isNaN(exp.getTime()) && exp <= in90Days;
+  });
+
+  // Filter based on active subtab
+  let displayedItems = filteredItems;
+  if (inventoryCurrentTab === 'expiry-alerts') {
+    displayedItems = filteredItems.filter(item => {
+      const isLow = (Number(item.currentStock) || 0) <= (Number(item.reorderLevel) || 10);
+      const expDate = new Date(item.expiryDate);
+      const isExpiring = !isNaN(expDate.getTime()) && expDate <= in90Days;
+      return isLow || isExpiring;
+    });
+  }
+
   const totalStockCount = items.reduce((acc, curr) => acc + (Number(curr.currentStock) || 0), 0);
   const selectedCount = selectedInventoryItemIds.size;
-  const allFilteredSelected = filteredItems.length > 0 && filteredItems.every(i => selectedInventoryItemIds.has(i.id));
+  const allFilteredSelected = displayedItems.length > 0 && displayedItems.every(i => selectedInventoryItemIds.has(i.id));
 
   container.innerHTML = `
     <!-- Top Subtabs Bar -->
@@ -37,30 +58,79 @@ function renderInventoryView(container) {
       <button class="subtab-btn ${inventoryCurrentTab === 'inventory' ? 'active' : ''}" onclick="switchInventoryTab('inventory')">
         INVENTORY
       </button>
-      <button class="subtab-btn ${inventoryCurrentTab === 'generic-link' ? 'active' : ''}" onclick="switchInventoryTab('generic-link')">
-        GENERIC & BRAND MAPPING
-      </button>
-      <button class="subtab-btn ${inventoryCurrentTab === 'expiry-alerts' ? 'active' : ''}" onclick="switchInventoryTab('expiry-alerts')">
-        BATCH EXPIRY & REORDER ALERTS (${items.filter(i => i.currentStock <= i.reorderLevel).length})
+      <button class="subtab-btn ${inventoryCurrentTab === 'expiry-alerts' ? 'active' : ''}" onclick="switchInventoryTab('expiry-alerts')" style="display: inline-flex; align-items: center; gap: 6px;">
+        <i data-lucide="alert-triangle" style="width: 14px; height: 14px; color: ${lowStockItems.length + expiringItems.length > 0 ? '#ef4444' : 'inherit'};"></i>
+        <span>BATCH EXPIRY & REORDER ALERTS</span>
+        <span style="background: ${lowStockItems.length + expiringItems.length > 0 ? '#fee2e2' : '#f1f5f9'}; color: ${lowStockItems.length + expiringItems.length > 0 ? '#dc2626' : 'var(--text-muted)'}; padding: 1px 7px; border-radius: 9999px; font-weight: 800; font-size: 0.72rem;">
+          ${lowStockItems.length + expiringItems.length}
+        </span>
       </button>
     </div>
+
+    <!-- Alert KPI Summary Banner (Shows in Alert tab or when items need attention) -->
+    ${(inventoryCurrentTab === 'expiry-alerts' || lowStockItems.length > 0 || expiringItems.length > 0) ? `
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 1rem; margin-bottom: 1.25rem;">
+        <!-- Needs Restock Box -->
+        <div class="card" onclick="switchInventoryTab('expiry-alerts')" style="margin-bottom: 0; padding: 1rem 1.25rem; border-left: 4px solid #ef4444; background: #fffafb; cursor: pointer; transition: transform 0.15s ease;">
+          <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+            <div>
+              <div style="font-size: 0.75rem; font-weight: 700; color: #b91c1c; text-transform: uppercase; letter-spacing: 0.04em; display: flex; align-items: center; gap: 5px;">
+                <i data-lucide="package-plus" style="width: 15px; height: 15px;"></i> Needs Restock
+              </div>
+              <div style="font-size: 1.6rem; font-weight: 900; color: #dc2626; margin: 0.2rem 0;">
+                ${lowStockItems.length}
+              </div>
+              <div style="font-size: 0.73rem; color: var(--text-muted);">
+                ${lowStockItems.length > 0 ? lowStockItems.map(i => i.brandName).slice(0, 3).join(', ') + (lowStockItems.length > 3 ? ` +${lowStockItems.length - 3} more` : '') : 'All medicines at healthy stock'}
+              </div>
+            </div>
+            <span style="font-size: 0.7rem; font-weight: 700; background: #fee2e2; color: #b91c1c; padding: 2px 8px; border-radius: 9999px;">
+              ≤ Reorder Threshold
+            </span>
+          </div>
+        </div>
+
+        <!-- Expiring Soon Box -->
+        <div class="card" onclick="switchInventoryTab('expiry-alerts')" style="margin-bottom: 0; padding: 1rem 1.25rem; border-left: 4px solid #f59e0b; background: #fffdfa; cursor: pointer; transition: transform 0.15s ease;">
+          <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+            <div>
+              <div style="font-size: 0.75rem; font-weight: 700; color: #b45309; text-transform: uppercase; letter-spacing: 0.04em; display: flex; align-items: center; gap: 5px;">
+                <i data-lucide="clock" style="width: 15px; height: 15px;"></i> Expiring Within 90 Days
+              </div>
+              <div style="font-size: 1.6rem; font-weight: 900; color: #d97706; margin: 0.2rem 0;">
+                ${expiringItems.length}
+              </div>
+              <div style="font-size: 0.73rem; color: var(--text-muted);">
+                ${expiringItems.length > 0 ? expiringItems.map(i => `${i.brandName} (${i.expiryDate})`).slice(0, 2).join(', ') + (expiringItems.length > 2 ? ` +${expiringItems.length - 2} more` : '') : 'No batches expiring soon'}
+              </div>
+            </div>
+            <span style="font-size: 0.7rem; font-weight: 700; background: #fef3c7; color: #b45309; padding: 2px 8px; border-radius: 9999px;">
+              Near Expiry
+            </span>
+          </div>
+        </div>
+      </div>
+    ` : ''}
 
     <!-- Top Action Buttons -->
     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.25rem; flex-wrap: wrap; gap: 0.75rem;">
       <div style="display: flex; gap: 0.75rem;">
         <button onclick="document.getElementById('csvFileInput').click()" class="btn-primary" style="background: var(--brand-charcoal); display: flex; align-items: center; gap: 0.5rem; box-shadow: none;">
-          <span>☁ Upload CSV File</span>
+          <i data-lucide="upload" style="width: 15px; height: 15px;"></i>
+          <span>Upload CSV File</span>
         </button>
         <input type="file" id="csvFileInput" accept=".csv" style="display: none;" onchange="handleCSVUpload(event)" />
 
-        <button onclick="exportInventoryToCSV()" class="btn-outline">
-          <span>📥 Export Stock CSV</span>
+        <button onclick="exportInventoryToCSV()" class="btn-outline" style="display: flex; align-items: center; gap: 0.5rem;">
+          <i data-lucide="download" style="width: 15px; height: 15px;"></i>
+          <span>Export Stock CSV</span>
         </button>
       </div>
 
       <div style="display: flex; gap: 0.5rem;">
-        <button onclick="openAddMedicineModal()" class="btn-primary" style="background: var(--primary);">
-          <span>+ Detailed Medicine / Batch Form</span>
+        <button onclick="openAddMedicineModal()" class="btn-primary" style="background: var(--primary); display: flex; align-items: center; gap: 0.4rem;">
+          <i data-lucide="plus" style="width: 15px; height: 15px;"></i>
+          <span>Detailed Medicine / Batch Form</span>
         </button>
       </div>
     </div>
@@ -84,17 +154,17 @@ function renderInventoryView(container) {
     ${selectedCount > 0 ? `
       <div class="selected-count-banner">
         <div style="display: flex; align-items: center; gap: 0.75rem;">
-          <span>✓ <strong>${selectedCount}</strong> item${selectedCount > 1 ? 's' : ''} selected</span>
+          <span style="display: inline-flex; align-items: center; gap: 6px;"><i data-lucide="check" style="width: 14px; height: 14px;"></i> <strong>${selectedCount}</strong> item${selectedCount > 1 ? 's' : ''} selected</span>
           <span style="font-size: 0.75rem; color: var(--text-muted); font-weight: normal;">(Tip: You can use <strong>Shift + Click</strong> on any row to select)</span>
         </div>
         <div style="display: flex; align-items: center; gap: 0.5rem;">
           ${selectedCount === 1 ? `
-            <button onclick="editFirstSelected()" class="btn-action-edit">
-              ✏️ Edit Selected
+            <button onclick="editFirstSelected()" class="btn-action-edit" style="display: inline-flex; align-items: center; gap: 4px;">
+              <i data-lucide="edit-3" style="width: 14px; height: 14px;"></i> Edit Selected
             </button>
           ` : ''}
-          <button onclick="deleteSelectedItems()" class="btn-action-delete">
-            🗑️ Delete Selected (${selectedCount})
+          <button onclick="deleteSelectedItems()" class="btn-action-delete" style="display: inline-flex; align-items: center; gap: 4px;">
+            <i data-lucide="trash-2" style="width: 14px; height: 14px;"></i> Delete Selected (${selectedCount})
           </button>
           <button onclick="clearItemSelection()" class="btn-outline" style="padding: 2px 8px; font-size: 0.75rem;">
             Deselect All
@@ -121,14 +191,18 @@ function renderInventoryView(container) {
       </div>
 
       <div style="display: flex; align-items: center; gap: 1.2rem;">
-        <span style="font-size: 0.82rem; color: var(--text-muted); cursor: pointer;">29th Sep</span>
-        <span style="font-size: 0.82rem; color: var(--text-muted); cursor: pointer;">Yesterday</span>
-        <span style="font-size: 0.85rem; color: var(--primary); font-weight: 700; border-bottom: 2px solid var(--primary); padding-bottom: 2px; cursor: pointer;">Today</span>
+        ${inventoryCurrentTab === 'expiry-alerts' ? `
+          <button onclick="switchInventoryTab('inventory')" class="btn-outline" style="font-size: 0.75rem; padding: 3px 8px;">
+            View All Inventory (${items.length})
+          </button>
+        ` : `
+          <span style="font-size: 0.85rem; color: var(--primary); font-weight: 700; border-bottom: 2px solid var(--primary); padding-bottom: 2px;">All Items</span>
+        `}
 
         <!-- Total medicines count -->
         <div style="background: #e07a5f; color: white; padding: 0.4rem 1rem; border-radius: var(--radius-sm); font-size: 0.82rem; font-weight: 700; display: flex; align-items: center; gap: 0.4rem;">
-          <span>📦</span>
-          <span>${items.length} Medicines (${totalStockCount} units)</span>
+          <i data-lucide="package" style="width: 15px; height: 15px;"></i>
+          <span>${displayedItems.length} Medicines displayed</span>
         </div>
       </div>
     </div>
@@ -154,22 +228,22 @@ function renderInventoryView(container) {
           </tr>
         </thead>
         <tbody>
-          ${filteredItems.length === 0 ? `
+          ${displayedItems.length === 0 ? `
             <tr>
               <td colspan="11" style="text-align: center; padding: 3rem 1rem; color: var(--text-muted);">
-                <div style="font-size: 2.2rem; margin-bottom: 0.5rem;">📦</div>
+                <div style="margin-bottom: 0.5rem; display: flex; justify-content: center;"><i data-lucide="${inventoryCurrentTab === 'expiry-alerts' ? 'check-circle' : 'package'}" style="width: 36px; height: 36px; opacity: 0.5; color: ${inventoryCurrentTab === 'expiry-alerts' ? '#10b981' : 'inherit'};"></i></div>
                 <div style="font-weight: 700; font-size: 1.05rem; color: var(--text-main); margin-bottom: 0.25rem;">
-                  ${inventorySearchQuery ? `No medicines matching "${inventorySearchQuery}"` : 'No medicines in inventory'}
+                  ${inventoryCurrentTab === 'expiry-alerts' ? 'No Low Stock or Expiring Batches Found' : (inventorySearchQuery ? `No medicines matching "${inventorySearchQuery}"` : 'No medicines in inventory')}
                 </div>
                 <div style="font-size: 0.84rem; max-width: 420px; margin: 0 auto 1.25rem auto;">
-                  Your inventory is currently empty. Use the quick entry bar above or click the button below to add your first medicine batch.
+                  ${inventoryCurrentTab === 'expiry-alerts' ? 'All batches are well within safe shelf-life limits and have sufficient inventory.' : 'Your inventory is currently empty. Use the quick entry bar above or click the button below to add your first medicine batch.'}
                 </div>
-                <button onclick="openAddMedicineModal()" class="btn-primary" style="background: var(--primary);">
-                  + Add First Medicine
+                <button onclick="${inventoryCurrentTab === 'expiry-alerts' ? "switchInventoryTab('inventory')" : 'openAddMedicineModal()'}" class="btn-primary" style="background: var(--primary); display: inline-flex; align-items: center; gap: 4px;">
+                  <i data-lucide="${inventoryCurrentTab === 'expiry-alerts' ? 'arrow-left' : 'plus'}" style="width: 15px; height: 15px;"></i> ${inventoryCurrentTab === 'expiry-alerts' ? 'Back to All Inventory' : 'Add First Medicine'}
                 </button>
               </td>
             </tr>
-          ` : filteredItems.map(item => {
+          ` : displayedItems.map(item => {
             const isLow = item.currentStock <= item.reorderLevel;
             const expDate = new Date(item.expiryDate);
             const now = new Date();
@@ -207,9 +281,23 @@ function renderInventoryView(container) {
                   </span>
                 </td>
                 <td>
-                  <div style="font-family: monospace; font-size: 0.78rem;">${item.batchLot}</div>
-                  <div style="font-size: 0.72rem; ${isExpiringSoon ? 'color: #dc2626; font-weight: 700;' : 'color: var(--text-muted);'}">
-                    Exp: ${item.expiryDate} ${isExpiringSoon ? '⚠️' : ''}
+                  <div style="font-family: monospace; font-size: 0.78rem; font-weight: 600;">${item.batchLot}</div>
+                  <div style="font-size: 0.72rem; margin-top: 2px;">
+                    ${daysToExpiry <= 0 ? `
+                      <span style="background: #fee2e2; color: #b91c1c; font-weight: 800; padding: 1px 6px; border-radius: 4px; display: inline-flex; align-items: center; gap: 3px;">
+                        <i data-lucide="alert-octagon" style="width: 11px; height: 11px;"></i> EXPIRED (${item.expiryDate})
+                      </span>
+                    ` : (daysToExpiry <= 30 ? `
+                      <span style="background: #fee2e2; color: #dc2626; font-weight: 700; padding: 1px 6px; border-radius: 4px; display: inline-flex; align-items: center; gap: 3px;">
+                        <i data-lucide="alert-triangle" style="width: 11px; height: 11px;"></i> Expires in ${daysToExpiry}d (${item.expiryDate})
+                      </span>
+                    ` : (isExpiringSoon ? `
+                      <span style="background: #fef3c7; color: #b45309; font-weight: 700; padding: 1px 6px; border-radius: 4px; display: inline-flex; align-items: center; gap: 3px;">
+                        <i data-lucide="clock" style="width: 11px; height: 11px;"></i> Exp in ${daysToExpiry}d (${item.expiryDate})
+                      </span>
+                    ` : `
+                      <span style="color: var(--text-muted);">Exp: ${item.expiryDate}</span>
+                    `))}
                   </div>
                 </td>
                 <td style="text-align: right; color: var(--text-muted);">${item.beginningStock}</td>
@@ -217,7 +305,15 @@ function renderInventoryView(container) {
                 <td style="text-align: right; color: #dc2626; font-weight: 600;">-${item.deductedStock}</td>
                 <td style="text-align: right; font-weight: 800; font-size: 0.95rem; ${isLow ? 'color: #dc2626;' : 'color: var(--text-main);'}">
                   ${item.currentStock}
-                  ${isLow ? '<span style="display: block; font-size: 0.68rem; color: #dc2626; font-weight: 600;">REORDER</span>' : ''}
+                  ${item.currentStock === 0 ? `
+                    <span style="display: inline-block; font-size: 0.68rem; background: #fee2e2; color: #b91c1c; font-weight: 800; padding: 1px 5px; border-radius: 3px; margin-top: 2px;">
+                      OUT OF STOCK
+                    </span>
+                  ` : (isLow ? `
+                    <span style="display: inline-block; font-size: 0.68rem; background: #fff1f2; color: #e11d48; font-weight: 700; padding: 1px 5px; border-radius: 3px; margin-top: 2px;">
+                      REORDER (≤${item.reorderLevel || 10})
+                    </span>
+                  ` : '')}
                 </td>
                 <td style="text-align: right; font-weight: 600;">₱${Number(item.sellingPrice).toFixed(2)}</td>
                 <td style="text-align: center;" onclick="event.stopPropagation()">
@@ -250,15 +346,17 @@ function renderInventoryView(container) {
                       onclick="openEditMedicineModal('${item.id}')" 
                       class="btn-action-edit"
                       title="Edit this medicine"
+                      style="display: inline-flex; align-items: center; gap: 4px;"
                     >
-                      ✏️ Edit
+                      <i data-lucide="edit-3" style="width: 13px; height: 13px;"></i> Edit
                     </button>
                     <button 
                       onclick="confirmDeleteItem('${item.id}')" 
                       class="btn-action-delete"
                       title="Delete this medicine permanently"
+                      style="display: inline-flex; align-items: center; gap: 4px;"
                     >
-                      🗑️ Delete
+                      <i data-lucide="trash-2" style="width: 13px; height: 13px;"></i> Delete
                     </button>
                   </div>
                 </td>
@@ -274,7 +372,7 @@ function renderInventoryView(container) {
       <div class="modal-card">
         <div class="modal-header">
           <h3 class="modal-title" id="medModalTitle">Add New Medicine</h3>
-          <button onclick="closeMedicineModal()" style="background: none; border: none; font-size: 1.3rem; cursor: pointer;">✕</button>
+          <button onclick="closeMedicineModal()" style="background: none; border: none; cursor: pointer; display: flex; align-items: center; justify-content: center;"><i data-lucide="x" style="width: 18px; height: 18px;"></i></button>
         </div>
         <form id="medDetailForm" onsubmit="handleSaveDetailedMedicine(event)">
           <div class="modal-body" style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
@@ -350,6 +448,10 @@ function renderInventoryView(container) {
       </div>
     </div>
   `;
+
+  if (typeof lucide !== 'undefined') {
+    lucide.createIcons();
+  }
 }
 
 // ── Quick Selection Shortcuts (Shift + Left Click) ───────────────────────────

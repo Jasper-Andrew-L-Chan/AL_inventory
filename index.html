@@ -109,12 +109,56 @@
 
         <div class="topbar-actions">
 
-          <button class="icon-btn"
-            onclick="alert('Alerts: 2 medicines expiring in 60 days. 1 item reached low stock threshold.')"
-            title="Notifications">
-            <span>🔔</span>
-            <span class="notif-dot"></span>
-          </button>
+          <!-- Notifications & Alerts Dropdown -->
+          <div class="notif-dropdown-wrapper">
+            <button class="icon-btn" id="notifBellBtn" onclick="toggleAlertsDropdown(event)" title="Medicine Expiry & Restock Alerts">
+              <i data-lucide="bell" style="width: 18px; height: 18px;"></i>
+              <span class="notif-dot" id="notifBadgeDot" style="display: none;"></span>
+            </button>
+
+            <!-- Dropdown Menu -->
+            <div class="notif-dropdown" id="alertsDropdown">
+              <div class="notif-header">
+                <div class="notif-header-title">
+                  <i data-lucide="bell" style="width: 16px; height: 16px; color: var(--primary);"></i>
+                  <span>Pharmacy Alerts</span>
+                  <span id="notifHeaderCount" style="font-size: 0.7rem; background: #fee2e2; color: #dc2626; padding: 1px 6px; border-radius: 9999px; font-weight: 800;">0</span>
+                </div>
+                <button onclick="closeAlertsDropdown()" style="background: none; border: none; cursor: pointer; color: var(--text-muted); padding: 2px;">
+                  <i data-lucide="x" style="width: 15px; height: 15px;"></i>
+                </button>
+              </div>
+
+              <!-- Tab selector: All / Restock Needed / Expiring Soon -->
+              <div class="notif-tab-bar">
+                <button class="notif-tab-btn active" id="tabNotifAll" onclick="filterNotifTab('all')">
+                  <span>All Alerts</span>
+                </button>
+                <button class="notif-tab-btn" id="tabNotifRestock" onclick="filterNotifTab('restock')">
+                  <i data-lucide="package-plus" style="width: 13px; height: 13px;"></i>
+                  <span>Restock</span>
+                </button>
+                <button class="notif-tab-btn" id="tabNotifExpiry" onclick="filterNotifTab('expiry')">
+                  <i data-lucide="clock" style="width: 13px; height: 13px;"></i>
+                  <span>Expiring</span>
+                </button>
+              </div>
+
+              <!-- Alerts List Container -->
+              <div class="notif-list-container" id="notifListContainer">
+                <!-- Dynamically populated -->
+              </div>
+
+              <!-- Footer with direct navigation -->
+              <div class="notif-footer">
+                <span style="font-size: 0.72rem; color: var(--text-muted);" id="notifSyncTime">Updated live</span>
+                <button onclick="goToAlertsTab()" class="btn-primary" style="padding: 4px 10px; font-size: 0.75rem; display: inline-flex; align-items: center; gap: 4px;">
+                  <span>Open Full Inventory Alerts</span>
+                  <i data-lucide="arrow-right" style="width: 13px; height: 13px;"></i>
+                </button>
+              </div>
+            </div>
+          </div>
 
           <div class="user-profile">
             <div class="user-avatar">

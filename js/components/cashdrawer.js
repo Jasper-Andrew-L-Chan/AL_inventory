@@ -17,8 +17,8 @@ function renderCashDrawerView(container) {
         <h2 style="font-size: 1.35rem; font-weight: 700; color: #0d9488;">Cash Drawer & Shift Reconciliation</h2>
         <div style="font-size: 0.8rem; color: var(--text-muted);">Current Shift: ${drawer.shiftDate} (Operator: <strong style="color: var(--text-main);">${currentOperator}</strong>)</div>
       </div>
-      <button onclick="handleZReading()" class="btn-primary" style="background: #e11d48;">
-        🧾 Print End-of-Day Z-Reading
+      <button onclick="handleZReading()" class="btn-primary" style="background: #e11d48; display: inline-flex; align-items: center; gap: 6px;">
+        <i data-lucide="printer" style="width: 16px; height: 16px;"></i> Print End-of-Day Z-Reading
       </button>
     </div>
 
@@ -65,12 +65,16 @@ function renderCashDrawerView(container) {
         <button onclick="alert('Petty Cash Out modal')" class="btn-outline">
           - Cash Out (Store Expense / Delivery)
         </button>
-        <button onclick="alert('Cash Count Verification modal')" class="btn-outline">
-          🪙 Perform Mid-Day Cash Count
+        <button onclick="alert('Cash Count Verification modal')" class="btn-outline" style="display: inline-flex; align-items: center; gap: 6px;">
+          <i data-lucide="coins" style="width: 15px; height: 15px;"></i> Perform Mid-Day Cash Count
         </button>
       </div>
     </div>
   `;
+
+  if (typeof lucide !== 'undefined') {
+    lucide.createIcons();
+  }
 }
 
 window.handleZReading = function() {

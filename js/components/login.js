@@ -92,8 +92,8 @@ function renderLoginPage() {
           <div class="login-demo-label">Select user account to sign in:</div>
           <div class="login-demo-accounts">
             ${users.map(u => `
-              <button type="button" class="login-demo-pill" onclick="fillDemo('${u.username}','${u.password}')" title="${u.fullName} (${u.role})">
-                <span>👤</span> <strong>${u.username}</strong>
+              <button type="button" class="login-demo-pill" onclick="fillDemo('${u.username}','${u.password}')" title="${u.fullName} (${u.role})" style="display: inline-flex; align-items: center; gap: 4px;">
+                <i data-lucide="user" style="width: 14px; height: 14px;"></i> <strong>${u.username}</strong>
               </button>
             `).join('')}
           </div>
@@ -105,6 +105,10 @@ function renderLoginPage() {
       </div>
     </div>
   `;
+
+  if (typeof lucide !== 'undefined') {
+    lucide.createIcons();
+  }
 
   // Auto-focus username field
   setTimeout(() => {

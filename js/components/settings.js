@@ -14,8 +14,8 @@ function renderSettingsView(container) {
 
     <form id="settingsForm" onsubmit="handleSaveSettings(event)" style="max-width: 800px;">
       <div class="card" style="padding: 1.5rem; margin-bottom: 1.25rem;">
-        <h3 style="font-size: 1rem; font-weight: 700; color: var(--text-main); margin-bottom: 1rem;">
-          🏥 Pharmacy Identity & Branding
+        <h3 style="font-size: 1rem; font-weight: 700; color: var(--text-main); margin-bottom: 1rem; display: flex; align-items: center; gap: 6px;">
+          <i data-lucide="building-2" style="width: 17px; height: 17px; color: var(--primary);"></i> Pharmacy Identity & Branding
         </h3>
         <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
           <div class="input-group">
@@ -42,8 +42,8 @@ function renderSettingsView(container) {
       </div>
 
       <div class="card" style="padding: 1.5rem; margin-bottom: 1.25rem;">
-        <h3 style="font-size: 1rem; font-weight: 700; color: var(--text-main); margin-bottom: 1rem;">
-          🇵🇭 Regulatory Compliance (BIR & FDA)
+        <h3 style="font-size: 1rem; font-weight: 700; color: var(--text-main); margin-bottom: 1rem; display: flex; align-items: center; gap: 6px;">
+          <i data-lucide="shield-check" style="width: 17px; height: 17px; color: #16a34a;"></i> Regulatory Compliance (BIR & FDA)
         </h3>
         <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
           <div class="input-group">
@@ -66,8 +66,8 @@ function renderSettingsView(container) {
       </div>
 
       <div style="display: flex; justify-content: space-between; align-items: center;">
-        <button type="button" onclick="handleResetData()" style="color: #ef4444; background: none; border: 1px solid #fecaca; padding: 0.5rem 1rem; border-radius: var(--radius-sm); font-size: 0.8rem; cursor: pointer;">
-          ↺ Reset All Sample Pharmacy Data
+        <button type="button" onclick="handleResetData()" style="color: #ef4444; background: none; border: 1px solid #fecaca; padding: 0.5rem 1rem; border-radius: var(--radius-sm); font-size: 0.8rem; cursor: pointer; display: inline-flex; align-items: center; gap: 4px;">
+          <i data-lucide="rotate-ccw" style="width: 14px; height: 14px;"></i> Reset All Sample Pharmacy Data
         </button>
         <button type="submit" class="btn-primary" style="padding: 0.65rem 1.8rem;">
           Save Settings
@@ -75,6 +75,10 @@ function renderSettingsView(container) {
       </div>
     </form>
   `;
+
+  if (typeof lucide !== 'undefined') {
+    lucide.createIcons();
+  }
 }
 
 window.handleSaveSettings = function(e) {

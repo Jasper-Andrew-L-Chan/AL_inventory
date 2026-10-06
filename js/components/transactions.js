@@ -11,6 +11,24 @@
  * 5. Tabular audit log with search, filters, details, and receipt printing
  */
 
+function formatDateMMDDYY(dateStr) {
+  if (!dateStr) return '';
+  const cleanStr = String(dateStr).trim();
+  const parts = cleanStr.split('T')[0].split('-');
+  if (parts.length === 3) {
+    const [y, m, d] = parts;
+    return `${m.padStart(2, '0')}//${d.padStart(2, '0')}//${y.slice(-2)}`;
+  }
+  const dt = new Date(cleanStr);
+  if (!isNaN(dt.getTime())) {
+    const m = String(dt.getMonth() + 1).padStart(2, '0');
+    const d = String(dt.getDate()).padStart(2, '0');
+    const yy = String(dt.getFullYear()).slice(-2);
+    return `${m}//${d}//${yy}`;
+  }
+  return cleanStr;
+}
+
 let txnSearchFilters = {
   date: '',
   time: '',
@@ -22,6 +40,8 @@ let txnSearchFilters = {
 let txnCurrentTab = 'DETAILS';
 let expandedTxnId = null;
 let editingTxnId = null; // Track transaction being edited & restocked
+let txnHistoryPage = 1;
+const TXN_PAGE_SIZE = 10;
 
 // Local state for the customer transaction entry form
 let currentTxnForm = {
@@ -81,7 +101,12 @@ function renderTransactionsView(container) {
   });
 
   const filteredTxns = allTxns.filter(t => {
-    if (txnSearchFilters.date && !t.date.toLowerCase().includes(txnSearchFilters.date.toLowerCase())) return false;
+    if (txnSearchFilters.date) {
+      const q = txnSearchFilters.date.toLowerCase();
+      const rawDate = (t.date || '').toLowerCase();
+      const formattedDate = formatDateMMDDYY(t.date).toLowerCase();
+      if (!rawDate.includes(q) && !formattedDate.includes(q)) return false;
+    }
     if (txnSearchFilters.time && !t.time.toLowerCase().includes(txnSearchFilters.time.toLowerCase())) return false;
     if (txnSearchFilters.receipt && !t.receiptNo.toLowerCase().includes(txnSearchFilters.receipt.toLowerCase())) return false;
     if (txnSearchFilters.cashier && !t.cashier.toLowerCase().includes(txnSearchFilters.cashier.toLowerCase())) return false;
@@ -92,6 +117,14 @@ function renderTransactionsView(container) {
     }
     return true;
   });
+
+  const totalTxnCount = filteredTxns.length;
+  const totalTxnPages = Math.ceil(totalTxnCount / TXN_PAGE_SIZE) || 1;
+  if (txnHistoryPage > totalTxnPages) txnHistoryPage = totalTxnPages;
+  if (txnHistoryPage < 1) txnHistoryPage = 1;
+
+  const startTxnIdx = (txnHistoryPage - 1) * TXN_PAGE_SIZE;
+  const pageTxns = filteredTxns.slice(startTxnIdx, startTxnIdx + TXN_PAGE_SIZE);
 
   const nowStr = new Date().toISOString().split('T')[0];
 
@@ -115,7 +148,9 @@ function renderTransactionsView(container) {
     <div class="inout-builder-card" style="${editingTxnId ? 'border: 2px solid #f59e0b; box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.2);' : ''}">
       <div class="inout-builder-header" style="${editingTxnId ? 'background: linear-gradient(135deg, #d97706 0%, #f59e0b 100%);' : ''}">
         <div style="display: flex; align-items: center; gap: 0.65rem;">
-          <span style="font-size: 1.35rem;">${editingTxnId ? '🔄' : '📦'}</span>
+          <span style="display: inline-flex; align-items: center; justify-content: center; width: 34px; height: 34px; background: rgba(255,255,255,0.2); border-radius: 8px;">
+            <i data-lucide="${editingTxnId ? 'refresh-cw' : 'package-plus'}" style="width: 18px; height: 18px; color: #ffffff;"></i>
+          </span>
           <div>
             <h3 style="margin: 0; font-size: 1rem; font-weight: 700; letter-spacing: -0.01em;">
               ${editingTxnId ? 'Edit / Restock Transaction & Item Substitution' : 'Customer Transaction & Stock Out Entry'}
@@ -129,12 +164,14 @@ function renderTransactionsView(container) {
         </div>
         <div style="display: flex; gap: 0.5rem; align-items: center;">
           ${editingTxnId ? `
-            <button type="button" onclick="cancelEditTxn()" class="btn-outline" style="background: rgba(0,0,0,0.25); color: white; border: 1px solid rgba(255,255,255,0.4); font-size: 0.78rem; padding: 0.35rem 0.75rem; font-weight: 700;">
-              ✕ Cancel Edit
+            <button type="button" onclick="cancelEditTxn()" class="btn-outline" style="background: rgba(0,0,0,0.25); color: white; border: 1px solid rgba(255,255,255,0.4); font-size: 0.78rem; padding: 0.35rem 0.75rem; font-weight: 700; display: inline-flex; align-items: center; gap: 0.35rem;">
+              <i data-lucide="x" style="width: 14px; height: 14px;"></i>
+              <span>Cancel Edit</span>
             </button>
           ` : ''}
-          <button type="button" onclick="resetCustomerForm()" class="btn-outline" style="background: rgba(255,255,255,0.15); color: white; border: 1px solid rgba(255,255,255,0.3); font-size: 0.78rem; padding: 0.35rem 0.75rem;">
-            Clear Form
+          <button type="button" onclick="resetCustomerForm()" class="btn-outline" style="background: rgba(255,255,255,0.15); color: white; border: 1px solid rgba(255,255,255,0.3); font-size: 0.78rem; padding: 0.35rem 0.75rem; display: inline-flex; align-items: center; gap: 0.35rem;">
+            <i data-lucide="rotate-ccw" style="width: 13px; height: 13px;"></i>
+            <span>Clear Form</span>
           </button>
         </div>
       </div>
@@ -218,16 +255,18 @@ function renderTransactionsView(container) {
         <!-- Medicines List Entry -->
         <div style="margin-bottom: 1rem;">
           <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.6rem;">
-            <div style="font-size: 0.84rem; font-weight: 700; color: #1e293b;">
-              📋 List of Medicines Purchased
+            <div style="font-size: 0.84rem; font-weight: 700; color: #1e293b; display: inline-flex; align-items: center; gap: 0.4rem;">
+              <i data-lucide="clipboard-list" style="width: 16px; height: 16px; color: var(--primary);"></i>
+              <span>List of Medicines Purchased</span>
             </div>
             <button 
               type="button" 
               onclick="addMedicineRow()" 
               class="btn-primary" 
-              style="padding: 0.35rem 0.75rem; font-size: 0.78rem; background: #0f766e; display: flex; align-items: center; gap: 0.3rem;"
+              style="padding: 0.35rem 0.75rem; font-size: 0.78rem; background: var(--primary); display: flex; align-items: center; gap: 0.35rem;"
             >
-              <span>+ Add Another Medicine</span>
+              <i data-lucide="plus" style="width: 14px; height: 14px;"></i>
+              <span>Add Another Medicine</span>
             </button>
           </div>
 
@@ -256,22 +295,23 @@ function renderTransactionsView(container) {
           <div style="display: flex; gap: 1.5rem; align-items: center; flex-wrap: wrap;">
             <div>
               <span style="font-size: 0.75rem; color: #64748b; font-weight: 600;">Total Units:</span>
-              <span id="formGrandTotalQty" style="font-size: 1rem; font-weight: 800; color: #0f766e; margin-left: 0.35rem;">
+              <span id="formGrandTotalQty" style="font-size: 1rem; font-weight: 800; color: var(--brand-charcoal); margin-left: 0.35rem;">
                 ${formGrandTotalQty}
               </span>
             </div>
             <div>
               <span style="font-size: 0.75rem; color: #64748b; font-weight: 600;">Total Selling Price:</span>
-              <span id="formGrandTotalSelling" style="font-size: 1.15rem; font-weight: 800; color: #0f766e; margin-left: 0.35rem;">
+              <span id="formGrandTotalSelling" style="font-size: 1.15rem; font-weight: 800; color: var(--primary); margin-left: 0.35rem;">
                 ₱${formGrandTotalSelling.toFixed(2)}
               </span>
             </div>
             <div id="budgetAlertContainer">
               ${customerBudget > 0 ? `
-                <div style="padding: 0.25rem 0.65rem; border-radius: 4px; font-size: 0.76rem; font-weight: 700; ${isOverBudget ? 'background: #fee2e2; color: #b91c1c;' : 'background: #ecfdf5; color: #047857;'}">
-                  ${isOverBudget
-        ? `⚠️ Over Budget by ₱${(formGrandTotalSelling - customerBudget).toFixed(2)}`
-        : `✓ Within Budget (₱${(customerBudget - formGrandTotalSelling).toFixed(2)} remaining)`}
+                <div style="padding: 0.25rem 0.65rem; border-radius: 4px; font-size: 0.76rem; font-weight: 700; display: inline-flex; align-items: center; gap: 0.35rem; ${isOverBudget ? 'background: #fee2e2; color: #b91c1c;' : 'background: #ecfdf5; color: #047857;'}">
+                  <i data-lucide="${isOverBudget ? 'alert-triangle' : 'check'}" style="width: 13px; height: 13px;"></i>
+                  <span>${isOverBudget
+          ? `Over Budget by ₱${(formGrandTotalSelling - customerBudget).toFixed(2)}`
+          : `Within Budget (₱${(customerBudget - formGrandTotalSelling).toFixed(2)} remaining)`}</span>
                 </div>
               ` : ''}
             </div>
@@ -282,9 +322,10 @@ function renderTransactionsView(container) {
               type="button" 
               onclick="saveCustomerTransaction()" 
               class="btn-primary" 
-              style="background: ${editingTxnId ? '#d97706' : '#0f766e'}; font-size: 0.88rem; padding: 0.6rem 1.5rem; display: flex; align-items: center; gap: 0.5rem; box-shadow: 0 3px 8px ${editingTxnId ? 'rgba(217, 119, 6, 0.35)' : 'rgba(15, 118, 110, 0.3)'};"
+              style="background: ${editingTxnId ? '#d97706' : 'var(--primary)'}; font-size: 0.88rem; padding: 0.6rem 1.5rem; display: flex; align-items: center; gap: 0.5rem; box-shadow: 0 3px 8px ${editingTxnId ? 'rgba(217, 119, 6, 0.35)' : 'rgba(255, 90, 0, 0.3)'};"
             >
-              <span>${editingTxnId ? '🔄 Save Changes & Restock / Deduct' : '💾 Save & Deduct Inventory'}</span>
+              <i data-lucide="${editingTxnId ? 'refresh-cw' : 'save'}" style="width: 16px; height: 16px;"></i>
+              <span>${editingTxnId ? 'Save Changes & Restock / Deduct' : 'Save & Deduct Inventory'}</span>
             </button>
           </div>
         </div>
@@ -303,7 +344,7 @@ function renderTransactionsView(container) {
             <label style="font-size: 0.75rem; color: var(--text-muted); font-weight: 600;">To</label>
             <input type="date" id="txnToDate" value="${nowStr}" class="form-input" style="padding: 0.4rem 0.6rem; font-size: 0.82rem;" />
           </div>
-          <button onclick="handleTxnDateFilter()" class="btn-primary" style="margin-top: 1.2rem; background: #2dd4bf; color: #0f766e; font-weight: 700;">
+          <button onclick="handleTxnDateFilter()" class="btn-primary" style="margin-top: 1.2rem; background: var(--primary); color: #ffffff; font-weight: 700;">
             Go!
           </button>
         </div>
@@ -313,188 +354,306 @@ function renderTransactionsView(container) {
       </div>
 
       <div>
-        <button onclick="exportTransactionsCSV()" class="btn-primary" style="background: #028090; display: flex; align-items: center; gap: 0.5rem;">
-          <span>⬇ Download CSV</span>
+        <button onclick="exportTransactionsCSV()" class="btn-primary" style="background: var(--brand-charcoal); display: flex; align-items: center; gap: 0.5rem;">
+          <i data-lucide="download" style="width: 15px; height: 15px;"></i>
+          <span>Download CSV</span>
         </button>
       </div>
     </div>
 
     <!-- Data Table of In - Out Transactions -->
-    <div class="table-container">
-      <table class="data-table">
-        <thead>
-          <tr style="background: #38b2ac; color: white;">
-            <th style="width: 30px; background: #38b2ac; color: white;"></th>
-            <th style="background: #38b2ac; color: white;">Date & Ref</th>
-            <th style="background: #38b2ac; color: white;">Customer / Brgy</th>
-            <th style="background: #38b2ac; color: white;">Receipt No.</th>
-            <th style="background: #38b2ac; color: white;">Cashier</th>
-            <th style="background: #38b2ac; color: white;">Medicines Supplied</th>
-            <th style="background: #38b2ac; color: white; text-align: right;">Total Amount</th>
-            <th style="background: #38b2ac; color: white; text-align: center;">Action</th>
-          </tr>
-          <!-- Subheader Column Search -->
-          <tr style="background: #ffffff;">
-            <td></td>
-            <td><input type="text" placeholder="Search date..." value="${txnSearchFilters.date}" oninput="updateTxnFilter('date', this.value)" class="table-search-input" style="width: 100px;" /></td>
-            <td><input type="text" placeholder="Search customer..." value="${txnSearchFilters.cashier}" oninput="updateTxnFilter('cashier', this.value)" class="table-search-input" style="width: 120px;" /></td>
-            <td><input type="text" placeholder="Search ref..." value="${txnSearchFilters.receipt}" oninput="updateTxnFilter('receipt', this.value)" class="table-search-input" style="width: 100px;" /></td>
-            <td><input type="text" placeholder="Search staff..." value="" oninput="updateTxnFilter('time', this.value)" class="table-search-input" style="width: 80px;" /></td>
-            <td><input type="text" placeholder="Search medicines..." value="${txnSearchFilters.items}" oninput="updateTxnFilter('items', this.value)" class="table-search-input" style="width: 180px;" /></td>
-            <td><input type="text" placeholder="Search ₱..." value="${txnSearchFilters.total}" oninput="updateTxnFilter('total', this.value)" class="table-search-input" style="width: 80px; text-align: right;" /></td>
-            <td></td>
-          </tr>
-        </thead>
-        <tbody>
-          ${filteredTxns.length === 0 ? `
-            <tr>
-              <td colspan="8" style="text-align: center; padding: 3rem 1rem; color: var(--text-muted);">
-                <div style="font-size: 2.2rem; margin-bottom: 0.5rem;">🔄</div>
-                <div style="font-weight: 700; font-size: 1.05rem; color: var(--text-main); margin-bottom: 0.25rem;">
-                  No In - Out stock movement logs found
-                </div>
-                <div style="font-size: 0.84rem; max-width: 420px; margin: 0 auto;">
-                  Use the Customer Transaction entry form above to record customer purchases. Stock will automatically deduct from inventory.
-                </div>
-              </td>
+    <div style="background: #ffffff; border: 1px solid var(--border-color); border-radius: var(--radius-md); box-shadow: var(--shadow-sm); overflow: hidden; margin-bottom: 1.5rem;">
+      <div style="max-height: 520px; overflow-y: auto; overflow-x: auto;">
+        <table class="data-table" style="margin: 0;">
+          <thead style="position: sticky; top: 0; z-index: 2; box-shadow: 0 1px 2px rgba(0,0,0,0.05);">
+            <tr style="background: #f8fafc; color: var(--text-main); border-bottom: 2px solid var(--border-color);">
+              <th style="width: 30px; background: #f8fafc; color: var(--text-muted);"></th>
+              <th style="background: #f8fafc; color: var(--brand-charcoal); font-weight: 700;">Date & Ref</th>
+              <th style="background: #f8fafc; color: var(--brand-charcoal); font-weight: 700;">Customer / Brgy</th>
+              <th style="background: #f8fafc; color: var(--brand-charcoal); font-weight: 700;">Receipt No.</th>
+              <th style="background: #f8fafc; color: var(--brand-charcoal); font-weight: 700;">Cashier</th>
+              <th style="background: #f8fafc; color: var(--brand-charcoal); font-weight: 700;">Medicines Supplied</th>
+              <th style="background: #f8fafc; color: var(--brand-charcoal); font-weight: 700; text-align: right;">Total Amount</th>
+              <th style="background: #f8fafc; color: var(--brand-charcoal); font-weight: 700; text-align: center;">Action</th>
             </tr>
-          ` : filteredTxns.map(t => {
-          const isExpanded = expandedTxnId === t.id;
-          const isRefunded = t.status === 'Refunded';
-
-          return `
-              <tr style="${isRefunded ? 'opacity: 0.6; background: #fff1f2;' : ''}">
-                <td style="text-align: center; cursor: pointer;" onclick="toggleExpandTxn('${t.id}')">
-                  <span style="font-weight: 700; color: var(--primary);">${isExpanded ? '▼' : '▶'}</span>
-                </td>
-                <td>
-                  <div style="font-weight: 600; color: var(--text-main); font-size: 0.85rem;">
-                    ${t.date}
+            <!-- Subheader Column Search -->
+            <tr style="background: #ffffff;">
+              <td></td>
+              <td><input type="text" placeholder="Search date..." value="${txnSearchFilters.date}" oninput="updateTxnFilter('date', this.value)" class="table-search-input" style="width: 100px;" /></td>
+              <td><input type="text" placeholder="Search customer..." value="${txnSearchFilters.cashier}" oninput="updateTxnFilter('cashier', this.value)" class="table-search-input" style="width: 120px;" /></td>
+              <td><input type="text" placeholder="Search ref..." value="${txnSearchFilters.receipt}" oninput="updateTxnFilter('receipt', this.value)" class="table-search-input" style="width: 100px;" /></td>
+              <td><input type="text" placeholder="Search staff..." value="" oninput="updateTxnFilter('time', this.value)" class="table-search-input" style="width: 80px;" /></td>
+              <td><input type="text" placeholder="Search medicines..." value="${txnSearchFilters.items}" oninput="updateTxnFilter('items', this.value)" class="table-search-input" style="width: 180px;" /></td>
+              <td><input type="text" placeholder="Search ₱..." value="${txnSearchFilters.total}" oninput="updateTxnFilter('total', this.value)" class="table-search-input" style="width: 80px; text-align: right;" /></td>
+              <td></td>
+            </tr>
+          </thead>
+          <tbody>
+            ${totalTxnCount === 0 ? `
+              <tr>
+                <td colspan="8" style="text-align: center; padding: 3rem 1rem; color: var(--text-muted);">
+                  <div style="margin-bottom: 0.5rem; display: flex; justify-content: center;">
+                    <i data-lucide="refresh-cw" style="width: 36px; height: 36px; color: var(--border-color);"></i>
                   </div>
-                  <div style="font-size: 0.72rem; color: var(--text-muted); font-family: monospace;">
-                    ${t.time || ''}
+                  <div style="font-weight: 700; font-size: 1.05rem; color: var(--text-main); margin-bottom: 0.25rem;">
+                    No In - Out stock movement logs found
                   </div>
-                </td>
-                <td>
-                  <div style="font-weight: 700; color: #0f766e; font-size: 0.86rem;">
-                    ${escapeHtml(t.customerName || 'Walk-in')}
+                  <div style="font-size: 0.84rem; max-width: 420px; margin: 0 auto;">
+                    Use the Customer Transaction entry form above to record customer purchases. Stock will automatically deduct from inventory.
                   </div>
-                  ${t.barangay ? `
-                    <div style="font-size: 0.73rem; color: #64748b;">
-                      📍 Brgy. ${escapeHtml(t.barangay)}
-                    </div>
-                  ` : ''}
-                  ${t.budget > 0 ? `
-                    <div style="font-size: 0.7rem; color: #0284c7; font-weight: 600;">
-                      Budget: ₱${Number(t.budget).toFixed(2)}
-                    </div>
-                  ` : ''}
-                </td>
-                <td style="font-family: monospace; font-weight: 700; color: #0f766e;">
-                  ${t.receiptNo}
-                </td>
-                <td style="font-size: 0.82rem;">${t.cashier}</td>
-                <td style="font-size: 0.82rem;">
-                  <div style="font-weight: 500; color: var(--text-main);">
-                    ${t.items.map(i => {
-            const wasSubstituted = i.isSubstitute || (i.actualSuppliedName && i.actualSuppliedName !== i.name);
-            if (wasSubstituted) {
-              return `<span style="display: inline-block; margin-bottom: 2px;">
-                          <strong>${escapeHtml(i.actualSuppliedName || i.name)}</strong> (x${i.qty})
-                          <span style="font-size: 0.7rem; color: #d97706; background: #fef3c7; padding: 1px 4px; border-radius: 3px;">Substituted for ${escapeHtml(i.requestedName || i.name)}</span>
-                        </span>`;
-            }
-            return `<span>${escapeHtml(i.name)} (x${i.qty})</span>`;
-          }).join(', ')}
-                  </div>
-                </td>
-                <td style="text-align: right; font-weight: 800; font-size: 0.95rem; color: var(--text-main);">
-                  ₱${Number(t.netTotal).toFixed(2)}
-                  ${isRefunded ? '<div style="font-size: 0.68rem; color: #ef4444;">VOIDED / RESTOCKED</div>' : ''}
-                </td>
-                <td style="text-align: center;">
-                  ${!isRefunded ? `
-                    <button 
-                      onclick="handleStartEditTxn('${t.id}')" 
-                      style="background: #f0fdfa; border: 1.5px solid #0f766e; color: #0f766e; border-radius: var(--radius-sm); padding: 5px 12px; font-size: 0.78rem; font-weight: 700; cursor: pointer; transition: all 0.15s ease;"
-                      onmouseover="this.style.background='#0f766e'; this.style.color='#ffffff';"
-                      onmouseout="this.style.background='#f0fdfa'; this.style.color='#0f766e';"
-                      title="Edit this transaction and substitute or restock medicines"
-                    >
-                      ✏️ Edit / Restock
-                    </button>
-                  ` : `
-                    <span style="font-size: 0.75rem; color: #94a3b8; font-weight: 600;">Restocked</span>
-                  `}
                 </td>
               </tr>
+            ` : pageTxns.map(t => {
+            const isExpanded = expandedTxnId === t.id;
+            const isRefunded = t.status === 'Refunded';
 
-              <!-- Expanded Details Row -->
-              ${isExpanded ? `
-                <tr style="background: #f8fafc;">
-                  <td colspan="8" style="padding: 1rem 1.5rem;">
-                    <div style="border-left: 3px solid #0f766e; padding-left: 1rem;">
-                      <h4 style="font-size: 0.88rem; font-weight: 700; margin-bottom: 0.4rem; color: var(--text-main);">
-                        Transaction Breakdown: ${t.receiptNo} (${t.date} ${t.time})
-                      </h4>
-                      <div style="font-size: 0.78rem; color: var(--text-muted); margin-bottom: 0.6rem;">
-                        <strong>Customer:</strong> ${escapeHtml(t.customerName)} | 
-                        <strong>Barangay:</strong> ${escapeHtml(t.barangay || 'N/A')} | 
-                        <strong>Budget:</strong> ${t.budget ? '₱' + Number(t.budget).toFixed(2) : 'N/A'} |
-                        <strong>Staff:</strong> ${escapeHtml(t.cashier)}
+            return `
+                <tr style="${isRefunded ? 'opacity: 0.6; background: #fff1f2;' : ''}">
+                  <td style="text-align: center; cursor: pointer;" onclick="toggleExpandTxn('${t.id}')">
+                    <span style="display: inline-flex; align-items: center; justify-content: center; color: var(--primary);">
+                      <i data-lucide="${isExpanded ? 'chevron-down' : 'chevron-right'}" style="width: 16px; height: 16px;"></i>
+                    </span>
+                  </td>
+                  <td>
+                    <div style="font-weight: 600; color: var(--text-main); font-size: 0.85rem;">
+                      ${formatDateMMDDYY(t.date)}
+                    </div>
+                    <div style="font-size: 0.72rem; color: var(--text-muted); font-family: monospace;">
+                      ${t.time || ''}
+                    </div>
+                  </td>
+                  <td>
+                    <div style="font-weight: 700; color: var(--brand-charcoal); font-size: 0.86rem;">
+                      ${escapeHtml(t.customerName || 'Walk-in')}
+                    </div>
+                    ${t.barangay ? `
+                      <div style="font-size: 0.73rem; color: #64748b; display: inline-flex; align-items: center; gap: 0.25rem; margin-top: 2px;">
+                        <i data-lucide="map-pin" style="width: 12px; height: 12px; color: #94a3b8;"></i>
+                        <span>Brgy. ${escapeHtml(t.barangay)}</span>
                       </div>
-
-                      <table style="width: 100%; max-width: 720px; font-size: 0.78rem; border-collapse: collapse; margin-bottom: 0.75rem;">
-                        <thead>
-                          <tr style="border-bottom: 1px solid #cbd5e1; text-align: left; background: #f1f5f9;">
-                            <th style="padding: 6px 8px;">Medicine Requested</th>
-                            <th style="padding: 6px 8px;">Actual Medicine Supplied (Deducted)</th>
-                            <th style="padding: 6px 8px; text-align: center;">Qty</th>
-                            <th style="padding: 6px 8px; text-align: right;">Unit Price</th>
-                            <th style="padding: 6px 8px; text-align: right;">Selling Price</th>
-                            <th style="padding: 6px 8px; text-align: right;">Subtotal</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          ${t.items.map(item => `
-                            <tr style="border-bottom: 1px solid #f1f5f9;">
-                              <td style="padding: 6px 8px;">${escapeHtml(item.requestedName || item.name)}</td>
-                              <td style="padding: 6px 8px; font-weight: 600; color: #0f766e;">
-                                ${escapeHtml(item.actualSuppliedName || item.name)}
-                                ${item.isSubstitute ? '<span style="color: #b45309; font-size: 0.7rem;"> (Substitute)</span>' : ''}
-                              </td>
-                              <td style="padding: 6px 8px; text-align: center; font-weight: 700;">${item.qty}</td>
-                              <td style="padding: 6px 8px; text-align: right;">₱${Number(item.unitPrice || 0).toFixed(2)}</td>
-                              <td style="padding: 6px 8px; text-align: right;">₱${Number(item.sellingPrice || item.price || 0).toFixed(2)}</td>
-                              <td style="padding: 6px 8px; text-align: right; font-weight: 700;">₱${((item.sellingPrice || item.price || 0) * item.qty).toFixed(2)}</td>
-                            </tr>
-                          `).join('')}
-                        </tbody>
-                        <tfoot>
-                          <tr>
-                            <td colspan="5" style="text-align: right; font-weight: 700; padding: 6px 8px;">Total:</td>
-                            <td style="text-align: right; font-weight: 800; font-size: 0.88rem; color: #0f766e; padding: 6px 8px;">
-                              ₱${Number(t.netTotal).toFixed(2)}
-                            </td>
-                          </tr>
-                        </tfoot>
-                      </table>
-
-                      <div style="display: flex; gap: 0.75rem;">
-                        <button onclick="window.renderOfficialReceipt(window.pharmacyStore.getTransactions().find(x => x.id === '${t.id}'))" class="btn-outline" style="font-size: 0.75rem; padding: 4px 10px;">
-                          View Full Official Receipt
+                    ` : ''}
+                    ${t.budget > 0 ? `
+                      <div style="font-size: 0.7rem; color: var(--primary); font-weight: 600;">
+                        Budget: ₱${Number(t.budget).toFixed(2)}
+                      </div>
+                    ` : ''}
+                  </td>
+                  <td style="font-family: monospace; font-weight: 700; color: var(--brand-charcoal);">
+                    ${t.receiptNo}
+                  </td>
+                  <td style="font-size: 0.82rem;">${t.cashier}</td>
+                  <td style="font-size: 0.82rem;">
+                    <div style="font-weight: 500; color: var(--text-main);">
+                      ${t.items.map(i => {
+              const wasSubstituted = i.isSubstitute || (i.actualSuppliedName && i.actualSuppliedName !== i.name);
+              if (wasSubstituted) {
+                return `<span style="display: inline-block; margin-bottom: 2px;">
+                            <strong>${escapeHtml(i.actualSuppliedName || i.name)}</strong> (x${i.qty})
+                            <span style="font-size: 0.7rem; color: #d97706; background: #fef3c7; padding: 1px 4px; border-radius: 3px;">Substituted for ${escapeHtml(i.requestedName || i.name)}</span>
+                          </span>`;
+              }
+              return `<span>${escapeHtml(i.name)} (x${i.qty})</span>`;
+            }).join(', ')}
+                    </div>
+                  </td>
+                  <td style="text-align: right; font-weight: 800; font-size: 0.95rem; color: var(--text-main);">
+                    ₱${Number(t.netTotal).toFixed(2)}
+                    ${isRefunded ? '<div style="font-size: 0.68rem; color: #ef4444;">VOIDED / RESTOCKED</div>' : ''}
+                  </td>
+                  <td style="text-align: center;">
+                    <div style="display: flex; gap: 0.35rem; justify-content: center; align-items: center; flex-wrap: wrap;">
+                      ${!isRefunded ? `
+                        <button 
+                          onclick="handleStartEditTxn('${t.id}')" 
+                          style="background: var(--primary-light); border: 1.5px solid var(--primary); color: var(--primary-dark); border-radius: var(--radius-sm); padding: 4px 10px; font-size: 0.76rem; font-weight: 700; cursor: pointer; transition: all 0.15s ease; display: inline-flex; align-items: center; gap: 0.35rem;"
+                          onmouseover="this.style.background='var(--primary)'; this.style.color='#ffffff';"
+                          onmouseout="this.style.background='var(--primary-light)'; this.style.color='var(--primary-dark)';"
+                          title="Edit this transaction and substitute or restock medicines"
+                        >
+                          <i data-lucide="edit-3" style="width: 12px; height: 12px;"></i>
+                          <span>Edit / Restock</span>
                         </button>
-                      </div>
+                      ` : `
+                        <span style="font-size: 0.75rem; color: #94a3b8; font-weight: 600;">Restocked</span>
+                      `}
+                      <button 
+                        onclick="handleDeleteTxn('${t.id}')" 
+                        style="background: #fee2e2; border: 1.5px solid #f87171; color: #b91c1c; border-radius: var(--radius-sm); padding: 5px 8px; font-size: 0.76rem; font-weight: 700; cursor: pointer; transition: all 0.15s ease; display: inline-flex; align-items: center;"
+                        onmouseover="this.style.background='#ef4444'; this.style.color='#ffffff';"
+                        onmouseout="this.style.background='#fee2e2'; this.style.color='#b91c1c';"
+                        title="Remove transaction from history"
+                      >
+                        <i data-lucide="trash-2" style="width: 13px; height: 13px;"></i>
+                      </button>
                     </div>
                   </td>
                 </tr>
-              ` : ''}
-            `;
-        }).join('')}
-        </tbody>
-      </table>
+
+                <!-- Expanded Details Row -->
+                ${isExpanded ? `
+                  <tr style="background: #f8fafc;">
+                    <td colspan="8" style="padding: 1rem 1.5rem;">
+                      <div style="border-left: 3px solid var(--primary); padding-left: 1rem;">
+                        <h4 style="font-size: 0.88rem; font-weight: 700; margin-bottom: 0.4rem; color: var(--text-main);">
+                          Transaction Breakdown: ${t.receiptNo} (${formatDateMMDDYY(t.date)} ${t.time})
+                        </h4>
+                        <div style="font-size: 0.78rem; color: var(--text-muted); margin-bottom: 0.6rem;">
+                          <strong>Customer:</strong> ${escapeHtml(t.customerName)} | 
+                          <strong>Barangay:</strong> ${escapeHtml(t.barangay || 'N/A')} | 
+                          <strong>Budget:</strong> ${t.budget ? '₱' + Number(t.budget).toFixed(2) : 'N/A'} |
+                          <strong>Staff:</strong> ${escapeHtml(t.cashier)}
+                        </div>
+
+                        <table style="width: 100%; max-width: 720px; font-size: 0.78rem; border-collapse: collapse; margin-bottom: 0.75rem;">
+                          <thead>
+                            <tr style="border-bottom: 1px solid #cbd5e1; text-align: left; background: #f1f5f9;">
+                              <th style="padding: 6px 8px;">Medicine Requested</th>
+                              <th style="padding: 6px 8px;">Actual Medicine Supplied (Deducted)</th>
+                              <th style="padding: 6px 8px; text-align: center;">Qty</th>
+                              <th style="padding: 6px 8px; text-align: right;">Unit Price</th>
+                              <th style="padding: 6px 8px; text-align: right;">Selling Price</th>
+                              <th style="padding: 6px 8px; text-align: right;">Subtotal</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            ${t.items.map(item => `
+                              <tr style="border-bottom: 1px solid #f1f5f9;">
+                                <td style="padding: 6px 8px;">${escapeHtml(item.requestedName || item.name)}</td>
+                                <td style="padding: 6px 8px; font-weight: 600; color: var(--primary-dark);">
+                                  ${escapeHtml(item.actualSuppliedName || item.name)}
+                                  ${item.isSubstitute ? '<span style="color: #b45309; font-size: 0.7rem;"> (Substitute)</span>' : ''}
+                                </td>
+                                <td style="padding: 6px 8px; text-align: center; font-weight: 700;">${item.qty}</td>
+                                <td style="padding: 6px 8px; text-align: right;">₱${Number(item.unitPrice || 0).toFixed(2)}</td>
+                                <td style="padding: 6px 8px; text-align: right;">₱${Number(item.sellingPrice || item.price || 0).toFixed(2)}</td>
+                                <td style="padding: 6px 8px; text-align: right; font-weight: 700;">₱${((item.sellingPrice || item.price || 0) * item.qty).toFixed(2)}</td>
+                              </tr>
+                            `).join('')}
+                          </tbody>
+                          <tfoot>
+                            <tr>
+                              <td colspan="5" style="text-align: right; font-weight: 700; padding: 6px 8px;">Total:</td>
+                              <td style="text-align: right; font-weight: 800; font-size: 0.88rem; color: var(--primary); padding: 6px 8px;">
+                                ₱${Number(t.netTotal).toFixed(2)}
+                              </td>
+                            </tr>
+                          </tfoot>
+                        </table>
+
+                        <div style="display: flex; gap: 0.75rem; align-items: center;">
+                          <button onclick="window.renderOfficialReceipt(window.pharmacyStore.getTransactions().find(x => x.id === '${t.id}'))" class="btn-outline" style="font-size: 0.75rem; padding: 4px 10px; display: inline-flex; align-items: center; gap: 0.35rem;">
+                            <i data-lucide="receipt" style="width: 13px; height: 13px;"></i>
+                            <span>View Full Official Receipt</span>
+                          </button>
+                          <button onclick="handleDeleteTxn('${t.id}')" class="btn-outline" style="font-size: 0.75rem; padding: 4px 10px; color: #b91c1c; border-color: #fca5a5; display: inline-flex; align-items: center; gap: 0.35rem;">
+                            <i data-lucide="trash-2" style="width: 13px; height: 13px;"></i>
+                            <span>Delete Log Entry</span>
+                          </button>
+                        </div>
+                      </div>
+                    </td>
+                  </tr>
+                ` : ''}
+              `;
+          }).join('')}
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Pagination Footer -->
+      ${totalTxnCount > 0 ? `
+        <div style="display: flex; justify-content: space-between; align-items: center; padding: 0.75rem 1.25rem; border-top: 1px solid var(--border-color); background: #f8fafc; flex-wrap: wrap; gap: 0.75rem;">
+          <div style="font-size: 0.8rem; color: var(--text-muted);">
+            Showing <strong>${startTxnIdx + 1}</strong> to <strong>${Math.min(startTxnIdx + TXN_PAGE_SIZE, totalTxnCount)}</strong> of <strong>${totalTxnCount}</strong> transactions
+          </div>
+
+          <div style="display: flex; align-items: center; gap: 0.35rem;">
+            <!-- First Page -->
+            <button 
+              onclick="handleTxnHistoryPageChange(1)" 
+              class="btn-outline" 
+              style="padding: 4px 8px; font-size: 0.75rem; font-weight: 700;" 
+              ${txnHistoryPage === 1 ? 'disabled style="opacity: 0.4; cursor: not-allowed; padding: 4px 8px; font-size: 0.75rem;"' : ''}
+              title="First Page"
+            >
+              «
+            </button>
+
+            <!-- Previous Page -->
+            <button 
+              onclick="handleTxnHistoryPageChange(${txnHistoryPage - 1})" 
+              class="btn-outline" 
+              style="padding: 4px 10px; font-size: 0.75rem; font-weight: 700;" 
+              ${txnHistoryPage === 1 ? 'disabled style="opacity: 0.4; cursor: not-allowed; padding: 4px 10px; font-size: 0.75rem;"' : ''}
+            >
+              ‹ Prev
+            </button>
+
+            <!-- Page Number Indicator -->
+            <span style="font-size: 0.78rem; font-weight: 700; color: var(--text-main); padding: 0 0.5rem;">
+              Page ${txnHistoryPage} of ${totalTxnPages}
+            </span>
+
+            <!-- Next Page -->
+            <button 
+              onclick="handleTxnHistoryPageChange(${txnHistoryPage + 1})" 
+              class="btn-outline" 
+              style="padding: 4px 10px; font-size: 0.75rem; font-weight: 700;" 
+              ${txnHistoryPage === totalTxnPages ? 'disabled style="opacity: 0.4; cursor: not-allowed; padding: 4px 10px; font-size: 0.75rem;"' : ''}
+            >
+              Next ›
+            </button>
+
+            <!-- Last Page -->
+            <button 
+              onclick="handleTxnHistoryPageChange(${totalTxnPages})" 
+              class="btn-outline" 
+              style="padding: 4px 8px; font-size: 0.75rem; font-weight: 700;" 
+              ${txnHistoryPage === totalTxnPages ? 'disabled style="opacity: 0.4; cursor: not-allowed; padding: 4px 8px; font-size: 0.75rem;"' : ''}
+              title="Last Page"
+            >
+              »
+            </button>
+          </div>
+        </div>
+      ` : ''}
     </div>
   `;
+
+  if (typeof lucide !== 'undefined') {
+    lucide.createIcons();
+  }
+}
+
+// Helper to format medicine name as: Generic Name (Brand Name)
+function getMedicineDisplayName(item) {
+  if (!item) return 'Unnamed Medicine';
+  const brand = (item.brandName || '').trim();
+  const generic = (item.genericName || '').trim();
+  const dosage = (item.dosage && item.dosage !== 'Standard') ? item.dosage.trim() : '';
+
+  if (generic && brand) {
+    const genericFull = dosage ? `${generic} ${dosage}` : generic;
+    return `${genericFull} (${brand})`;
+  }
+
+  // If item.name already contains formatted string like "Brand (Generic)" or "Brand (Generic Dosage)"
+  if (item.name && item.name.includes('(') && item.name.includes(')')) {
+    const match = item.name.match(/^([^(]+)\s*\(([^)]+)\)$/);
+    if (match) {
+      const part1 = match[1].trim(); // previously brand
+      const part2 = match[2].trim(); // previously generic
+      return `${part2} (${part1})`;
+    }
+  }
+
+  if (generic) {
+    return dosage ? `${generic} ${dosage}` : generic;
+  }
+  if (brand) {
+    return dosage ? `${brand} ${dosage}` : brand;
+  }
+  return item.name || 'Unnamed Medicine';
 }
 
 // Render a single medicine row in the form
@@ -526,11 +685,11 @@ function renderMedRowHtml(row, idx, inventoryItems) {
               <option value="">-- Select Medicine from Inventory --</option>
               ${inventoryItems.map(item => `
                 <option value="${item.id}" ${row.selectedMedId === item.id ? 'selected' : ''}>
-                  ${escapeHtml(item.name)} — (${item.currentStock} units available)
+                  ${escapeHtml(getMedicineDisplayName(item))} — (${item.currentStock} units available)
                 </option>
               `).join('')}
               <option value="__CUSTOM__" ${row.selectedMedId === '__CUSTOM__' ? 'selected' : ''}>
-                ✏️ Custom / Unlisted Medicine...
+                + Custom / Unlisted Medicine...
               </option>
             </select>
           </div>
@@ -566,9 +725,10 @@ function renderMedRowHtml(row, idx, inventoryItems) {
                 <button 
                   type="button" 
                   onclick="toggleSubstituteMode('${row.id}')" 
-                  style="background: none; border: none; color: #0284c7; text-decoration: underline; cursor: pointer; font-size: 0.72rem; font-weight: 600;"
+                  style="background: none; border: none; color: #0284c7; text-decoration: underline; cursor: pointer; font-size: 0.72rem; font-weight: 600; display: inline-flex; align-items: center; gap: 0.25rem;"
                 >
-                  ${row.isSubstitute ? '✕ Close substitute' : '🔄 Choose substitute'}
+                  <i data-lucide="${row.isSubstitute ? 'x' : 'refresh-cw'}" style="width: 11px; height: 11px;"></i>
+                  <span>${row.isSubstitute ? 'Close substitute' : 'Choose substitute'}</span>
                 </button>
               </div>
               <div style="display: flex; gap: 0.75rem; color: #64748b; font-size: 0.7rem; flex-wrap: wrap;">
@@ -580,15 +740,18 @@ function renderMedRowHtml(row, idx, inventoryItems) {
               </div>
             </div>
           ` : (row.selectedMedId === '__CUSTOM__' ? `
-            <div style="font-size: 0.72rem; color: #d97706; font-weight: 600; padding: 2px;">
-              ⚠️ Custom medicine entered. Select an available inventory substitute below to deduct from stock.
+            <div style="font-size: 0.72rem; color: #d97706; font-weight: 600; padding: 2px; display: flex; align-items: center; gap: 0.35rem;">
+              <i data-lucide="alert-triangle" style="width: 13px; height: 13px;"></i>
+              <span>Custom medicine entered. Select an available inventory substitute below to deduct from stock.</span>
             </div>
           ` : '')}
 
           <!-- Substitute Dropdown (shown if out of stock, custom, or manually toggled) -->
           ${(needsSubstitute || row.selectedMedId === '__CUSTOM__') ? `
             <div class="substitute-alert">
-              <span style="font-size: 1.1rem;">🔄</span>
+              <span style="display: inline-flex; align-items: center; justify-content: center; color: #b45309;">
+                <i data-lucide="refresh-cw" style="width: 16px; height: 16px;"></i>
+              </span>
               <div style="flex: 1;">
                 <div style="font-weight: 700; font-size: 0.72rem; margin-bottom: 2px; color: #92400e;">
                   Actual Medicine Supplied (Deducted from Inventory):
@@ -603,13 +766,14 @@ function renderMedRowHtml(row, idx, inventoryItems) {
         .filter(item => item.id !== row.selectedMedId)
         .map(item => `
                       <option value="${item.id}" ${row.actualInventoryId === item.id ? 'selected' : ''}>
-                        ${escapeHtml(item.name)} — (${item.currentStock} in stock, ₱${Number(item.sellingPrice || 0).toFixed(2)})
+                        ${escapeHtml(getMedicineDisplayName(item))} — (${item.currentStock} in stock, ₱${Number(item.sellingPrice || 0).toFixed(2)})
                       </option>
                     `).join('')}
                 </select>
                 ${actualItem ? `
-                  <div style="font-size: 0.7rem; color: #047857; margin-top: 3px; font-weight: 600;">
-                    ✓ Deducting from inventory: <strong>${escapeHtml(actualItem.name)}</strong> (${actualStock} units available)
+                  <div style="font-size: 0.7rem; color: #047857; margin-top: 3px; font-weight: 600; display: inline-flex; align-items: center; gap: 0.25rem;">
+                    <i data-lucide="check" style="width: 12px; height: 12px;"></i>
+                    <span>Deducting from inventory: <strong>${escapeHtml(getMedicineDisplayName(actualItem))}</strong> (${actualStock} units available)</span>
                   </div>
                 ` : ''}
               </div>
@@ -680,7 +844,7 @@ function renderMedRowHtml(row, idx, inventoryItems) {
       </td>
 
       <!-- Total Selling Price -->
-      <td id="row-totalSellingPrice-${row.id}" style="text-align: right; vertical-align: top; padding-top: 1.1rem; font-weight: 800; color: #0f766e; font-size: 0.92rem;">
+      <td id="row-totalSellingPrice-${row.id}" style="text-align: right; vertical-align: top; padding-top: 1.1rem; font-weight: 800; color: var(--primary); font-size: 0.92rem;">
         ₱${(Number(row.totalSellingPrice) || 0).toFixed(2)}
       </td>
 
@@ -873,12 +1037,14 @@ window.updateMedRowField = function (rowId, field, val) {
   if (budgetContainer) {
     if (customerBudget > 0) {
       budgetContainer.innerHTML = `
-        <div style="padding: 0.25rem 0.65rem; border-radius: 4px; font-size: 0.76rem; font-weight: 700; ${isOverBudget ? 'background: #fee2e2; color: #b91c1c;' : 'background: #ecfdf5; color: #047857;'}">
-          ${isOverBudget
-          ? `⚠️ Over Budget by ₱${(formGrandTotalSelling - customerBudget).toFixed(2)}`
-          : `✓ Within Budget (₱${(customerBudget - formGrandTotalSelling).toFixed(2)} remaining)`}
+        <div style="padding: 0.25rem 0.65rem; border-radius: 4px; font-size: 0.76rem; font-weight: 700; display: inline-flex; align-items: center; gap: 0.35rem; ${isOverBudget ? 'background: #fee2e2; color: #b91c1c;' : 'background: #ecfdf5; color: #047857;'}">
+          <i data-lucide="${isOverBudget ? 'alert-triangle' : 'check'}" style="width: 13px; height: 13px;"></i>
+          <span>${isOverBudget
+          ? `Over Budget by ₱${(formGrandTotalSelling - customerBudget).toFixed(2)}`
+          : `Within Budget (₱${(customerBudget - formGrandTotalSelling).toFixed(2)} remaining)`}</span>
         </div>
       `;
+      if (typeof lucide !== 'undefined') lucide.createIcons();
     } else {
       budgetContainer.innerHTML = '';
     }
@@ -989,7 +1155,7 @@ window.saveCustomerTransaction = function () {
       }
     } else if (row.selectedMedId) {
       const orig = inventoryItems.find(i => i.id === row.selectedMedId);
-      requestedName = orig ? orig.name : 'Unknown Medicine';
+      requestedName = orig ? getMedicineDisplayName(orig) : 'Unknown Medicine';
     }
 
     // Determine actual inventory item to supply and deduct
@@ -1017,8 +1183,9 @@ window.saveCustomerTransaction = function () {
     }
 
     // Rule: Prevent deducting more units than available in stock
+    const actualDisplayName = getMedicineDisplayName(actualItem);
     if (qty > availableStock) {
-      alert(`Line ${rowNum}: Cannot deduct ${qty} units of "${actualItem.name}". Only ${availableStock} units are currently available (including restocked units).`);
+      alert(`Line ${rowNum}: Cannot deduct ${qty} units of "${actualDisplayName}". Only ${availableStock} units are currently available (including restocked units).`);
       return;
     }
 
@@ -1027,9 +1194,9 @@ window.saveCustomerTransaction = function () {
     transactionItems.push({
       id: actualItem.id,                      // ID for receipt / display
       actualInventoryId: actualItem.id,       // Targeted for stock deduction
-      name: actualItem.name,                  // Actual medicine supplied name
-      actualSuppliedName: actualItem.name,
-      requestedName: requestedName || actualItem.name, // Original name customer asked for
+      name: actualDisplayName,                // Actual medicine supplied name
+      actualSuppliedName: actualDisplayName,
+      requestedName: requestedName || actualDisplayName, // Original name customer asked for
       isSubstitute: isSub,
       qty: qty,
       unitPrice: Number(row.unitPrice || 0),
@@ -1081,6 +1248,7 @@ window.switchTxnTab = function (tab) {
 
 window.updateTxnFilter = function (key, val) {
   txnSearchFilters[key] = val;
+  txnHistoryPage = 1;
   renderTransactionsView(document.getElementById('main-content'));
 };
 
@@ -1119,6 +1287,20 @@ window.exportTransactionsCSV = function () {
   document.body.appendChild(link);
   link.click();
   document.body.removeChild(link);
+};
+
+window.handleTxnHistoryPageChange = function (newPage) {
+  txnHistoryPage = newPage;
+  renderTransactionsView(document.getElementById('main-content'));
+};
+
+window.handleDeleteTxn = function (id) {
+  const txn = window.pharmacyStore.getTransactions().find(t => t.id === id);
+  const name = txn ? (txn.customerName || txn.receiptNo) : 'this transaction';
+  if (confirm(`Are you sure you want to delete the transaction record for "${name}"?`)) {
+    window.pharmacyStore.deleteTransaction(id, false);
+    renderTransactionsView(document.getElementById('main-content'));
+  }
 };
 
 window.handleTxnDateFilter = function () {

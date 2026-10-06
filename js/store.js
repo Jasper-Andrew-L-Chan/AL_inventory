@@ -72,6 +72,16 @@ class PharmacyStore {
       localStorage.setItem('al_pharmacy_txns_cleared_v1', 'true');
     } else if (!localStorage.getItem(STORAGE_KEYS.TRANSACTIONS)) {
       localStorage.setItem(STORAGE_KEYS.TRANSACTIONS, JSON.stringify([]));
+    } else {
+      // Clean up deleted/voided transactions for ALLYANE and JO if previously purged
+      const currentTxns = JSON.parse(localStorage.getItem(STORAGE_KEYS.TRANSACTIONS)) || [];
+      const cleaned = currentTxns.filter(t => {
+        const name = (t.customerName || '').toUpperCase().trim();
+        return name !== 'ALLYANE' && name !== 'JO';
+      });
+      if (cleaned.length !== currentTxns.length) {
+        localStorage.setItem(STORAGE_KEYS.TRANSACTIONS, JSON.stringify(cleaned));
+      }
     }
     if (!localStorage.getItem(STORAGE_KEYS.SETTINGS)) {
       localStorage.setItem(STORAGE_KEYS.SETTINGS, JSON.stringify(INITIAL_SETTINGS));
@@ -314,6 +324,26 @@ class PharmacyStore {
     return null;
   }
 
+  deleteTransaction(txnId, restockItems = false) {
+    const txns = this.getTransactions();
+    const idx = txns.findIndex(t => t.id === txnId);
+    if (idx === -1) return false;
+
+    const txn = txns[idx];
+    if (restockItems && txn.status !== 'Refunded' && Array.isArray(txn.items)) {
+      txn.items.forEach(item => {
+        const targetInvId = item.actualInventoryId || item.id;
+        if (targetInvId) {
+          this.adjustStock(targetInvId, Math.abs(Number(item.qty || 0)), 'Restock on delete ' + txn.receiptNo);
+        }
+      });
+    }
+
+    txns.splice(idx, 1);
+    this.saveTransactions(txns);
+    return true;
+  }
+
   // --- Financial & Dashboard Aggregates ---
   getDashboardMetrics() {
     const txns = this.getTransactions().filter(t => t.status !== 'Refunded');
@@ -345,10 +375,14 @@ class PharmacyStore {
       }
 
       t.items.forEach(sold => {
-        totalItemsDispensed += Number(sold.qty || 0);
-        const originalItem = items.find(i => i.id === sold.id);
-        const cost = originalItem ? originalItem.costPrice : sold.price * 0.6;
-        costOfGoods += cost * Number(sold.qty || 0);
+        const qty = Number(sold.qty || 0);
+        totalItemsDispensed += qty;
+        const targetId = sold.actualInventoryId || sold.id;
+        const originalItem = items.find(i => i.id === targetId);
+        const cost = Number(sold.unitPrice) > 0 
+          ? Number(sold.unitPrice) 
+          : (originalItem && Number(originalItem.costPrice) > 0 ? Number(originalItem.costPrice) : Number(sold.price || sold.sellingPrice || 0) * 0.65);
+        costOfGoods += cost * qty;
       });
     });
 
@@ -363,6 +397,24 @@ class PharmacyStore {
       return exp <= in90Days;
     }).length;
 
+    // Items sold log for real-time live feed (all recorded sales)
+    const recentSoldList = [];
+    txns.forEach(t => {
+      (t.items || []).forEach(item => {
+        recentSoldList.push({
+          time: t.time || '',
+          date: t.date || '',
+          receiptNo: t.receiptNo || '',
+          customerName: t.customerName || 'Walk-in',
+          name: item.actualSuppliedName || item.name || 'Medicine',
+          qty: Number(item.qty || 1),
+          sellingPrice: Number(item.sellingPrice || item.price || 0),
+          totalPrice: Number(item.qty || 1) * Number(item.sellingPrice || item.price || 0),
+          isSubstitute: !!item.isSubstitute
+        });
+      });
+    });
+
     return {
       netSales: totalNetSales,
       discounts: totalDiscounts,
@@ -374,8 +426,24 @@ class PharmacyStore {
       lowStockCount,
       expiringSoonCount,
       paymentTotals,
-      totalSKUs: items.length
+      totalSKUs: items.length,
+      recentSold: recentSoldList,
+      allCompletedTxns: txns
     };
+  }
+
+  getLowStockItems() {
+    return this.getItems().filter(i => (Number(i.currentStock) || 0) <= (Number(i.reorderLevel) || 10));
+  }
+
+  getExpiringItems(daysAhead = 90) {
+    const now = new Date();
+    const threshold = new Date(now.getTime() + daysAhead * 24 * 60 * 60 * 1000);
+    return this.getItems().filter(i => {
+      if (!i.expiryDate) return false;
+      const exp = new Date(i.expiryDate);
+      return !isNaN(exp.getTime()) && exp <= threshold;
+    }).sort((a, b) => new Date(a.expiryDate) - new Date(b.expiryDate));
   }
 
   // --- Settings ---

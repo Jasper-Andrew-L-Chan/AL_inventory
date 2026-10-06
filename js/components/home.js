@@ -32,10 +32,12 @@ function renderHomeView(container) {
         </p>
         <div style="display: flex; gap: 0.85rem; flex-wrap: wrap;">
           <button onclick="window.appRouter.navigate('inventory')" style="background: var(--primary-gradient); color: white; border: none; padding: 0.7rem 1.4rem; border-radius: var(--radius-sm); font-weight: 700; font-size: 0.92rem; cursor: pointer; display: flex; align-items: center; gap: 0.5rem; box-shadow: 0 4px 14px rgba(255, 90, 0, 0.4); transition: transform 0.15s ease;">
-            <span>📦 Open Medicine Inventory</span>
+            <i data-lucide="package" style="width: 17px; height: 17px;"></i>
+            <span>Open Medicine Inventory</span>
           </button>
           <button onclick="window.appRouter.navigate('dashboard')" style="background: rgba(255,255,255,0.08); color: white; border: 1px solid rgba(255,255,255,0.2); padding: 0.7rem 1.4rem; border-radius: var(--radius-sm); font-weight: 600; font-size: 0.92rem; cursor: pointer; display: flex; align-items: center; gap: 0.5rem; backdrop-filter: blur(4px);">
-            <span>📊 View Analytics Dashboard</span>
+            <i data-lucide="layout-dashboard" style="width: 17px; height: 17px;"></i>
+            <span>View Analytics Dashboard</span>
           </button>
         </div>
       </div>
@@ -59,7 +61,7 @@ function renderHomeView(container) {
       <!-- Interactive Pharmacy Tutorial Banner -->
       <div style="background: #ffffff; border-left: 4px solid var(--primary); border-radius: var(--radius-md); padding: 1.1rem 1.25rem; display: flex; align-items: flex-start; justify-content: space-between; box-shadow: var(--shadow-sm); border: 1px solid var(--border-color); border-left-width: 4px;">
         <div style="display: flex; gap: 0.85rem;">
-          <div style="font-size: 1.3rem; color: var(--primary);">💊</div>
+          <div style="color: var(--primary); display: flex; align-items: center;"><i data-lucide="pill" style="width: 24px; height: 24px;"></i></div>
           <div>
             <h4 style="font-size: 0.95rem; font-weight: 700; color: var(--text-main); margin-bottom: 0.25rem;">
               Inventory Management Quick Guide
@@ -77,7 +79,7 @@ function renderHomeView(container) {
       <!-- Online Orders & Delivery Integration -->
       <div style="background: #ffffff; border-left: 4px solid #10b981; border-radius: var(--radius-md); padding: 1.1rem 1.25rem; display: flex; align-items: flex-start; justify-content: space-between; box-shadow: var(--shadow-sm); border: 1px solid var(--border-color); border-left-width: 4px;">
         <div style="display: flex; gap: 0.85rem;">
-          <div style="font-size: 1.3rem; color: #10b981;">🛵</div>
+          <div style="color: #10b981; display: flex; align-items: center;"><i data-lucide="arrow-left-right" style="width: 24px; height: 24px;"></i></div>
           <div>
             <h4 style="font-size: 0.95rem; font-weight: 700; color: var(--text-main); margin-bottom: 0.25rem;">
               Stock In &amp; Stock Out History
@@ -107,13 +109,13 @@ function renderHomeView(container) {
         <div id="onboarding-panel" style="margin-top: 1rem; padding-top: 1rem; border-top: 1px solid var(--border-light); font-size: 0.85rem;">
           <div style="display: flex; flex-direction: column; gap: 0.65rem;">
             <div style="display: flex; align-items: center; gap: 0.6rem; color: #10b981;">
-              <span>✓</span> <strong style="color: var(--text-main);">Store & Branch Profile:</strong> Configured (${settings.pharmacyName} - ${settings.branch})
+              <i data-lucide="check" style="width: 15px; height: 15px;"></i> <strong style="color: var(--text-main);">Store & Branch Profile:</strong> Configured (${settings.pharmacyName} - ${settings.branch})
             </div>
             <div style="display: flex; align-items: center; gap: 0.6rem; color: #10b981;">
-              <span>✓</span> <strong style="color: var(--text-main);">Medicine Formulary Seeded:</strong> ${metrics.totalSKUs} core medicines loaded with generic names & batch lot numbers
+              <i data-lucide="check" style="width: 15px; height: 15px;"></i> <strong style="color: var(--text-main);">Medicine Formulary Seeded:</strong> ${metrics.totalSKUs} core medicines loaded with generic names & batch lot numbers
             </div>
             <div style="display: flex; align-items: center; gap: 0.6rem; color: var(--primary);">
-              <span>➜</span> <strong style="color: var(--text-main);">Senior Citizen & PWD Discount Rate:</strong> 20% discount + VAT Exemption active
+              <i data-lucide="arrow-right" style="width: 15px; height: 15px;"></i> <strong style="color: var(--text-main);">Senior Citizen & PWD Discount Rate:</strong> 20% discount + VAT Exemption active
             </div>
           </div>
         </div>
@@ -131,16 +133,16 @@ function renderHomeView(container) {
         <div id="links-panel" style="margin-top: 1rem; padding-top: 1rem; border-top: 1px solid var(--border-light); font-size: 0.85rem; display: none;">
           <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 0.75rem;">
             <a href="https://ww2.fda.gov.ph/" target="_blank" style="padding: 0.6rem 0.8rem; border: 1px solid var(--border-color); border-radius: var(--radius-sm); text-decoration: none; color: var(--text-main); font-weight: 500; display: flex; align-items: center; gap: 0.5rem; background: #fafafa;">
-              <span>🏛️</span> Philippine FDA Portal
+              <i data-lucide="building-2" style="width: 15px; height: 15px; color: var(--text-muted);"></i> Philippine FDA Portal
             </a>
             <a href="https://www.bir.gov.ph/" target="_blank" style="padding: 0.6rem 0.8rem; border: 1px solid var(--border-color); border-radius: var(--radius-sm); text-decoration: none; color: var(--text-main); font-weight: 500; display: flex; align-items: center; gap: 0.5rem; background: #fafafa;">
-              <span>📑</span> BIR Official Receipts Guidelines
+              <i data-lucide="file-text" style="width: 15px; height: 15px; color: var(--text-muted);"></i> BIR Official Receipts Guidelines
             </a>
             <div onclick="window.appRouter.navigate('reports')" style="padding: 0.6rem 0.8rem; border: 1px solid var(--border-color); border-radius: var(--radius-sm); cursor: pointer; color: var(--text-main); font-weight: 500; display: flex; align-items: center; gap: 0.5rem; background: #fafafa;">
-              <span>📋</span> Senior / PWD Discount Record Log
+              <i data-lucide="clipboard-list" style="width: 15px; height: 15px; color: var(--text-muted);"></i> Senior / PWD Discount Record Log
             </div>
             <div onclick="window.appRouter.navigate('inventory')" style="padding: 0.6rem 0.8rem; border: 1px solid var(--border-color); border-radius: var(--radius-sm); cursor: pointer; color: var(--text-main); font-weight: 500; display: flex; align-items: center; gap: 0.5rem; background: #fafafa;">
-              <span>⚠️</span> Drug Expiry Risk Monitoring
+              <i data-lucide="alert-triangle" style="width: 15px; height: 15px; color: #dc2626;"></i> Drug Expiry Risk Monitoring
             </div>
           </div>
         </div>
@@ -168,6 +170,10 @@ function renderHomeView(container) {
       </div>
     </div>
   `;
+
+  if (typeof lucide !== 'undefined') {
+    lucide.createIcons();
+  }
 }
 
 window.toggleAccordion = function (panelId) {

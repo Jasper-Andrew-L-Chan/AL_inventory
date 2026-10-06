@@ -53,7 +53,7 @@ function renderReportsView(container) {
       <div style="background: white; border: 1px solid var(--border-color); border-radius: var(--radius-sm); padding: 0.5rem 1rem; display: flex; align-items: center; gap: 0.75rem; font-size: 0.84rem; box-shadow: var(--shadow-sm);">
         <span style="color: var(--text-muted); font-size: 0.75rem; text-transform: uppercase; font-weight: 600;">Date Filter:</span>
         <strong style="color: var(--text-main);">Sep 24, 12:00am – Oct 1, 11:59pm</strong>
-        <span style="cursor: pointer;">📅</span>
+        <i data-lucide="calendar" style="width: 15px; height: 15px; color: var(--text-muted); cursor: pointer;"></i>
       </div>
     </div>
 
@@ -288,6 +288,10 @@ function renderReportsView(container) {
       </div>
     ` : ''}
   `;
+
+  if (typeof lucide !== 'undefined') {
+    lucide.createIcons();
+  }
 }
 
 window.switchReportsTab = function(tab) {
