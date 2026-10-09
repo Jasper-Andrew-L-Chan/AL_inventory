@@ -38,6 +38,10 @@ let txnSearchFilters = {
   total: ''
 };
 let txnCurrentTab = 'DETAILS';
+let txnDateRange = {
+  from: '',
+  to: ''
+};
 let expandedTxnId = null;
 let editingTxnId = null; // Track transaction being edited & restocked
 let txnHistoryPage = 1;
@@ -64,6 +68,7 @@ function createEmptyMedRow() {
     isSubstitute: false,
     qty: 1,
     unitPrice: 0,            // cost/unit price
+    congPrice: 0,            // cong price
     sellingPrice: 0,         // selling price per unit
     totalUnit: 1,            // total unit
     totalSellingPrice: 0     // qty * sellingPrice
@@ -90,6 +95,7 @@ function renderTransactionsView(container) {
         const curItem = inventoryItems.find(i => i.id === row.selectedMedId);
         if (curItem && !row.isSubstitute) {
           if (!row.unitPrice) row.unitPrice = Number(curItem.costPrice || 0);
+          if (row.congPrice === undefined || row.congPrice === null) row.congPrice = Number(curItem.congPrice || 0);
           if (!row.sellingPrice) row.sellingPrice = Number(curItem.sellingPrice || 0);
           row.totalSellingPrice = (Number(row.qty) || 1) * (Number(row.sellingPrice) || 0);
         }
@@ -115,6 +121,8 @@ function renderTransactionsView(container) {
       const itemsStr = t.items.map(i => `${i.name} ${i.actualSuppliedName || ''}`).join(' ').toLowerCase();
       if (!itemsStr.includes(txnSearchFilters.items.toLowerCase())) return false;
     }
+    if (txnDateRange.from && t.date && t.date < txnDateRange.from) return false;
+    if (txnDateRange.to && t.date && t.date > txnDateRange.to) return false;
     return true;
   });
 
@@ -134,6 +142,20 @@ function renderTransactionsView(container) {
   const customerBudget = Number(currentTxnForm.budget) || 0;
   const isOverBudget = customerBudget > 0 && formGrandTotalSelling > customerBudget;
 
+  let tabContentHtml = '';
+
+  if (txnCurrentTab === 'DETAILS') {
+    tabContentHtml = renderDetailsTabHtml(editingTxnId, currentTxnForm, allTxns, inventoryItems, formGrandTotalQty, formGrandTotalSelling, isOverBudget, customerBudget, nowStr);
+  } else if (txnCurrentTab === 'IN - OUT LOGS') {
+    tabContentHtml = renderLogsTabHtml(filteredTxns, totalTxnCount, totalTxnPages, startTxnIdx, pageTxns, nowStr);
+  } else if (txnCurrentTab === 'HOURLY') {
+    tabContentHtml = renderHourlyTabHtml(allTxns);
+  } else if (txnCurrentTab === 'DAILY') {
+    tabContentHtml = renderDailyTabHtml(allTxns);
+  } else if (txnCurrentTab === 'MONTHLY') {
+    tabContentHtml = renderMonthlyTabHtml(allTxns);
+  }
+
   container.innerHTML = `
     <!-- Top Subtabs -->
     <div class="subtabs-bar">
@@ -144,6 +166,21 @@ function renderTransactionsView(container) {
       `).join('')}
     </div>
 
+    <!-- Dynamic Tab Content -->
+    ${tabContentHtml}
+  `;
+
+  if (typeof lucide !== 'undefined') {
+    lucide.createIcons();
+  }
+}
+
+/* -------------------------------------------------------------
+ * TAB RENDERERS: DETAILS, IN - OUT LOGS, HOURLY, DAILY, MONTHLY
+ * ------------------------------------------------------------- */
+
+function renderDetailsTabHtml(editingTxnId, currentTxnForm, allTxns, inventoryItems, formGrandTotalQty, formGrandTotalSelling, isOverBudget, customerBudget, nowStr) {
+  return `
     <!-- 1. Customer Transaction & Stock Out Entry Section -->
     <div class="inout-builder-card" style="${editingTxnId ? 'border: 2px solid #f59e0b; box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.2);' : ''}">
       <div class="inout-builder-header" style="${editingTxnId ? 'background: linear-gradient(135deg, #d97706 0%, #f59e0b 100%);' : ''}">
@@ -226,13 +263,13 @@ function renderTransactionsView(container) {
 
           <div class="input-group">
             <label style="font-size: 0.78rem; font-weight: 700; color: #334155; margin-bottom: 0.3rem;">
-              Barangay (Brgy.)
+              GL
             </label>
             <input 
               type="text" 
               id="custBrgy" 
               value="${escapeHtml(currentTxnForm.barangay)}" 
-              placeholder="e.g. Brgy. Poblacion" 
+              placeholder="e.g. GL / Barangay" 
               class="form-input" 
               oninput="updateCustFormField('barangay', this.value)"
             />
@@ -277,6 +314,7 @@ function renderTransactionsView(container) {
                   <th style="min-width: 240px;">Medicine Selection</th>
                   <th style="width: 100px; text-align: center;">Quantity (QTY)</th>
                   <th style="width: 120px; text-align: right;">Unit Price (Cost)</th>
+                  <th style="width: 120px; text-align: right;">Cong Price</th>
                   <th style="width: 120px; text-align: right;">Selling Price</th>
                   <th style="width: 90px; text-align: center;">Total Unit</th>
                   <th style="width: 130px; text-align: right;">Total Selling Price</th>
@@ -332,24 +370,68 @@ function renderTransactionsView(container) {
       </div>
     </div>
 
+    <!-- Quick Details Navigation & Instructions Callout -->
+    <div style="background: #ffffff; border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 1.25rem 1.5rem; margin-top: 1.5rem; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem; box-shadow: var(--shadow-sm);">
+      <div style="display: flex; align-items: center; gap: 0.85rem;">
+        <div style="width: 42px; height: 42px; border-radius: 8px; background: rgba(2, 128, 144, 0.1); color: var(--primary); display: flex; align-items: center; justify-content: center; font-size: 1.2rem;">
+          <i data-lucide="layers" style="width: 22px; height: 22px;"></i>
+        </div>
+        <div>
+          <div style="font-weight: 700; color: var(--brand-charcoal); font-size: 0.95rem;">
+            Customer Order & Item Substitution Entry
+          </div>
+          <div style="font-size: 0.78rem; color: var(--text-muted);">
+            Record stock-out orders with real-time budget verification and medicine substitution. To view completed audit logs or periodic analytics, explore the tabs above:
+          </div>
+        </div>
+      </div>
+      <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
+        <button type="button" onclick="switchTxnTab('IN - OUT LOGS')" class="btn-primary" style="background: var(--primary); font-size: 0.8rem; padding: 0.45rem 0.95rem; display: inline-flex; align-items: center; gap: 0.35rem;">
+          <i data-lucide="file-text" style="width: 14px; height: 14px;"></i>
+          <span>View In - Out Logs (${allTxns.length})</span>
+        </button>
+        <button type="button" onclick="switchTxnTab('HOURLY')" class="btn-outline" style="font-size: 0.8rem; padding: 0.45rem 0.85rem; display: inline-flex; align-items: center; gap: 0.35rem;">
+          <i data-lucide="clock" style="width: 14px; height: 14px;"></i>
+          <span>Hourly</span>
+        </button>
+        <button type="button" onclick="switchTxnTab('DAILY')" class="btn-outline" style="font-size: 0.8rem; padding: 0.45rem 0.85rem; display: inline-flex; align-items: center; gap: 0.35rem;">
+          <i data-lucide="calendar" style="width: 14px; height: 14px;"></i>
+          <span>Daily</span>
+        </button>
+        <button type="button" onclick="switchTxnTab('MONTHLY')" class="btn-outline" style="font-size: 0.8rem; padding: 0.45rem 0.85rem; display: inline-flex; align-items: center; gap: 0.35rem;">
+          <i data-lucide="bar-chart-2" style="width: 14px; height: 14px;"></i>
+          <span>Monthly</span>
+        </button>
+      </div>
+    </div>
+  `;
+}
+
+function renderLogsTabHtml(filteredTxns, totalTxnCount, totalTxnPages, startTxnIdx, pageTxns, nowStr) {
+  return `
     <!-- 2. Date Range & Download Toolbar -->
     <div style="display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 1.25rem; flex-wrap: wrap; gap: 1rem;">
       <div>
         <div style="display: flex; align-items: center; gap: 0.75rem; margin-bottom: 0.35rem;">
           <div style="display: flex; flex-direction: column;">
             <label style="font-size: 0.75rem; color: var(--text-muted); font-weight: 600;">From</label>
-            <input type="date" id="txnFromDate" value="${nowStr}" class="form-input" style="padding: 0.4rem 0.6rem; font-size: 0.82rem;" />
+            <input type="date" id="txnFromDate" value="${txnDateRange.from}" class="form-input" style="padding: 0.4rem 0.6rem; font-size: 0.82rem;" />
           </div>
           <div style="display: flex; flex-direction: column;">
             <label style="font-size: 0.75rem; color: var(--text-muted); font-weight: 600;">To</label>
-            <input type="date" id="txnToDate" value="${nowStr}" class="form-input" style="padding: 0.4rem 0.6rem; font-size: 0.82rem;" />
+            <input type="date" id="txnToDate" value="${txnDateRange.to}" class="form-input" style="padding: 0.4rem 0.6rem; font-size: 0.82rem;" />
           </div>
           <button onclick="handleTxnDateFilter()" class="btn-primary" style="margin-top: 1.2rem; background: var(--primary); color: #ffffff; font-weight: 700;">
             Go!
           </button>
+          ${(txnDateRange.from || txnDateRange.to) ? `
+            <button onclick="clearTxnDateFilter()" class="btn-outline" style="margin-top: 1.2rem; font-size: 0.78rem; padding: 0.4rem 0.75rem;">
+              Clear Date
+            </button>
+          ` : ''}
         </div>
         <div style="font-size: 0.72rem; color: var(--text-muted);">
-          In - Out logs can be viewed for all completed customer stock out transactions.
+          In - Out logs can be viewed for all completed customer stock out transactions. Showing <strong>${filteredTxns.length}</strong> record${filteredTxns.length === 1 ? '' : 's'}.
         </div>
       </div>
 
@@ -369,7 +451,7 @@ function renderTransactionsView(container) {
             <tr style="background: #f8fafc; color: var(--text-main); border-bottom: 2px solid var(--border-color);">
               <th style="width: 30px; background: #f8fafc; color: var(--text-muted);"></th>
               <th style="background: #f8fafc; color: var(--brand-charcoal); font-weight: 700;">Date & Ref</th>
-              <th style="background: #f8fafc; color: var(--brand-charcoal); font-weight: 700;">Customer / Brgy</th>
+              <th style="background: #f8fafc; color: var(--brand-charcoal); font-weight: 700;">Customer / GL</th>
               <th style="background: #f8fafc; color: var(--brand-charcoal); font-weight: 700;">Receipt No.</th>
               <th style="background: #f8fafc; color: var(--brand-charcoal); font-weight: 700;">Cashier</th>
               <th style="background: #f8fafc; color: var(--brand-charcoal); font-weight: 700;">Medicines Supplied</th>
@@ -429,7 +511,7 @@ function renderTransactionsView(container) {
                     ${t.barangay ? `
                       <div style="font-size: 0.73rem; color: #64748b; display: inline-flex; align-items: center; gap: 0.25rem; margin-top: 2px;">
                         <i data-lucide="map-pin" style="width: 12px; height: 12px; color: #94a3b8;"></i>
-                        <span>Brgy. ${escapeHtml(t.barangay)}</span>
+                        <span>GL: ${escapeHtml(t.barangay)}</span>
                       </div>
                     ` : ''}
                     ${t.budget > 0 ? `
@@ -499,7 +581,7 @@ function renderTransactionsView(container) {
                         </h4>
                         <div style="font-size: 0.78rem; color: var(--text-muted); margin-bottom: 0.6rem;">
                           <strong>Customer:</strong> ${escapeHtml(t.customerName)} | 
-                          <strong>Barangay:</strong> ${escapeHtml(t.barangay || 'N/A')} | 
+                          <strong>GL:</strong> ${escapeHtml(t.barangay || 'N/A')} | 
                           <strong>Budget:</strong> ${t.budget ? '₱' + Number(t.budget).toFixed(2) : 'N/A'} |
                           <strong>Staff:</strong> ${escapeHtml(t.cashier)}
                         </div>
@@ -511,6 +593,7 @@ function renderTransactionsView(container) {
                               <th style="padding: 6px 8px;">Actual Medicine Supplied (Deducted)</th>
                               <th style="padding: 6px 8px; text-align: center;">Qty</th>
                               <th style="padding: 6px 8px; text-align: right;">Unit Price</th>
+                              <th style="padding: 6px 8px; text-align: right;">Cong Price</th>
                               <th style="padding: 6px 8px; text-align: right;">Selling Price</th>
                               <th style="padding: 6px 8px; text-align: right;">Subtotal</th>
                             </tr>
@@ -525,6 +608,7 @@ function renderTransactionsView(container) {
                                 </td>
                                 <td style="padding: 6px 8px; text-align: center; font-weight: 700;">${item.qty}</td>
                                 <td style="padding: 6px 8px; text-align: right;">₱${Number(item.unitPrice || 0).toFixed(2)}</td>
+                                <td style="padding: 6px 8px; text-align: right;">₱${Number(item.congPrice || 0).toFixed(2)}</td>
                                 <td style="padding: 6px 8px; text-align: right;">₱${Number(item.sellingPrice || item.price || 0).toFixed(2)}</td>
                                 <td style="padding: 6px 8px; text-align: right; font-weight: 700;">₱${((item.sellingPrice || item.price || 0) * item.qty).toFixed(2)}</td>
                               </tr>
@@ -532,7 +616,7 @@ function renderTransactionsView(container) {
                           </tbody>
                           <tfoot>
                             <tr>
-                              <td colspan="5" style="text-align: right; font-weight: 700; padding: 6px 8px;">Total:</td>
+                              <td colspan="6" style="text-align: right; font-weight: 700; padding: 6px 8px;">Total:</td>
                               <td style="text-align: right; font-weight: 800; font-size: 0.88rem; color: var(--primary); padding: 6px 8px;">
                                 ₱${Number(t.netTotal).toFixed(2)}
                               </td>
@@ -619,10 +703,6 @@ function renderTransactionsView(container) {
       ` : ''}
     </div>
   `;
-
-  if (typeof lucide !== 'undefined') {
-    lucide.createIcons();
-  }
 }
 
 // Helper to format medicine name as: Generic Name (Brand Name)
@@ -820,6 +900,24 @@ function renderMedRowHtml(row, idx, inventoryItems) {
         </div>
       </td>
 
+      <!-- Cong Price -->
+      <td style="text-align: right; vertical-align: top; padding-top: 0.9rem;">
+        <div style="display: flex; align-items: center; justify-content: flex-end; gap: 2px;">
+          <span style="font-size: 0.75rem; color: #64748b;">₱</span>
+          <input 
+            type="number" 
+            id="row-congPrice-${row.id}"
+            min="0" 
+            step="0.01" 
+            value="${row.congPrice || 0}" 
+            class="form-input" 
+            style="width: 90px; text-align: right; font-size: 0.82rem;" 
+            oninput="updateMedRowField('${row.id}', 'congPrice', this.value)"
+            onkeydown="if(event.key==='Enter'){event.preventDefault(); this.blur();}"
+          />
+        </div>
+      </td>
+
       <!-- Selling Price -->
       <td style="text-align: right; vertical-align: top; padding-top: 0.9rem;">
         <div style="display: flex; align-items: center; justify-content: flex-end; gap: 2px;">
@@ -924,22 +1022,26 @@ window.onSelectPrimaryMedicine = function (rowId, selectedId) {
       row.isSubstitute = true;
       row.actualInventoryId = '';
       row.unitPrice = Number(found.costPrice || 0);
+      row.congPrice = Number(found.congPrice || 0);
       row.sellingPrice = Number(found.sellingPrice || 0);
     } else {
       row.isSubstitute = false;
       row.actualInventoryId = found.id;
       row.unitPrice = Number(found.costPrice || 0);
+      row.congPrice = Number(found.congPrice || 0);
       row.sellingPrice = Number(found.sellingPrice || 0);
     }
   } else if (selectedId === '__CUSTOM__') {
     row.isSubstitute = true;
     row.actualInventoryId = '';
     row.unitPrice = 0;
+    row.congPrice = 0;
     row.sellingPrice = 0;
   } else {
     row.actualInventoryId = '';
     row.isSubstitute = false;
     row.unitPrice = 0;
+    row.congPrice = 0;
     row.sellingPrice = 0;
   }
 
@@ -960,6 +1062,7 @@ window.toggleSubstituteMode = function (rowId) {
     if (orig) {
       row.actualInventoryId = orig.id;
       row.unitPrice = Number(orig.costPrice || 0);
+      row.congPrice = Number(orig.congPrice || 0);
       row.sellingPrice = Number(orig.sellingPrice || 0);
       row.totalSellingPrice = row.totalUnit * row.sellingPrice;
     }
@@ -977,6 +1080,7 @@ window.onSelectActualSubstitute = function (rowId, actualInvId) {
 
   if (subItem) {
     row.unitPrice = Number(subItem.costPrice || 0);
+    row.congPrice = Number(subItem.congPrice || 0);
     row.sellingPrice = Number(subItem.sellingPrice || 0);
   }
 
@@ -997,6 +1101,8 @@ window.updateMedRowField = function (rowId, field, val) {
     row.totalUnit = qty;
   } else if (field === 'unitPrice') {
     row.unitPrice = Number(val) || 0;
+  } else if (field === 'congPrice') {
+    row.congPrice = Number(val) || 0;
   } else if (field === 'sellingPrice') {
     row.sellingPrice = Number(val) || 0;
   } else {
@@ -1091,6 +1197,7 @@ window.handleStartEditTxn = function (txnId) {
 
       const rowQty = Number(item.qty) || 1;
       const rowUnitPrice = Number(item.unitPrice || 0);
+      const rowCongPrice = Number(item.congPrice !== undefined ? item.congPrice : (actualInv ? actualInv.congPrice : 0)) || 0;
       const rowSellingPrice = Number(item.sellingPrice || item.price || 0);
 
       return {
@@ -1101,6 +1208,7 @@ window.handleStartEditTxn = function (txnId) {
         isSubstitute: isSub,
         qty: rowQty,
         unitPrice: rowUnitPrice,
+        congPrice: rowCongPrice,
         sellingPrice: rowSellingPrice,
         totalUnit: rowQty,
         totalSellingPrice: rowQty * rowSellingPrice
@@ -1200,6 +1308,7 @@ window.saveCustomerTransaction = function () {
       isSubstitute: isSub,
       qty: qty,
       unitPrice: Number(row.unitPrice || 0),
+      congPrice: Number(row.congPrice || 0),
       sellingPrice: Number(row.sellingPrice || actualItem.sellingPrice || 0),
       price: Number(row.sellingPrice || actualItem.sellingPrice || 0), // compatibility with receipt
       totalUnit: qty,
@@ -1266,27 +1375,44 @@ window.handleRefundTxn = function (id) {
 
 window.exportTransactionsCSV = function () {
   const txns = window.pharmacyStore.getTransactions();
-  const headers = ['Receipt No,Date,Time,Customer,Barangay,Budget,Items Supplied,Net Total,Status'];
-  const rows = txns.map(t => [
-    t.receiptNo,
-    t.date,
-    `"${t.time || ''}"`,
-    `"${t.customerName || 'Walk-in'}"`,
-    `"${t.barangay || ''}"`,
-    t.budget || 0,
-    `"${t.items.map(i => `${i.name} (x${i.qty})`).join('; ')}"`,
-    t.netTotal,
-    t.status
-  ].join(','));
+  const headers = ['Receipt No,Date,Time,Customer,GL,Budget,Items Supplied,Net Total,Status'];
+  const rows = txns.map(t => {
+    // Escape double quotes for CSV safety
+    const safeCustomer = (t.customerName || 'Walk-in').replace(/"/g, '""');
+    const safeGL = (t.barangay || '').replace(/"/g, '""');
+    const safeTime = (t.time || '').replace(/"/g, '""');
+    
+    // Format items with Unit Price and Cong Price: e.g. "DAPAGLIFLOXIN 10MG (x1, Unit Price: ₱0.00, Cong Price: ₱0.00)"
+    const itemsStr = (t.items || []).map(i => {
+      const medName = (i.name || i.actualSuppliedName || 'Medicine').replace(/"/g, '""');
+      const unitP = Number(i.unitPrice || 0).toFixed(2);
+      const congP = Number(i.congPrice || 0).toFixed(2);
+      return `${medName} (x${i.qty}, Unit Price: ₱${unitP}, Cong Price: ₱${congP})`;
+    }).join('; ').replace(/"/g, '""');
 
-  const csvContent = 'data:text/csv;charset=utf-8,' + [headers, ...rows].join('\n');
-  const encodedUri = encodeURI(csvContent);
+    return [
+      `"${t.receiptNo || ''}"`,
+      `"${t.date || ''}"`,
+      `"${safeTime}"`,
+      `"${safeCustomer}"`,
+      `"${safeGL}"`,
+      Number(t.budget || 0).toFixed(2),
+      `"${itemsStr}"`,
+      Number(t.netTotal || 0).toFixed(2),
+      `"${t.status || 'Completed'}"`
+    ].join(',');
+  });
+
+  const csvContent = '\uFEFF' + [headers.join(','), ...rows].join('\r\n');
+  const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
   const link = document.createElement('a');
-  link.setAttribute('href', encodedUri);
+  link.setAttribute('href', url);
   link.setAttribute('download', `AffordaLabs_InOut_${new Date().toISOString().split('T')[0]}.csv`);
   document.body.appendChild(link);
   link.click();
   document.body.removeChild(link);
+  URL.revokeObjectURL(url);
 };
 
 window.handleTxnHistoryPageChange = function (newPage) {
@@ -1304,5 +1430,561 @@ window.handleDeleteTxn = function (id) {
 };
 
 window.handleTxnDateFilter = function () {
-  alert('Date filter applied to In - Out log records.');
+  const fromEl = document.getElementById('txnFromDate');
+  const toEl = document.getElementById('txnToDate');
+  txnDateRange.from = fromEl ? fromEl.value : '';
+  txnDateRange.to = toEl ? toEl.value : '';
+  txnHistoryPage = 1;
+  renderTransactionsView(document.getElementById('main-content'));
 };
+
+window.clearTxnDateFilter = function () {
+  txnDateRange.from = '';
+  txnDateRange.to = '';
+  txnHistoryPage = 1;
+  renderTransactionsView(document.getElementById('main-content'));
+};
+
+/* -------------------------------------------------------------
+ * PERIODIC AGGREGATIONS & VIEWS: HOURLY, DAILY, MONTHLY
+ * ------------------------------------------------------------- */
+
+// Helper to extract hour number (0 - 23) from time string or ISO date
+function extractHourFromTxn(txn) {
+  if (txn.time) {
+    const match = txn.time.match(/(\d+):(\d+)\s*(AM|PM)?/i);
+    if (match) {
+      let h = parseInt(match[1], 10);
+      const isPM = (match[3] || '').toUpperCase() === 'PM';
+      const isAM = (match[3] || '').toUpperCase() === 'AM';
+      if (isPM && h < 12) h += 12;
+      if (isAM && h === 12) h = 0;
+      return h;
+    }
+  }
+  if (txn.date) {
+    const d = new Date(txn.date);
+    if (!isNaN(d.getTime())) return d.getHours();
+  }
+  return 12; // default midday
+}
+
+// Compute Hourly Aggregations
+function computeHourlyInOutData(allTxns) {
+  // Define 2-hour pharmacy operating intervals
+  const slots = [
+    { label: '06:00 - 08:00 AM', start: 6, end: 7 },
+    { label: '08:00 - 10:00 AM', start: 8, end: 9 },
+    { label: '10:00 - 12:00 PM', start: 10, end: 11 },
+    { label: '12:00 - 02:00 PM', start: 12, end: 13 },
+    { label: '02:00 - 04:00 PM', start: 14, end: 15 },
+    { label: '04:00 - 06:00 PM', start: 16, end: 17 },
+    { label: '06:00 - 08:00 PM', start: 18, end: 19 },
+    { label: '08:00 - 10:00 PM', start: 20, end: 21 },
+    { label: 'Night / Other', start: 22, end: 23, isOther: true }
+  ];
+
+  const slotData = slots.map(slot => ({
+    ...slot,
+    txnCount: 0,
+    unitsDispensed: 0,
+    totalAmount: 0,
+    transactions: [],
+    medMap: {}
+  }));
+
+  allTxns.forEach(t => {
+    const h = extractHourFromTxn(t);
+    let matched = slotData.find(s => !s.isOther && h >= s.start && h <= s.end);
+    if (!matched) {
+      matched = slotData[slotData.length - 1]; // Other
+    }
+
+    matched.txnCount += 1;
+    matched.totalAmount += Number(t.netTotal || 0);
+    matched.transactions.push(t);
+
+    if (Array.isArray(t.items)) {
+      t.items.forEach(item => {
+        const q = Number(item.qty || 0);
+        matched.unitsDispensed += q;
+        const medName = item.actualSuppliedName || item.name || 'Medicine';
+        matched.medMap[medName] = (matched.medMap[medName] || 0) + q;
+      });
+    }
+  });
+
+  return slotData;
+}
+
+function renderHourlyTabHtml(allTxns) {
+  const hourlySlots = computeHourlyInOutData(allTxns);
+  const totalVolume = hourlySlots.reduce((acc, s) => acc + s.unitsDispensed, 0);
+  const totalAmount = hourlySlots.reduce((acc, s) => acc + s.totalAmount, 0);
+  const totalTxns = hourlySlots.reduce((acc, s) => acc + s.txnCount, 0);
+
+  // Find peak hour slot
+  const peakSlot = [...hourlySlots].sort((a, b) => b.totalAmount - a.totalAmount)[0] || hourlySlots[0];
+  const maxSlotAmount = Math.max(...hourlySlots.map(s => s.totalAmount), 100);
+
+  return `
+    <!-- Hourly KPI Header Cards -->
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 1rem; margin-bottom: 1.5rem;">
+      <div class="card" style="margin-bottom: 0; padding: 1.1rem 1.25rem; border-left: 4px solid var(--primary);">
+        <div style="font-size: 0.74rem; font-weight: 700; color: var(--text-muted); text-transform: uppercase;">Total In - Out Volume</div>
+        <div style="font-size: 1.6rem; font-weight: 900; color: var(--brand-charcoal); margin: 0.2rem 0;">${totalVolume} units</div>
+        <div style="font-size: 0.75rem; color: var(--text-muted);">${totalTxns} total customer stock-out orders</div>
+      </div>
+
+      <div class="card" style="margin-bottom: 0; padding: 1.1rem 1.25rem; border-left: 4px solid #10b981;">
+        <div style="font-size: 0.74rem; font-weight: 700; color: var(--text-muted); text-transform: uppercase;">Total Dispensed Value</div>
+        <div style="font-size: 1.6rem; font-weight: 900; color: #047857; margin: 0.2rem 0;">₱${totalAmount.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+        <div style="font-size: 0.75rem; color: var(--text-muted);">Across operating store hours</div>
+      </div>
+
+      <div class="card" style="margin-bottom: 0; padding: 1.1rem 1.25rem; border-left: 4px solid #f59e0b;">
+        <div style="font-size: 0.74rem; font-weight: 700; color: var(--text-muted); text-transform: uppercase;">Peak Activity Interval</div>
+        <div style="font-size: 1.3rem; font-weight: 900; color: #b45309; margin: 0.35rem 0 0.2rem 0;">${peakSlot.label}</div>
+        <div style="font-size: 0.75rem; color: var(--text-muted);">₱${peakSlot.totalAmount.toFixed(2)} (${peakSlot.unitsDispensed} units)</div>
+      </div>
+    </div>
+
+    <!-- Hourly Distribution Bar Visualizer Card -->
+    <div class="card" style="padding: 1.5rem; margin-bottom: 1.5rem;">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.25rem; flex-wrap: wrap; gap: 0.5rem;">
+        <div>
+          <h4 style="margin: 0; font-size: 1.05rem; font-weight: 800; color: var(--brand-charcoal);">
+            Hourly Stock Out Velocity & Sales
+          </h4>
+          <p style="margin: 0; font-size: 0.76rem; color: var(--text-muted);">
+            Hourly load distribution across dispensary counter
+          </p>
+        </div>
+        <span style="font-size: 0.74rem; background: #f1f5f9; padding: 4px 10px; border-radius: 9999px; font-weight: 600; color: #475569;">
+          2-Hour Windows
+        </span>
+      </div>
+
+      <!-- Custom SVG / CSS Bar Chart for Hourly Performance -->
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(80px, 1fr)); gap: 0.75rem; align-items: flex-end; height: 180px; padding: 1rem 0; border-bottom: 1px solid var(--border-color);">
+        ${hourlySlots.map(s => {
+          const pct = Math.round((s.totalAmount / maxSlotAmount) * 100);
+          return `
+            <div style="display: flex; flex-direction: column; align-items: center; height: 100%; justify-content: flex-end; gap: 6px;">
+              <div style="font-size: 0.7rem; font-weight: 700; color: var(--text-main);">${s.totalAmount > 0 ? `₱${Math.round(s.totalAmount)}` : ''}</div>
+              <div style="width: 100%; max-width: 42px; height: ${Math.max(pct, 4)}%; background: ${s === peakSlot && s.totalAmount > 0 ? 'linear-gradient(180deg, #f59e0b 0%, #d97706 100%)' : 'linear-gradient(180deg, var(--primary) 0%, var(--primary-dark) 100%)'}; border-radius: 4px 4px 0 0; transition: height 0.3s ease;" title="${s.label}: ₱${s.totalAmount.toFixed(2)} (${s.unitsDispensed} units)"></div>
+              <div style="font-size: 0.68rem; color: var(--text-muted); font-weight: 600; text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; width: 100%;">
+                ${s.label.split(' - ')[0]}
+              </div>
+            </div>
+          `;
+        }).join('')}
+      </div>
+    </div>
+
+    <!-- Hourly Breakdown Data Table -->
+    <div style="background: #ffffff; border: 1px solid var(--border-color); border-radius: var(--radius-md); box-shadow: var(--shadow-sm); overflow: hidden; margin-bottom: 1.5rem;">
+      <div style="padding: 1rem 1.25rem; border-bottom: 1px solid var(--border-color); background: #f8fafc; display: flex; justify-content: space-between; align-items: center;">
+        <h4 style="margin: 0; font-size: 0.95rem; font-weight: 800; color: var(--brand-charcoal);">
+          Hourly Operating Table & Top Dispensed Items
+        </h4>
+        <span style="font-size: 0.75rem; color: var(--text-muted);">
+          Breakdown of Customer Stock Deductions
+        </span>
+      </div>
+
+      <div style="overflow-x: auto;">
+        <table class="data-table" style="margin: 0;">
+          <thead>
+            <tr style="background: #f8fafc; border-bottom: 2px solid var(--border-color);">
+              <th style="font-weight: 700; color: var(--brand-charcoal);">Time Interval</th>
+              <th style="font-weight: 700; color: var(--brand-charcoal); text-align: center;">Transactions</th>
+              <th style="font-weight: 700; color: var(--brand-charcoal); text-align: center;">Units Dispensed</th>
+              <th style="font-weight: 700; color: var(--brand-charcoal);">Top Dispensed Medicines in Window</th>
+              <th style="font-weight: 700; color: var(--brand-charcoal); text-align: right;">Total Amount</th>
+              <th style="font-weight: 700; color: var(--brand-charcoal); text-align: center;">Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${hourlySlots.map(s => {
+              const topMeds = Object.entries(s.medMap)
+                .sort((a, b) => b[1] - a[1])
+                .slice(0, 3)
+                .map(([name, qty]) => `${name} (x${qty})`)
+                .join(', ');
+
+              return `
+                <tr>
+                  <td style="font-weight: 700; color: var(--brand-charcoal); font-size: 0.84rem;">
+                    <i data-lucide="clock" style="width: 13px; height: 13px; display: inline-block; vertical-align: middle; margin-right: 4px; color: var(--primary);"></i>
+                    ${s.label}
+                  </td>
+                  <td style="text-align: center; font-weight: 600; color: var(--text-main);">
+                    ${s.txnCount}
+                  </td>
+                  <td style="text-align: center; font-weight: 700; color: var(--primary);">
+                    ${s.unitsDispensed}
+                  </td>
+                  <td style="font-size: 0.8rem; color: var(--text-muted); max-width: 380px;">
+                    ${topMeds || '<span style="color: #cbd5e1; font-style: italic;">No items dispensed</span>'}
+                  </td>
+                  <td style="text-align: right; font-weight: 800; font-size: 0.92rem; color: var(--text-main);">
+                    ₱${s.totalAmount.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  </td>
+                  <td style="text-align: center;">
+                    ${s.txnCount > 0 ? `
+                      <span class="badge" style="background: #ecfdf5; color: #047857; font-weight: 700; font-size: 0.72rem;">Active</span>
+                    ` : `
+                      <span class="badge" style="background: #f1f5f9; color: #94a3b8; font-size: 0.72rem;">Quiet</span>
+                    `}
+                  </td>
+                </tr>
+              `;
+            }).join('')}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  `;
+}
+
+// Compute Daily Aggregations
+function computeDailyInOutData(allTxns) {
+  const dayMap = {};
+
+  allTxns.forEach(t => {
+    const rawDate = t.date || new Date().toISOString().split('T')[0];
+    if (!dayMap[rawDate]) {
+      dayMap[rawDate] = {
+        date: rawDate,
+        txnCount: 0,
+        unitsDispensed: 0,
+        totalSales: 0,
+        totalBudget: 0,
+        totalCogs: 0,
+        refundedCount: 0,
+        barangays: new Set(),
+        medMap: {}
+      };
+    }
+
+    const dObj = dayMap[rawDate];
+    dObj.txnCount += 1;
+    dObj.totalSales += Number(t.netTotal || 0);
+    dObj.totalBudget += Number(t.budget || 0);
+    if (t.status === 'Refunded') dObj.refundedCount += 1;
+    if (t.barangay) dObj.barangays.add(t.barangay);
+
+    if (Array.isArray(t.items)) {
+      t.items.forEach(item => {
+        const q = Number(item.qty || 0);
+        dObj.unitsDispensed += q;
+        dObj.totalCogs += (Number(item.unitPrice || 0) * q);
+        const medName = item.actualSuppliedName || item.name || 'Medicine';
+        dObj.medMap[medName] = (dObj.medMap[medName] || 0) + q;
+      });
+    }
+  });
+
+  // Sort dates descending
+  return Object.values(dayMap).sort((a, b) => b.date.localeCompare(a.date));
+}
+
+function renderDailyInOutViewHtml(dailyData) {
+  const totalDays = dailyData.length;
+  const grandTotalSales = dailyData.reduce((acc, d) => acc + d.totalSales, 0);
+  const grandUnits = dailyData.reduce((acc, d) => acc + d.unitsDispensed, 0);
+  const avgSalesPerDay = totalDays > 0 ? (grandTotalSales / totalDays) : 0;
+  const maxDailySales = Math.max(...dailyData.map(d => d.totalSales), 500);
+
+  return `
+    <!-- Daily KPI Cards -->
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 1rem; margin-bottom: 1.5rem;">
+      <div class="card" style="margin-bottom: 0; padding: 1.1rem 1.25rem; border-left: 4px solid var(--primary);">
+        <div style="font-size: 0.74rem; font-weight: 700; color: var(--text-muted); text-transform: uppercase;">Active Days Recorded</div>
+        <div style="font-size: 1.6rem; font-weight: 900; color: var(--brand-charcoal); margin: 0.2rem 0;">${totalDays} Days</div>
+        <div style="font-size: 0.75rem; color: var(--text-muted);">Historical daily logs available</div>
+      </div>
+
+      <div class="card" style="margin-bottom: 0; padding: 1.1rem 1.25rem; border-left: 4px solid #10b981;">
+        <div style="font-size: 0.74rem; font-weight: 700; color: var(--text-muted); text-transform: uppercase;">Total Dispensed Value</div>
+        <div style="font-size: 1.6rem; font-weight: 900; color: #047857; margin: 0.2rem 0;">₱${grandTotalSales.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+        <div style="font-size: 0.75rem; color: var(--text-muted);">${grandUnits} total medicines issued</div>
+      </div>
+
+      <div class="card" style="margin-bottom: 0; padding: 1.1rem 1.25rem; border-left: 4px solid #f59e0b;">
+        <div style="font-size: 0.74rem; font-weight: 700; color: var(--text-muted); text-transform: uppercase;">Daily Average Sales</div>
+        <div style="font-size: 1.6rem; font-weight: 900; color: #b45309; margin: 0.2rem 0;">₱${avgSalesPerDay.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+        <div style="font-size: 0.75rem; color: var(--text-muted);">Per active business day</div>
+      </div>
+    </div>
+
+    <!-- Daily Trend Visual Bar -->
+    ${totalDays > 0 ? `
+      <div class="card" style="padding: 1.5rem; margin-bottom: 1.5rem;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+          <div>
+            <h4 style="margin: 0; font-size: 1.05rem; font-weight: 800; color: var(--brand-charcoal);">Daily Stock Out Revenue Curve</h4>
+            <p style="margin: 0; font-size: 0.76rem; color: var(--text-muted);">Daily total sales value comparison</p>
+          </div>
+          <span style="font-size: 0.72rem; color: #64748b; font-weight: 600;">Last ${Math.min(totalDays, 14)} Days</span>
+        </div>
+
+        <div style="display: flex; gap: 0.75rem; align-items: flex-end; height: 160px; overflow-x: auto; padding-bottom: 0.5rem;">
+          ${dailyData.slice(0, 14).reverse().map(d => {
+            const pct = Math.round((d.totalSales / maxDailySales) * 100);
+            return `
+              <div style="flex: 1; min-width: 45px; display: flex; flex-direction: column; align-items: center; height: 100%; justify-content: flex-end; gap: 4px;">
+                <span style="font-size: 0.68rem; font-weight: 700; color: var(--text-main);">₱${Math.round(d.totalSales)}</span>
+                <div style="width: 100%; max-width: 36px; height: ${Math.max(pct, 6)}%; background: linear-gradient(180deg, #028090 0%, #004e64 100%); border-radius: 4px 4px 0 0;" title="${d.date}: ₱${d.totalSales.toFixed(2)} (${d.unitsDispensed} units)"></div>
+                <span style="font-size: 0.68rem; color: var(--text-muted); font-weight: 600; white-space: nowrap;">${formatDateMMDDYY(d.date).slice(0, 5)}</span>
+              </div>
+            `;
+          }).join('')}
+        </div>
+      </div>
+    ` : ''}
+
+    <!-- Daily Aggregation Table -->
+    <div style="background: #ffffff; border: 1px solid var(--border-color); border-radius: var(--radius-md); box-shadow: var(--shadow-sm); overflow: hidden; margin-bottom: 1.5rem;">
+      <div style="padding: 1rem 1.25rem; border-bottom: 1px solid var(--border-color); background: #f8fafc; display: flex; justify-content: space-between; align-items: center;">
+        <h4 style="margin: 0; font-size: 0.95rem; font-weight: 800; color: var(--brand-charcoal);">
+          Daily Transaction & Dispensing Log Book
+        </h4>
+        <span style="font-size: 0.75rem; color: var(--text-muted);">
+          Grouped by Date
+        </span>
+      </div>
+
+      <div style="overflow-x: auto;">
+        <table class="data-table" style="margin: 0;">
+          <thead>
+            <tr style="background: #f8fafc; border-bottom: 2px solid var(--border-color);">
+              <th style="font-weight: 700; color: var(--brand-charcoal);">Date</th>
+              <th style="font-weight: 700; color: var(--brand-charcoal); text-align: center;">Transactions</th>
+              <th style="font-weight: 700; color: var(--brand-charcoal); text-align: center;">Units Dispensed</th>
+              <th style="font-weight: 700; color: var(--brand-charcoal);">Barangays Covered</th>
+              <th style="font-weight: 700; color: var(--brand-charcoal);">Top Medicine Moving</th>
+              <th style="font-weight: 700; color: var(--brand-charcoal); text-align: right;">Total Sales</th>
+              <th style="font-weight: 700; color: var(--brand-charcoal); text-align: right;">Gross Margin</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${totalDays === 0 ? `
+              <tr>
+                <td colspan="7" style="text-align: center; padding: 2.5rem; color: var(--text-muted);">
+                  No daily transaction data recorded yet.
+                </td>
+              </tr>
+            ` : dailyData.map(d => {
+              const topMeds = Object.entries(d.medMap)
+                .sort((a, b) => b[1] - a[1])
+                .slice(0, 2)
+                .map(([name, qty]) => `${name} (x${qty})`)
+                .join(', ');
+              const grossProfit = d.totalSales - d.totalCogs;
+              const marginPct = d.totalSales > 0 ? ((grossProfit / d.totalSales) * 100).toFixed(1) : 0;
+              const brgyList = Array.from(d.barangays).slice(0, 2).join(', ');
+
+              return `
+                <tr>
+                  <td>
+                    <div style="font-weight: 700; color: var(--brand-charcoal); font-size: 0.86rem;">
+                      ${formatDateMMDDYY(d.date)}
+                    </div>
+                    <div style="font-size: 0.72rem; color: var(--text-muted); font-family: monospace;">
+                      ${d.date}
+                    </div>
+                  </td>
+                  <td style="text-align: center; font-weight: 600; color: var(--text-main);">
+                    ${d.txnCount}
+                    ${d.refundedCount > 0 ? `<div style="font-size: 0.68rem; color: #ef4444;">(${d.refundedCount} ref)</div>` : ''}
+                  </td>
+                  <td style="text-align: center; font-weight: 700; color: var(--primary);">
+                    ${d.unitsDispensed}
+                  </td>
+                  <td style="font-size: 0.8rem; color: #475569;">
+                    ${brgyList || 'Walk-in'}
+                  </td>
+                  <td style="font-size: 0.8rem; color: var(--text-muted); max-width: 260px;">
+                    ${topMeds || '—'}
+                  </td>
+                  <td style="text-align: right; font-weight: 800; font-size: 0.92rem; color: var(--text-main);">
+                    ₱${d.totalSales.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  </td>
+                  <td style="text-align: right; font-size: 0.82rem; font-weight: 700; color: ${marginPct >= 0 ? '#047857' : '#dc2626'};">
+                    ${marginPct}%
+                  </td>
+                </tr>
+              `;
+            }).join('')}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  `;
+}
+
+// Compute Monthly Aggregations
+function computeMonthlyInOutData(allTxns) {
+  const monthMap = {};
+
+  allTxns.forEach(t => {
+    let ym = '2026-10';
+    if (t.date && t.date.length >= 7) {
+      ym = t.date.slice(0, 7);
+    }
+    if (!monthMap[ym]) {
+      const [year, month] = ym.split('-');
+      const monthDate = new Date(parseInt(year, 10), parseInt(month, 10) - 1, 1);
+      const label = monthDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+      monthMap[ym] = {
+        ym,
+        label,
+        txnCount: 0,
+        unitsDispensed: 0,
+        totalSales: 0,
+        totalCogs: 0,
+        medMap: {}
+      };
+    }
+
+    const mObj = monthMap[ym];
+    mObj.txnCount += 1;
+    mObj.totalSales += Number(t.netTotal || 0);
+
+    if (Array.isArray(t.items)) {
+      t.items.forEach(item => {
+        const q = Number(item.qty || 0);
+        mObj.unitsDispensed += q;
+        mObj.totalCogs += (Number(item.unitPrice || 0) * q);
+        const medName = item.actualSuppliedName || item.name || 'Medicine';
+        mObj.medMap[medName] = (mObj.medMap[medName] || 0) + q;
+      });
+    }
+  });
+
+  return Object.values(monthMap).sort((a, b) => b.ym.localeCompare(a.ym));
+}
+
+function renderMonthlyTabHtml(allTxns) {
+  const monthlyData = computeMonthlyInOutData(allTxns);
+  const totalMonths = monthlyData.length;
+  const grandTotalSales = monthlyData.reduce((acc, m) => acc + m.totalSales, 0);
+  const grandUnits = monthlyData.reduce((acc, m) => acc + m.unitsDispensed, 0);
+  const maxMonthSales = Math.max(...monthlyData.map(m => m.totalSales), 1000);
+
+  return `
+    <!-- Monthly KPI Cards -->
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 1rem; margin-bottom: 1.5rem;">
+      <div class="card" style="margin-bottom: 0; padding: 1.1rem 1.25rem; border-left: 4px solid var(--primary);">
+        <div style="font-size: 0.74rem; font-weight: 700; color: var(--text-muted); text-transform: uppercase;">Logged Months</div>
+        <div style="font-size: 1.6rem; font-weight: 900; color: var(--brand-charcoal); margin: 0.2rem 0;">${totalMonths} Month${totalMonths === 1 ? '' : 's'}</div>
+        <div style="font-size: 0.75rem; color: var(--text-muted);">Dispensing historical periods</div>
+      </div>
+
+      <div class="card" style="margin-bottom: 0; padding: 1.1rem 1.25rem; border-left: 4px solid #10b981;">
+        <div style="font-size: 0.74rem; font-weight: 700; color: var(--text-muted); text-transform: uppercase;">Total Cumulative Revenue</div>
+        <div style="font-size: 1.6rem; font-weight: 900; color: #047857; margin: 0.2rem 0;">₱${grandTotalSales.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+        <div style="font-size: 0.75rem; color: var(--text-muted);">${grandUnits} total units deducted from inventory</div>
+      </div>
+
+      <div class="card" style="margin-bottom: 0; padding: 1.1rem 1.25rem; border-left: 4px solid #f59e0b;">
+        <div style="font-size: 0.74rem; font-weight: 700; color: var(--text-muted); text-transform: uppercase;">Total In - Out Orders</div>
+        <div style="font-size: 1.6rem; font-weight: 900; color: #b45309; margin: 0.2rem 0;">${allTxns.length} Orders</div>
+        <div style="font-size: 0.75rem; color: var(--text-muted);">Completed transactions recorded</div>
+      </div>
+    </div>
+
+    <!-- Monthly Visual Progress Comparison -->
+    ${totalMonths > 0 ? `
+      <div class="card" style="padding: 1.5rem; margin-bottom: 1.5rem;">
+        <h4 style="margin: 0 0 1rem 0; font-size: 1.05rem; font-weight: 800; color: var(--brand-charcoal);">
+          Monthly Revenue & Volume Performance
+        </h4>
+        <div style="display: flex; flex-direction: column; gap: 1rem;">
+          ${monthlyData.map(m => {
+            const pct = Math.round((m.totalSales / maxMonthSales) * 100);
+            return `
+              <div>
+                <div style="display: flex; justify-content: space-between; font-size: 0.84rem; font-weight: 700; margin-bottom: 0.35rem;">
+                  <span style="color: var(--brand-charcoal);">${m.label} (${m.txnCount} orders)</span>
+                  <span style="color: var(--primary);">₱${m.totalSales.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} • ${m.unitsDispensed} units</span>
+                </div>
+                <div style="width: 100%; height: 12px; background: #f1f5f9; border-radius: 9999px; overflow: hidden;">
+                  <div style="width: ${Math.max(pct, 5)}%; height: 100%; background: linear-gradient(90deg, #028090 0%, #00a896 100%); border-radius: 9999px;"></div>
+                </div>
+              </div>
+            `;
+          }).join('')}
+        </div>
+      </div>
+    ` : ''}
+
+    <!-- Monthly Summary Table -->
+    <div style="background: #ffffff; border: 1px solid var(--border-color); border-radius: var(--radius-md); box-shadow: var(--shadow-sm); overflow: hidden; margin-bottom: 1.5rem;">
+      <div style="padding: 1rem 1.25rem; border-bottom: 1px solid var(--border-color); background: #f8fafc; display: flex; justify-content: space-between; align-items: center;">
+        <h4 style="margin: 0; font-size: 0.95rem; font-weight: 800; color: var(--brand-charcoal);">
+          Monthly Summary Book
+        </h4>
+        <span style="font-size: 0.75rem; color: var(--text-muted);">
+          Calendar Year & Month Records
+        </span>
+      </div>
+
+      <div style="overflow-x: auto;">
+        <table class="data-table" style="margin: 0;">
+          <thead>
+            <tr style="background: #f8fafc; border-bottom: 2px solid var(--border-color);">
+              <th style="font-weight: 700; color: var(--brand-charcoal);">Month / Year</th>
+              <th style="font-weight: 700; color: var(--brand-charcoal); text-align: center;">Transactions</th>
+              <th style="font-weight: 700; color: var(--brand-charcoal); text-align: center;">Units Dispensed</th>
+              <th style="font-weight: 700; color: var(--brand-charcoal);">Top Product Movements</th>
+              <th style="font-weight: 700; color: var(--brand-charcoal); text-align: right;">Total Sales (₱)</th>
+              <th style="font-weight: 700; color: var(--brand-charcoal); text-align: right;">Gross Profit (₱)</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${totalMonths === 0 ? `
+              <tr>
+                <td colspan="6" style="text-align: center; padding: 2.5rem; color: var(--text-muted);">
+                  No monthly transaction data available yet.
+                </td>
+              </tr>
+            ` : monthlyData.map(m => {
+              const topMeds = Object.entries(m.medMap)
+                .sort((a, b) => b[1] - a[1])
+                .slice(0, 3)
+                .map(([name, qty]) => `${name} (x${qty})`)
+                .join(', ');
+              const gp = m.totalSales - m.totalCogs;
+
+              return `
+                <tr>
+                  <td style="font-weight: 800; color: var(--brand-charcoal); font-size: 0.88rem;">
+                    ${m.label}
+                  </td>
+                  <td style="text-align: center; font-weight: 600; color: var(--text-main);">
+                    ${m.txnCount}
+                  </td>
+                  <td style="text-align: center; font-weight: 700; color: var(--primary);">
+                    ${m.unitsDispensed}
+                  </td>
+                  <td style="font-size: 0.8rem; color: var(--text-muted); max-width: 320px;">
+                    ${topMeds || '—'}
+                  </td>
+                  <td style="text-align: right; font-weight: 800; font-size: 0.94rem; color: var(--text-main);">
+                    ₱${m.totalSales.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  </td>
+                  <td style="text-align: right; font-weight: 700; font-size: 0.88rem; color: #047857;">
+                    ₱${gp.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  </td>
+                </tr>
+              `;
+            }).join('')}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  `;
+}

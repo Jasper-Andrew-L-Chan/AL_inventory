@@ -37,9 +37,27 @@ class AppRouter {
         modals.forEach(m => m.classList.remove('active'));
       }
     });
+
+    // Check shift schedule periodically (every 30 seconds) and when user refocuses tab
+    setInterval(() => {
+      if (window.pharmacyStore && typeof window.pharmacyStore.checkAndResetShiftStock === 'function') {
+        window.pharmacyStore.checkAndResetShiftStock();
+      }
+    }, 30000);
+
+    document.addEventListener('visibilitychange', () => {
+      if (!document.hidden && window.pharmacyStore && typeof window.pharmacyStore.checkAndResetShiftStock === 'function') {
+        window.pharmacyStore.checkAndResetShiftStock();
+      }
+    });
   }
 
   navigate(viewName) {
+    // Check permission
+    const hasAccess = window.authStore && typeof window.authStore.hasPermission === 'function'
+      ? window.authStore.hasPermission(viewName)
+      : true;
+
     this.currentView = viewName;
 
     // Update active nav in sidebar
@@ -58,7 +76,7 @@ class AppRouter {
       inventory: 'Medicine Inventory & Batches',
       transactions: 'In - Out (Stock Movements & Logs)',
       reports: 'Reports & Analytics',
-      staff: 'Pharmacy Staff',
+      staff: 'Pharmacy Staff & Access Control',
       cashdrawer: 'Cash Drawer',
       settings: 'Settings'
     };
@@ -66,8 +84,51 @@ class AppRouter {
       this.pageTitleEl.textContent = titles[viewName] || 'AffordaLabs Pharmacy';
     }
 
-    this.renderCurrent();
+    if (!hasAccess) {
+      this.renderAccessDenied(viewName);
+    } else {
+      this.renderCurrent();
+    }
     this.updateBadges();
+  }
+
+  renderAccessDenied(viewName) {
+    if (!this.contentEl) return;
+    const session = window.authStore ? window.authStore.getSession() : null;
+    const roleName = session ? (session.role || session.level || 'Staff') : 'User';
+    const titles = {
+      home: 'Home',
+      dashboard: 'Dashboard',
+      inventory: 'Medicine Inventory',
+      transactions: 'In - Out Logs',
+      reports: 'Reports & Analytics',
+      staff: 'Staff Management',
+      cashdrawer: 'Cash Drawer',
+      settings: 'System Settings'
+    };
+    const modTitle = titles[viewName] || viewName;
+
+    this.contentEl.innerHTML = `
+      <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 58vh; text-align: center; padding: 2rem;">
+        <div style="width: 72px; height: 72px; border-radius: 50%; background: #fee2e2; color: #ef4444; display: flex; align-items: center; justify-content: center; margin-bottom: 1.25rem; box-shadow: 0 4px 12px rgba(239, 68, 68, 0.15);">
+          <i data-lucide="shield-alert" style="width: 38px; height: 38px;"></i>
+        </div>
+        <h2 style="font-size: 1.45rem; font-weight: 800; color: #1e293b; margin-bottom: 0.5rem;">Access Restricted</h2>
+        <p style="font-size: 0.92rem; color: #64748b; max-width: 480px; line-height: 1.5; margin-bottom: 1.5rem;">
+          Your user account <strong>(@${session ? session.username : 'user'})</strong> with role <strong>${roleName}</strong> does not have permission to access the <strong>${modTitle}</strong> module.
+        </p>
+        <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 0.85rem 1.25rem; margin-bottom: 1.5rem; font-size: 0.8rem; color: #475569; max-width: 480px;">
+          💡 To request access to this tab, contact the Pharmacy Owner (Jasper Andrew Chan) or System Administrator to grant permissions in the <strong>Staff</strong> tab.
+        </div>
+        <button onclick="window.appRouter.navigate('home')" class="btn-primary" style="background: var(--primary); display: inline-flex; align-items: center; gap: 6px;">
+          <i data-lucide="arrow-left" style="width: 16px; height: 16px;"></i> Return to Allowed Overview
+        </button>
+      </div>
+    `;
+
+    if (typeof lucide !== 'undefined') {
+      lucide.createIcons();
+    }
   }
 
   renderCurrent() {
@@ -327,6 +388,39 @@ window.updateUserProfileUI = function () {
   if (window.appRouter) {
     window.appRouter.updateBadges();
   }
+
+  // Visual permission indicators on sidebar nav items
+  document.querySelectorAll('.sidebar-nav .nav-item[data-view]').forEach(item => {
+    const view = item.getAttribute('data-view');
+    const hasPerm = window.authStore && typeof window.authStore.hasPermission === 'function'
+      ? window.authStore.hasPermission(view)
+      : true;
+
+    // Check if lock badge already exists
+    let lockBadge = item.querySelector('.nav-lock-badge');
+
+    if (!hasPerm) {
+      item.style.opacity = '0.5';
+      item.title = 'Access Restricted by Admin/Owner';
+      if (!lockBadge) {
+        lockBadge = document.createElement('span');
+        lockBadge.className = 'nav-lock-badge';
+        lockBadge.style.cssText = 'margin-left: auto; font-size: 0.65rem; color: #ef4444; display: flex; align-items: center;';
+        lockBadge.innerHTML = '<i data-lucide="lock" style="width: 12px; height: 12px;"></i>';
+        item.appendChild(lockBadge);
+      }
+    } else {
+      item.style.opacity = '1';
+      item.title = '';
+      if (lockBadge) {
+        lockBadge.remove();
+      }
+    }
+  });
+
+  if (typeof lucide !== 'undefined') {
+    lucide.createIcons();
+  }
 };
 
 window.bootApp = function () {
@@ -356,4 +450,42 @@ document.addEventListener('DOMContentLoaded', () => {
     if (overlay) overlay.style.display = 'none';
     window.bootApp();
   }
+
+  // Initialize theme mode
+  window.initThemeMode();
 });
+
+// ── Theme Mode (Dark / Light) Coordinator ────────────────────────────────────
+const THEME_STORAGE_KEY = 'al_theme_mode';
+
+window.initThemeMode = function () {
+  const saved = localStorage.getItem(THEME_STORAGE_KEY) || 'light';
+  window.applyThemeMode(saved === 'dark');
+};
+
+window.toggleThemeMode = function () {
+  const isDark = document.body.classList.contains('dark-mode');
+  window.applyThemeMode(!isDark);
+};
+
+window.applyThemeMode = function (isDark) {
+  const labelEl = document.getElementById('themeToggleLabel');
+  const iconEl = document.getElementById('themeToggleIcon');
+
+  if (isDark) {
+    document.body.classList.add('dark-mode');
+    localStorage.setItem(THEME_STORAGE_KEY, 'dark');
+    if (labelEl) labelEl.textContent = 'Light Mode';
+    if (iconEl) iconEl.innerHTML = '<i data-lucide="sun"></i>';
+  } else {
+    document.body.classList.remove('dark-mode');
+    localStorage.setItem(THEME_STORAGE_KEY, 'light');
+    if (labelEl) labelEl.textContent = 'Dark Mode';
+    if (iconEl) iconEl.innerHTML = '<i data-lucide="moon"></i>';
+  }
+
+  if (typeof lucide !== 'undefined') {
+    lucide.createIcons();
+  }
+};
+

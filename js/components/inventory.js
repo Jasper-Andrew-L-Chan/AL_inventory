@@ -84,8 +84,9 @@ function renderInventoryView(container) {
                 ${lowStockItems.length > 0 ? lowStockItems.map(i => i.brandName).slice(0, 3).join(', ') + (lowStockItems.length > 3 ? ` +${lowStockItems.length - 3} more` : '') : 'All medicines at healthy stock'}
               </div>
             </div>
-            <span style="font-size: 0.7rem; font-weight: 700; background: #fee2e2; color: #b91c1c; padding: 2px 8px; border-radius: 9999px;">
-              ≤ Reorder Threshold
+            <span class="reorder-pill-badge" style="font-size: 0.72rem; padding: 3px 10px;">
+              <span class="reorder-pill-dot"></span>
+              <span>Needs Restock</span>
             </span>
           </div>
         </div>
@@ -199,7 +200,12 @@ function renderInventoryView(container) {
           <span style="font-size: 0.85rem; color: var(--primary); font-weight: 700; border-bottom: 2px solid var(--primary); padding-bottom: 2px;">All Items</span>
         `}
 
-        <!-- Total medicines count -->
+        <!-- Total medicines count and Shift Status badge -->
+        <div style="background: rgba(2, 128, 144, 0.1); border: 1px solid rgba(2, 128, 144, 0.25); color: var(--primary); padding: 0.35rem 0.75rem; border-radius: var(--radius-sm); font-size: 0.75rem; font-weight: 700; display: flex; align-items: center; gap: 0.4rem;">
+          <i data-lucide="clock" style="width: 14px; height: 14px;"></i>
+          <span>Shift Window: 6:00 AM – 9:00 PM</span>
+        </div>
+
         <div style="background: #e07a5f; color: white; padding: 0.4rem 1rem; border-radius: var(--radius-sm); font-size: 0.82rem; font-weight: 700; display: flex; align-items: center; gap: 0.4rem;">
           <i data-lucide="package" style="width: 15px; height: 15px;"></i>
           <span>${displayedItems.length} Medicines displayed</span>
@@ -218,9 +224,9 @@ function renderInventoryView(container) {
             <th>Medicine Details & Generic Name</th>
             <th>Category / Rx</th>
             <th>Batch / Expiry</th>
-            <th style="text-align: right;">Beginning Today</th>
-            <th style="text-align: right;">Added</th>
-            <th style="text-align: right;">Deducted</th>
+            <th style="text-align: right;" title="Opening inventory at start of shift">Beginning Shift</th>
+            <th style="text-align: right;" title="Stock received / added during this shift (resets at 6am / 9pm)">Added (Shift)</th>
+            <th style="text-align: right;" title="Stock dispensed / deducted during this shift (resets at 6am / 9pm)">Deducted (Shift)</th>
             <th style="text-align: right; color: var(--primary); font-weight: 700;">Current Stock</th>
             <th style="text-align: right;">Unit Price</th>
             <th style="text-align: center; width: 140px;">Fast Adjust</th>
@@ -304,16 +310,20 @@ function renderInventoryView(container) {
                 <td style="text-align: right; color: #16a34a; font-weight: 600;">+${item.addedStock}</td>
                 <td style="text-align: right; color: #dc2626; font-weight: 600;">-${item.deductedStock}</td>
                 <td style="text-align: right; font-weight: 800; font-size: 0.95rem; ${isLow ? 'color: #dc2626;' : 'color: var(--text-main);'}">
-                  ${item.currentStock}
-                  ${item.currentStock === 0 ? `
-                    <span style="display: inline-block; font-size: 0.68rem; background: #fee2e2; color: #b91c1c; font-weight: 800; padding: 1px 5px; border-radius: 3px; margin-top: 2px;">
-                      OUT OF STOCK
-                    </span>
-                  ` : (isLow ? `
-                    <span style="display: inline-block; font-size: 0.68rem; background: #fff1f2; color: #e11d48; font-weight: 700; padding: 1px 5px; border-radius: 3px; margin-top: 2px;">
-                      REORDER (≤${item.reorderLevel || 10})
-                    </span>
-                  ` : '')}
+                  <div style="display: flex; flex-direction: column; align-items: flex-end; gap: 3px;">
+                    <span>${item.currentStock}</span>
+                    ${item.currentStock === 0 ? `
+                      <span class="reorder-pill-badge out-of-stock" title="Critical: 0 stock remaining. Reorder urgently!">
+                        <span class="reorder-pill-dot"></span>
+                        <span>OUT OF STOCK</span>
+                      </span>
+                    ` : (isLow ? `
+                      <span class="reorder-pill-badge" title="Stock at or below reorder threshold (≤${item.reorderLevel || 10})">
+                        <span class="reorder-pill-dot"></span>
+                        <span>REORDER (≤${item.reorderLevel || 10})</span>
+                      </span>
+                    ` : '')}
+                  </div>
                 </td>
                 <td style="text-align: right; font-weight: 600;">₱${Number(item.sellingPrice).toFixed(2)}</td>
                 <td style="text-align: center;" onclick="event.stopPropagation()">

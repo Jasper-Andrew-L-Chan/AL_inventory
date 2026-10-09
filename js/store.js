@@ -8,7 +8,8 @@ const STORAGE_KEYS = {
   TRANSACTIONS: 'al_pharmacy_transactions',
   SETTINGS: 'al_pharmacy_settings',
   STAFF: 'al_pharmacy_staff',
-  DRAWER: 'al_pharmacy_drawer'
+  DRAWER: 'al_pharmacy_drawer',
+  SHIFT_TRACKER: 'al_pharmacy_shift_tracker'
 };
 
 const INITIAL_MEDICINES = [];
@@ -92,10 +93,78 @@ class PharmacyStore {
     if (!localStorage.getItem(STORAGE_KEYS.DRAWER)) {
       localStorage.setItem(STORAGE_KEYS.DRAWER, JSON.stringify(INITIAL_DRAWER));
     }
+
+    // Verify and synchronize shift opening (6:00 AM) and closing (9:00 PM)
+    this.checkAndResetShiftStock();
+  }
+
+  /**
+   * Shift Window Identifier:
+   * The pharmacy operating hours are 6:00 AM (06:00) to 9:00 PM (21:00).
+   * - 'open' (Day Shift): 06:00 to 20:59:59 (6:00 AM to 9:00 PM)
+   * - 'closed' (Night / Closed Period): 21:00 to 05:59:59 (9:00 PM to 6:00 AM next day)
+   * Whenever transitioning into Open (6 AM) or Closed (9 PM), Added and Deducted reset to 0.
+   */
+  getCurrentShiftId(now = new Date()) {
+    const yyyy = now.getFullYear();
+    const mm = String(now.getMonth() + 1).padStart(2, '0');
+    const dd = String(now.getDate()).padStart(2, '0');
+    const dateStr = `${yyyy}-${mm}-${dd}`;
+    const hour = now.getHours();
+
+    if (hour >= 6 && hour < 21) {
+      return `${dateStr}_open_06_21`;
+    } else {
+      // If past 9 PM (21:00 - 23:59), it belongs to dateStr closed period
+      // If before 6 AM (00:00 - 05:59), it is the night following previous day
+      return `${dateStr}_closed_h${hour < 6 ? 'early' : 'late'}`;
+    }
+  }
+
+  checkAndResetShiftStock() {
+    const currentShift = this.getCurrentShiftId();
+    const recordedShift = localStorage.getItem(STORAGE_KEYS.SHIFT_TRACKER);
+
+    if (recordedShift !== currentShift) {
+      // New shift started (e.g. pharmacy just opened at 6am, or closed at 9pm, or new calendar day)
+      this.resetAddedAndDeductedStock(`Shift transition to: ${currentShift}`);
+      localStorage.setItem(STORAGE_KEYS.SHIFT_TRACKER, currentShift);
+    }
+  }
+
+  resetAddedAndDeductedStock(reason = 'Shift reset') {
+    const rawItems = JSON.parse(localStorage.getItem(STORAGE_KEYS.ITEMS)) || [];
+    let modified = false;
+
+    const updated = rawItems.map(item => {
+      const added = Number(item.addedStock) || 0;
+      const deducted = Number(item.deductedStock) || 0;
+      const current = Number(item.currentStock) || 0;
+
+      if (added !== 0 || deducted !== 0 || item.beginningStock !== current) {
+        modified = true;
+        return {
+          ...item,
+          beginningStock: current, // The new shift begins with current stock as beginning stock
+          addedStock: 0,
+          deductedStock: 0
+        };
+      }
+      return item;
+    });
+
+    if (modified) {
+      localStorage.setItem(STORAGE_KEYS.ITEMS, JSON.stringify(updated));
+      window.dispatchEvent(new CustomEvent('pharmacy:items-updated'));
+      console.log(`[AffordaLabs Shift] Reset added & deducted stock to 0. (${reason})`);
+    }
   }
 
   // --- Medicine Item Methods ---
   getItems() {
+    // Proactively verify shift window upon any item query
+    this.checkAndResetShiftStock();
+
     const items = JSON.parse(localStorage.getItem(STORAGE_KEYS.ITEMS)) || [];
     return items.map(item => {
       const name = this.formatItemName(item);
@@ -458,6 +527,22 @@ class PharmacyStore {
 
   // --- Staff ---
   getStaff() {
+    if (window.authStore && typeof window.authStore.getUsers === 'function') {
+      const authUsers = window.authStore.getUsers();
+      if (Array.isArray(authUsers) && authUsers.length > 0) {
+        return authUsers.map(u => ({
+          id: u.id,
+          username: u.username,
+          name: u.fullName,
+          role: u.role,
+          level: u.level || 'Staff',
+          permissions: u.permissions || [],
+          license: u.prcLicense || '-',
+          phone: u.phone || '-',
+          status: u.status || 'Active'
+        }));
+      }
+    }
     return JSON.parse(localStorage.getItem(STORAGE_KEYS.STAFF)) || INITIAL_STAFF;
   }
 

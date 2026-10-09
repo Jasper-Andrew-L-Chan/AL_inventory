@@ -82,6 +82,14 @@
       </nav>
 
       <div class="sidebar-footer">
+        <div class="nav-item theme-toggle-item" id="themeToggleBtn" data-label="Theme: Light / Dark"
+          onclick="toggleThemeMode()" title="Toggle Dark / Light Mode">
+          <span class="icon" id="themeToggleIcon"><i data-lucide="moon"></i></span>
+          <span class="nav-label" id="themeToggleLabel">Dark Mode</span>
+          <span class="theme-toggle-switch">
+            <span class="theme-toggle-knob"></span>
+          </span>
+        </div>
         <div class="nav-item" data-label="Help & Compliance"
           onclick="alert('AffordaLabs PharmaPOS v1.0.0 (Philippine FDA & BIR Compliant)')">
           <span class="icon"><i data-lucide="circle-help"></i></span>
