@@ -117,8 +117,9 @@ class AppRouter {
         <p style="font-size: 0.92rem; color: #64748b; max-width: 480px; line-height: 1.5; margin-bottom: 1.5rem;">
           Your user account <strong>(@${session ? session.username : 'user'})</strong> with role <strong>${roleName}</strong> does not have permission to access the <strong>${modTitle}</strong> module.
         </p>
-        <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 0.85rem 1.25rem; margin-bottom: 1.5rem; font-size: 0.8rem; color: #475569; max-width: 480px;">
-          💡 To request access to this tab, contact the Pharmacy Owner (Jasper Andrew Chan) or System Administrator to grant permissions in the <strong>Staff</strong> tab.
+        <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 0.85rem 1.25rem; margin-bottom: 1.5rem; font-size: 0.8rem; color: #475569; max-width: 480px; display: flex; align-items: center; gap: 8px; text-align: left;">
+          <i data-lucide="info" style="width: 16px; height: 16px; color: var(--primary); flex-shrink: 0;"></i>
+          <span>To request access to this tab, contact the Pharmacy Owner (Jasper Andrew Chan) or System Administrator to grant permissions in the <strong>Staff</strong> tab.</span>
         </div>
         <button onclick="window.appRouter.navigate('home')" class="btn-primary" style="background: var(--primary); display: inline-flex; align-items: center; gap: 6px;">
           <i data-lucide="arrow-left" style="width: 16px; height: 16px;"></i> Return to Allowed Overview
@@ -207,7 +208,7 @@ class AppRouter {
 // ── Topbar Alerts Dropdown Handlers ──────────────────────────────────────────
 let currentNotifFilter = 'all';
 
-window.toggleAlertsDropdown = function(event) {
+window.toggleAlertsDropdown = function (event) {
   if (event) event.stopPropagation();
   const dd = document.getElementById('alertsDropdown');
   if (!dd) return;
@@ -222,20 +223,20 @@ window.toggleAlertsDropdown = function(event) {
   }
 };
 
-window.closeAlertsDropdown = function() {
+window.closeAlertsDropdown = function () {
   const dd = document.getElementById('alertsDropdown');
   if (dd) dd.classList.remove('show');
 };
 
 // Close dropdown when clicking outside
-document.addEventListener('click', function(e) {
+document.addEventListener('click', function (e) {
   const wrapper = document.querySelector('.notif-dropdown-wrapper');
   if (wrapper && !wrapper.contains(e.target)) {
     window.closeAlertsDropdown();
   }
 });
 
-window.filterNotifTab = function(filter) {
+window.filterNotifTab = function (filter) {
   currentNotifFilter = filter;
   ['all', 'restock', 'expiry'].forEach(f => {
     const btn = document.getElementById('tabNotif' + f.charAt(0).toUpperCase() + f.slice(1));
@@ -247,7 +248,7 @@ window.filterNotifTab = function(filter) {
   renderAlertsDropdownContent();
 };
 
-window.renderAlertsDropdownContent = function() {
+window.renderAlertsDropdownContent = function () {
   const container = document.getElementById('notifListContainer');
   if (!container) return;
 
@@ -343,7 +344,7 @@ window.renderAlertsDropdownContent = function() {
   if (typeof lucide !== 'undefined') lucide.createIcons();
 };
 
-window.goToAlertsTab = function() {
+window.goToAlertsTab = function () {
   window.closeAlertsDropdown();
   if (window.appRouter) {
     window.appRouter.navigate('inventory');
@@ -355,7 +356,7 @@ window.goToAlertsTab = function() {
   }
 };
 
-window.openMedicineFromAlert = function(itemId) {
+window.openMedicineFromAlert = function (itemId) {
   window.closeAlertsDropdown();
   if (window.appRouter) {
     window.appRouter.navigate('inventory');

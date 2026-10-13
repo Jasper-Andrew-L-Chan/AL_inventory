@@ -179,6 +179,7 @@ function renderInventoryView(container) {
       <div style="display: flex; align-items: center; gap: 1rem;">
         <input 
           type="text" 
+          id="inventorySearchInput"
           placeholder="Search by brand, generic, or lot #..." 
           value="${inventorySearchQuery}" 
           oninput="handleInventorySearch(this.value)" 
@@ -206,9 +207,9 @@ function renderInventoryView(container) {
           <span>Shift Window: 6:00 AM – 9:00 PM</span>
         </div>
 
-        <div style="background: #e07a5f; color: white; padding: 0.4rem 1rem; border-radius: var(--radius-sm); font-size: 0.82rem; font-weight: 700; display: flex; align-items: center; gap: 0.4rem;">
+        <div id="inventoryCountBadge" style="background: #e07a5f; color: white; padding: 0.4rem 1rem; border-radius: var(--radius-sm); font-size: 0.82rem; font-weight: 700; display: flex; align-items: center; gap: 0.4rem;">
           <i data-lucide="package" style="width: 15px; height: 15px;"></i>
-          <span>${displayedItems.length} Medicines displayed</span>
+          <span id="inventoryCountText">${displayedItems.length} Medicines displayed</span>
         </div>
       </div>
     </div>
@@ -233,146 +234,8 @@ function renderInventoryView(container) {
             <th style="text-align: center; width: 160px;">Actions</th>
           </tr>
         </thead>
-        <tbody>
-          ${displayedItems.length === 0 ? `
-            <tr>
-              <td colspan="11" style="text-align: center; padding: 3rem 1rem; color: var(--text-muted);">
-                <div style="margin-bottom: 0.5rem; display: flex; justify-content: center;"><i data-lucide="${inventoryCurrentTab === 'expiry-alerts' ? 'check-circle' : 'package'}" style="width: 36px; height: 36px; opacity: 0.5; color: ${inventoryCurrentTab === 'expiry-alerts' ? '#10b981' : 'inherit'};"></i></div>
-                <div style="font-weight: 700; font-size: 1.05rem; color: var(--text-main); margin-bottom: 0.25rem;">
-                  ${inventoryCurrentTab === 'expiry-alerts' ? 'No Low Stock or Expiring Batches Found' : (inventorySearchQuery ? `No medicines matching "${inventorySearchQuery}"` : 'No medicines in inventory')}
-                </div>
-                <div style="font-size: 0.84rem; max-width: 420px; margin: 0 auto 1.25rem auto;">
-                  ${inventoryCurrentTab === 'expiry-alerts' ? 'All batches are well within safe shelf-life limits and have sufficient inventory.' : 'Your inventory is currently empty. Use the quick entry bar above or click the button below to add your first medicine batch.'}
-                </div>
-                <button onclick="${inventoryCurrentTab === 'expiry-alerts' ? "switchInventoryTab('inventory')" : 'openAddMedicineModal()'}" class="btn-primary" style="background: var(--primary); display: inline-flex; align-items: center; gap: 4px;">
-                  <i data-lucide="${inventoryCurrentTab === 'expiry-alerts' ? 'arrow-left' : 'plus'}" style="width: 15px; height: 15px;"></i> ${inventoryCurrentTab === 'expiry-alerts' ? 'Back to All Inventory' : 'Add First Medicine'}
-                </button>
-              </td>
-            </tr>
-          ` : displayedItems.map(item => {
-            const isLow = item.currentStock <= item.reorderLevel;
-            const expDate = new Date(item.expiryDate);
-            const now = new Date();
-            const daysToExpiry = Math.ceil((expDate - now) / (1000 * 60 * 60 * 24));
-            const isExpiringSoon = daysToExpiry <= 90;
-            const isSelected = selectedInventoryItemIds.has(item.id);
-
-            return `
-              <tr 
-                id="inv-row-${item.id}"
-                class="${isSelected ? 'selected' : ''}" 
-                onclick="handleRowClick(event, '${item.id}')"
-                style="cursor: pointer; user-select: none;"
-                title="Shift + Click to select for Edit / Delete"
-              >
-                <td style="text-align: center;" onclick="event.stopPropagation()">
-                  <input 
-                    type="checkbox" 
-                    ${isSelected ? 'checked' : ''} 
-                    onchange="toggleItemSelection('${item.id}', this.checked)" 
-                  />
-                </td>
-                <td>
-                  <div style="font-weight: 700; color: var(--text-main); font-size: 0.9rem;">
-                    ${item.brandName} <span style="font-weight: normal; color: var(--text-muted);">[${item.unit}]</span>
-                  </div>
-                  <div style="font-size: 0.75rem; color: #0d9488; font-style: italic;">
-                    ${item.genericName} - ${item.dosage || ''}
-                  </div>
-                </td>
-                <td>
-                  <div style="font-size: 0.78rem; color: var(--text-muted);">${item.category}</div>
-                  <span class="badge ${item.isRx ? 'badge-rx' : 'badge-otc'}" style="margin-top: 3px;">
-                    ${item.isRx ? 'Rx Required' : 'OTC'}
-                  </span>
-                </td>
-                <td>
-                  <div style="font-family: monospace; font-size: 0.78rem; font-weight: 600;">${item.batchLot}</div>
-                  <div style="font-size: 0.72rem; margin-top: 2px;">
-                    ${daysToExpiry <= 0 ? `
-                      <span style="background: #fee2e2; color: #b91c1c; font-weight: 800; padding: 1px 6px; border-radius: 4px; display: inline-flex; align-items: center; gap: 3px;">
-                        <i data-lucide="alert-octagon" style="width: 11px; height: 11px;"></i> EXPIRED (${item.expiryDate})
-                      </span>
-                    ` : (daysToExpiry <= 30 ? `
-                      <span style="background: #fee2e2; color: #dc2626; font-weight: 700; padding: 1px 6px; border-radius: 4px; display: inline-flex; align-items: center; gap: 3px;">
-                        <i data-lucide="alert-triangle" style="width: 11px; height: 11px;"></i> Expires in ${daysToExpiry}d (${item.expiryDate})
-                      </span>
-                    ` : (isExpiringSoon ? `
-                      <span style="background: #fef3c7; color: #b45309; font-weight: 700; padding: 1px 6px; border-radius: 4px; display: inline-flex; align-items: center; gap: 3px;">
-                        <i data-lucide="clock" style="width: 11px; height: 11px;"></i> Exp in ${daysToExpiry}d (${item.expiryDate})
-                      </span>
-                    ` : `
-                      <span style="color: var(--text-muted);">Exp: ${item.expiryDate}</span>
-                    `))}
-                  </div>
-                </td>
-                <td style="text-align: right; color: var(--text-muted);">${item.beginningStock}</td>
-                <td style="text-align: right; color: #16a34a; font-weight: 600;">+${item.addedStock}</td>
-                <td style="text-align: right; color: #dc2626; font-weight: 600;">-${item.deductedStock}</td>
-                <td style="text-align: right; font-weight: 800; font-size: 0.95rem; ${isLow ? 'color: #dc2626;' : 'color: var(--text-main);'}">
-                  <div style="display: flex; flex-direction: column; align-items: flex-end; gap: 3px;">
-                    <span>${item.currentStock}</span>
-                    ${item.currentStock === 0 ? `
-                      <span class="reorder-pill-badge out-of-stock" title="Critical: 0 stock remaining. Reorder urgently!">
-                        <span class="reorder-pill-dot"></span>
-                        <span>OUT OF STOCK</span>
-                      </span>
-                    ` : (isLow ? `
-                      <span class="reorder-pill-badge" title="Stock at or below reorder threshold (≤${item.reorderLevel || 10})">
-                        <span class="reorder-pill-dot"></span>
-                        <span>REORDER (≤${item.reorderLevel || 10})</span>
-                      </span>
-                    ` : '')}
-                  </div>
-                </td>
-                <td style="text-align: right; font-weight: 600;">₱${Number(item.sellingPrice).toFixed(2)}</td>
-                <td style="text-align: center;" onclick="event.stopPropagation()">
-                  <div style="display: flex; align-items: center; justify-content: center; gap: 4px;">
-                    <input 
-                      type="number" 
-                      id="adj-input-${item.id}" 
-                      placeholder="Qty" 
-                      style="width: 50px; padding: 3px 5px; font-size: 0.8rem; border: 1px solid var(--border-color); border-radius: 4px; text-align: center;" 
-                    />
-                    <button 
-                      onclick="fastAdjustStock('${item.id}', 1)" 
-                      title="Add to Stock"
-                      style="width: 24px; height: 24px; border-radius: 50%; background: #10b981; color: white; border: none; font-size: 0.85rem; font-weight: 700; cursor: pointer; display: flex; align-items: center; justify-content: center;"
-                    >
-                      +
-                    </button>
-                    <button 
-                      onclick="fastAdjustStock('${item.id}', -1)" 
-                      title="Deduct Stock"
-                      style="width: 24px; height: 24px; border-radius: 50%; background: #ef4444; color: white; border: none; font-size: 0.85rem; font-weight: 700; cursor: pointer; display: flex; align-items: center; justify-content: center;"
-                    >
-                      -
-                    </button>
-                  </div>
-                </td>
-                <td style="text-align: center;" onclick="event.stopPropagation()">
-                  <div class="action-btn-group">
-                    <button 
-                      onclick="openEditMedicineModal('${item.id}')" 
-                      class="btn-action-edit"
-                      title="Edit this medicine"
-                      style="display: inline-flex; align-items: center; gap: 4px;"
-                    >
-                      <i data-lucide="edit-3" style="width: 13px; height: 13px;"></i> Edit
-                    </button>
-                    <button 
-                      onclick="confirmDeleteItem('${item.id}')" 
-                      class="btn-action-delete"
-                      title="Delete this medicine permanently"
-                      style="display: inline-flex; align-items: center; gap: 4px;"
-                    >
-                      <i data-lucide="trash-2" style="width: 13px; height: 13px;"></i> Delete
-                    </button>
-                  </div>
-                </td>
-              </tr>
-            `;
-          }).join('')}
+        <tbody id="inventoryTableBody">
+          ${renderInventoryTableRows(displayedItems)}
         </tbody>
       </table>
     </div>
@@ -573,11 +436,200 @@ window.deleteSelectedItems = function() {
   }
 };
 
+function getFilteredInventoryItems() {
+  const items = window.pharmacyStore.getItems();
+  const filtered = items.filter(item => {
+    if (!inventorySearchQuery) return true;
+    const q = inventorySearchQuery.toLowerCase();
+    return (
+      (item.brandName || '').toLowerCase().includes(q) ||
+      (item.genericName || '').toLowerCase().includes(q) ||
+      (item.category || '').toLowerCase().includes(q) ||
+      (item.batchLot && item.batchLot.toLowerCase().includes(q))
+    );
+  });
+
+  const now = new Date();
+  const in90Days = new Date(now.getTime() + 90 * 24 * 60 * 60 * 1000);
+
+  if (inventoryCurrentTab === 'expiry-alerts') {
+    return filtered.filter(item => {
+      const isLow = (Number(item.currentStock) || 0) <= (Number(item.reorderLevel) || 10);
+      const expDate = new Date(item.expiryDate);
+      const isExpiring = !isNaN(expDate.getTime()) && expDate <= in90Days;
+      return isLow || isExpiring;
+    });
+  }
+
+  return filtered;
+}
+
+function renderInventoryTableRows(displayedItems) {
+  if (!displayedItems || displayedItems.length === 0) {
+    return `
+      <tr>
+        <td colspan="11" style="text-align: center; padding: 3rem 1rem; color: var(--text-muted);">
+          <div style="margin-bottom: 0.5rem; display: flex; justify-content: center;"><i data-lucide="${inventoryCurrentTab === 'expiry-alerts' ? 'check-circle' : 'package'}" style="width: 36px; height: 36px; opacity: 0.5; color: ${inventoryCurrentTab === 'expiry-alerts' ? '#10b981' : 'inherit'};"></i></div>
+          <div style="font-weight: 700; font-size: 1.05rem; color: var(--text-main); margin-bottom: 0.25rem;">
+            ${inventoryCurrentTab === 'expiry-alerts' ? 'No Low Stock or Expiring Batches Found' : (inventorySearchQuery ? `No medicines matching "${escapeHtml(inventorySearchQuery)}"` : 'No medicines in inventory')}
+          </div>
+          <div style="font-size: 0.84rem; max-width: 420px; margin: 0 auto 1.25rem auto;">
+            ${inventoryCurrentTab === 'expiry-alerts' ? 'All batches are well within safe shelf-life limits and have sufficient inventory.' : 'Your inventory is currently empty. Use the quick entry bar above or click the button below to add your first medicine batch.'}
+          </div>
+          <button onclick="${inventoryCurrentTab === 'expiry-alerts' ? "switchInventoryTab('inventory')" : 'openAddMedicineModal()'}" class="btn-primary" style="background: var(--primary); display: inline-flex; align-items: center; gap: 4px;">
+            <i data-lucide="${inventoryCurrentTab === 'expiry-alerts' ? 'arrow-left' : 'plus'}" style="width: 15px; height: 15px;"></i> ${inventoryCurrentTab === 'expiry-alerts' ? 'Back to All Inventory' : 'Add First Medicine'}
+          </button>
+        </td>
+      </tr>
+    `;
+  }
+
+  return displayedItems.map(item => {
+    const isLow = item.currentStock <= item.reorderLevel;
+    const expDate = new Date(item.expiryDate);
+    const now = new Date();
+    const daysToExpiry = Math.ceil((expDate - now) / (1000 * 60 * 60 * 24));
+    const isExpiringSoon = daysToExpiry <= 90;
+    const isSelected = selectedInventoryItemIds.has(item.id);
+
+    return `
+      <tr 
+        id="inv-row-${item.id}"
+        class="${isSelected ? 'selected' : ''}" 
+        onclick="handleRowClick(event, '${item.id}')"
+        style="cursor: pointer; user-select: none;"
+        title="Shift + Click to select for Edit / Delete"
+      >
+        <td style="text-align: center;" onclick="event.stopPropagation()">
+          <input 
+            type="checkbox" 
+            ${isSelected ? 'checked' : ''} 
+            onchange="toggleItemSelection('${item.id}', this.checked)" 
+          />
+        </td>
+        <td>
+          <div style="font-weight: 700; color: var(--text-main); font-size: 0.9rem;">
+            ${escapeHtml(item.brandName)} <span style="font-weight: normal; color: var(--text-muted);">[${escapeHtml(item.unit)}]</span>
+          </div>
+          <div style="font-size: 0.75rem; color: #0d9488; font-style: italic;">
+            ${escapeHtml(item.genericName)} - ${escapeHtml(item.dosage || '')}
+          </div>
+        </td>
+        <td>
+          <div style="font-size: 0.78rem; color: var(--text-muted);">${escapeHtml(item.category)}</div>
+          <span class="badge ${item.isRx ? 'badge-rx' : 'badge-otc'}" style="margin-top: 3px;">
+            ${item.isRx ? 'Rx Required' : 'OTC'}
+          </span>
+        </td>
+        <td>
+          <div style="font-family: monospace; font-size: 0.78rem; font-weight: 600;">${escapeHtml(item.batchLot)}</div>
+          <div style="font-size: 0.72rem; margin-top: 2px;">
+            ${daysToExpiry <= 0 ? `
+              <span style="background: #fee2e2; color: #b91c1c; font-weight: 800; padding: 1px 6px; border-radius: 4px; display: inline-flex; align-items: center; gap: 3px;">
+                <i data-lucide="alert-octagon" style="width: 11px; height: 11px;"></i> EXPIRED (${item.expiryDate})
+              </span>
+            ` : (daysToExpiry <= 30 ? `
+              <span style="background: #fee2e2; color: #dc2626; font-weight: 700; padding: 1px 6px; border-radius: 4px; display: inline-flex; align-items: center; gap: 3px;">
+                <i data-lucide="alert-triangle" style="width: 11px; height: 11px;"></i> Expires in ${daysToExpiry}d (${item.expiryDate})
+              </span>
+            ` : (isExpiringSoon ? `
+              <span style="background: #fef3c7; color: #b45309; font-weight: 700; padding: 1px 6px; border-radius: 4px; display: inline-flex; align-items: center; gap: 3px;">
+                <i data-lucide="clock" style="width: 11px; height: 11px;"></i> Exp in ${daysToExpiry}d (${item.expiryDate})
+              </span>
+            ` : `
+              <span style="color: var(--text-muted);">Exp: ${item.expiryDate}</span>
+            `))}
+          </div>
+        </td>
+        <td style="text-align: right; color: var(--text-muted);">${item.beginningStock}</td>
+        <td style="text-align: right; color: #16a34a; font-weight: 600;">+${item.addedStock}</td>
+        <td style="text-align: right; color: #dc2626; font-weight: 600;">-${item.deductedStock}</td>
+        <td style="text-align: right; font-weight: 800; font-size: 0.95rem; ${isLow ? 'color: #dc2626;' : 'color: var(--text-main);'}">
+          <div style="display: flex; flex-direction: column; align-items: flex-end; gap: 3px;">
+            <span>${item.currentStock}</span>
+            ${item.currentStock === 0 ? `
+              <span class="reorder-pill-badge out-of-stock" title="Critical: 0 stock remaining. Reorder urgently!">
+                <span class="reorder-pill-dot"></span>
+                <span>OUT OF STOCK</span>
+              </span>
+            ` : (isLow ? `
+              <span class="reorder-pill-badge" title="Stock at or below reorder threshold (≤${item.reorderLevel || 10})">
+                <span class="reorder-pill-dot"></span>
+                <span>REORDER (≤${item.reorderLevel || 10})</span>
+              </span>
+            ` : '')}
+          </div>
+        </td>
+        <td style="text-align: right; font-weight: 600;">₱${Number(item.sellingPrice).toFixed(2)}</td>
+        <td style="text-align: center;" onclick="event.stopPropagation()">
+          <div style="display: flex; align-items: center; justify-content: center; gap: 4px;">
+            <input 
+              type="number" 
+              id="adj-input-${item.id}" 
+              placeholder="Qty" 
+              style="width: 50px; padding: 3px 5px; font-size: 0.8rem; border: 1px solid var(--border-color); border-radius: 4px; text-align: center;" 
+            />
+            <button 
+              onclick="fastAdjustStock('${item.id}', 1)" 
+              title="Add to Stock"
+              style="width: 24px; height: 24px; border-radius: 50%; background: #10b981; color: white; border: none; font-size: 0.85rem; font-weight: 700; cursor: pointer; display: flex; align-items: center; justify-content: center;"
+            >
+              +
+            </button>
+            <button 
+              onclick="fastAdjustStock('${item.id}', -1)" 
+              title="Deduct Stock"
+              style="width: 24px; height: 24px; border-radius: 50%; background: #ef4444; color: white; border: none; font-size: 0.85rem; font-weight: 700; cursor: pointer; display: flex; align-items: center; justify-content: center;"
+            >
+              -
+            </button>
+          </div>
+        </td>
+        <td style="text-align: center;" onclick="event.stopPropagation()">
+          <div class="action-btn-group">
+            <button 
+              onclick="openEditMedicineModal('${item.id}')" 
+              class="btn-action-edit"
+              title="Edit this medicine"
+              style="display: inline-flex; align-items: center; gap: 4px;"
+            >
+              <i data-lucide="edit-3" style="width: 13px; height: 13px;"></i> Edit
+            </button>
+            <button 
+              onclick="confirmDeleteItem('${item.id}')" 
+              class="btn-action-delete"
+              title="Delete this medicine permanently"
+              style="display: inline-flex; align-items: center; gap: 4px;"
+            >
+              <i data-lucide="trash-2" style="width: 13px; height: 13px;"></i> Delete
+            </button>
+          </div>
+        </td>
+      </tr>
+    `;
+  }).join('');
+}
+
 // ── Search & Subtabs ─────────────────────────────────────────────────────────
 
 window.handleInventorySearch = function(query) {
   inventorySearchQuery = query;
-  renderInventoryView(document.getElementById('main-content'));
+
+  const tbody = document.getElementById('inventoryTableBody');
+  const countBadge = document.getElementById('inventoryCountText');
+
+  if (tbody) {
+    const displayedItems = getFilteredInventoryItems();
+    tbody.innerHTML = renderInventoryTableRows(displayedItems);
+    if (countBadge) {
+      countBadge.textContent = `${displayedItems.length} Medicines displayed`;
+    }
+    if (typeof lucide !== 'undefined') {
+      lucide.createIcons();
+    }
+  } else {
+    renderInventoryView(document.getElementById('main-content'));
+  }
 };
 
 window.switchInventoryTab = function(tab) {

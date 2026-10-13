@@ -67,126 +67,203 @@ function renderDashboardView(container) {
   const pageSoldItems = filteredSoldItems.slice(startIdx, startIdx + DASHBOARD_FEED_PAGE_SIZE);
 
   container.innerHTML = `
-    <!-- Top Sync Info Bar with Live Indicator -->
+    <!-- Top Sync Info Bar with Live Indicator & Quick Actions for PC Desktop -->
     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.25rem; flex-wrap: wrap; gap: 0.75rem;">
-      <div style="display: flex; align-items: center; gap: 0.65rem;">
-        <h2 style="font-size: 1.4rem; font-weight: 800; color: var(--brand-charcoal); margin: 0;">Dashboard</h2>
-        <span style="display: inline-flex; align-items: center; gap: 5px; font-size: 0.72rem; font-weight: 700; color: #16a34a; background: #dcfce7; padding: 2px 8px; border-radius: 9999px;">
-          <span style="width: 7px; height: 7px; border-radius: 50%; background: #16a34a; display: inline-block; animation: pulse 2s infinite;"></span>
-          LIVE FEED
+      <div style="display: flex; align-items: center; gap: 0.75rem;">
+        <h2 style="font-size: 1.45rem; font-weight: 800; color: var(--brand-charcoal); margin: 0; letter-spacing: -0.02em;">Dashboard</h2>
+        <span style="display: inline-flex; align-items: center; gap: 5px; font-size: 0.72rem; font-weight: 700; color: #16a34a; background: #dcfce7; padding: 3px 9px; border-radius: 9999px; border: 1px solid #bbf7d0;">
+          <span style="width: 7px; height: 7px; border-radius: 50%; background: #16a34a; display: inline-block; box-shadow: 0 0 6px rgba(22, 163, 74, 0.6);"></span>
+          LIVE DESKTOP FEED
         </span>
       </div>
-      <div style="display: flex; align-items: center; gap: 0.75rem; font-size: 0.78rem; color: var(--text-muted);">
-        <span>Logged in: <strong style="color: var(--text-main);">${session ? session.fullName : 'System'}</strong></span>
-        <span>•</span>
-        <span>Synced at ${timeStr}</span>
-        <button onclick="renderDashboardView(document.getElementById('main-content'))" style="background: var(--primary-light); border: 1px solid var(--primary-border); padding: 4px 10px; border-radius: var(--radius-sm); cursor: pointer; color: var(--primary-dark); font-weight: 700; display: flex; align-items: center; gap: 4px;">
-          ↻ Refresh Data
+
+      <!-- Quick Action Counter Launchers (Desktop Optimized) -->
+      <div style="display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap;">
+        <button onclick="window.appRouter.navigate('transactions')" class="btn-primary" style="background: var(--primary); font-size: 0.82rem; padding: 6px 14px; display: inline-flex; align-items: center; gap: 6px; box-shadow: var(--shadow-orange);" title="Open In - Out Transactions (POS)">
+          <i data-lucide="plus-circle" style="width: 15px; height: 15px;"></i>
+          <span>+ New Sale / Dispense</span>
+        </button>
+        <button onclick="window.appRouter.navigate('inventory')" class="btn-outline" style="font-size: 0.82rem; padding: 6px 12px; display: inline-flex; align-items: center; gap: 6px; background: white;" title="Receive or restock medicine batches">
+          <i data-lucide="package-plus" style="width: 15px; height: 15px; color: var(--primary);"></i>
+          <span>+ Receive Stock</span>
+        </button>
+        <button onclick="goToAlertsTab()" class="btn-outline" style="font-size: 0.82rem; padding: 6px 12px; display: inline-flex; align-items: center; gap: 6px; background: white; color: ${metrics.expiringSoonCount + metrics.lowStockCount > 0 ? '#b45309' : 'var(--text-main)'}; border-color: ${metrics.expiringSoonCount + metrics.lowStockCount > 0 ? '#fde68a' : 'var(--border-color)'};" title="View batch expiries & low stock alerts">
+          <i data-lucide="alert-triangle" style="width: 15px; height: 15px; color: #f59e0b;"></i>
+          <span>Batch Alerts (${metrics.expiringSoonCount + metrics.lowStockCount})</span>
+        </button>
+        <button onclick="renderDashboardView(document.getElementById('main-content'))" class="btn-outline" style="padding: 6px 10px; font-size: 0.82rem; display: inline-flex; align-items: center; gap: 4px; background: white;" title="Refresh live counter numbers">
+          <i data-lucide="refresh-cw" style="width: 14px; height: 14px;"></i>
         </button>
       </div>
     </div>
 
-    <!-- 8 Rounded KPI Cards Grid Reflecting Real-Time Inventory & Sales -->
-    <div class="kpi-grid">
-      <!-- 1. Total Net Sales -->
-      <div class="kpi-card coral">
-        <div class="kpi-header">
-          <i data-lucide="trending-up" style="width: 16px; height: 16px;"></i> Total Net Sales
+    <!-- 2-Tier Desktop Clinical KPI Grid -->
+    <div style="display: flex; flex-direction: column; gap: 1rem; margin-bottom: 1.5rem;">
+      <!-- Row 1: Financial & Margin Performance -->
+      <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 1rem;">
+        <!-- 1. Total Net Sales -->
+        <div class="kpi-card-desktop" style="border-left: 4px solid #f97316;">
+          <div class="kpi-head">
+            <span class="kpi-title">Total Net Sales</span>
+            <div class="kpi-icon-box" style="background: #fff7ed; color: #ea580c;">
+              <i data-lucide="trending-up" style="width: 17px; height: 17px;"></i>
+            </div>
+          </div>
+          <div class="kpi-val" style="color: #c2410c;">₱${metrics.netSales.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+          <div class="kpi-footnote">
+            <i data-lucide="check-circle-2" style="width: 13px; height: 13px; color: #16a34a;"></i>
+            <span>${metrics.transactionCount} completed sales transaction${metrics.transactionCount === 1 ? '' : 's'}</span>
+          </div>
         </div>
-        <div class="kpi-value">₱${metrics.netSales.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
-        <div class="kpi-sub">${metrics.transactionCount} completed sales transaction${metrics.transactionCount === 1 ? '' : 's'}</div>
+
+        <!-- 2. Gross Profit & Margin -->
+        <div class="kpi-card-desktop" style="border-left: 4px solid #10b981;">
+          <div class="kpi-head">
+            <span class="kpi-title">Gross Profit</span>
+            <div class="kpi-icon-box" style="background: #ecfdf5; color: #059669;">
+              <i data-lucide="banknote" style="width: 17px; height: 17px;"></i>
+            </div>
+          </div>
+          <div class="kpi-val" style="color: #047857;">₱${metrics.grossProfit.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+          <div class="kpi-footnote">
+            <span style="font-weight: 700; color: #059669; background: #d1fae5; padding: 1px 6px; border-radius: 4px;">
+              ${metrics.netSales ? ((metrics.grossProfit / metrics.netSales) * 100).toFixed(1) : 0}% Margin
+            </span>
+            <span>After direct COGS</span>
+          </div>
+        </div>
+
+        <!-- 3. Cost of Goods (COGS) -->
+        <div class="kpi-card-desktop" style="border-left: 4px solid #6366f1;">
+          <div class="kpi-head">
+            <span class="kpi-title">Cost of Goods (COGS)</span>
+            <div class="kpi-icon-box" style="background: #eef2ff; color: #4f46e5;">
+              <i data-lucide="receipt" style="width: 17px; height: 17px;"></i>
+            </div>
+          </div>
+          <div class="kpi-val">₱${metrics.costOfGoods.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+          <div class="kpi-footnote">
+            <i data-lucide="boxes" style="width: 13px; height: 13px;"></i>
+            <span>Direct inventory supplier cost</span>
+          </div>
+        </div>
+
+        <!-- 4. Discounts Granted (Senior / PWD) -->
+        <div class="kpi-card-desktop" style="border-left: 4px solid #06b6d4;">
+          <div class="kpi-head">
+            <span class="kpi-title">Discounts Applied</span>
+            <div class="kpi-icon-box" style="background: #ecfeff; color: #0891b2;">
+              <i data-lucide="percent" style="width: 17px; height: 17px;"></i>
+            </div>
+          </div>
+          <div class="kpi-val">₱${metrics.discounts.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+          <div class="kpi-footnote">
+            <i data-lucide="shield-check" style="width: 13px; height: 13px; color: #0891b2;"></i>
+            <span>Senior Citizen & PWD legal deduction</span>
+          </div>
+        </div>
       </div>
 
-      <!-- 2. Total Discounts (Senior/PWD) -->
-      <div class="kpi-card teal">
-        <div class="kpi-header">
-          <i data-lucide="percent" style="width: 16px; height: 16px;"></i> Total Discounts
+      <!-- Row 2: Operational Volume & Batch Safety -->
+      <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 1rem;">
+        <!-- 5. Items Dispensed -->
+        <div class="kpi-card-desktop" style="border-left: 4px solid #0284c7;">
+          <div class="kpi-head">
+            <span class="kpi-title">Items Dispensed</span>
+            <div class="kpi-icon-box" style="background: #f0f9ff; color: #0284c7;">
+              <i data-lucide="pill" style="width: 17px; height: 17px;"></i>
+            </div>
+          </div>
+          <div class="kpi-val">${metrics.itemsDispensed} <span style="font-size: 0.9rem; font-weight: 600; color: var(--text-muted);">units</span></div>
+          <div class="kpi-footnote">
+            <span>Avg ₱${metrics.transactionCount ? (metrics.netSales / metrics.transactionCount).toFixed(2) : '0.00'} / transaction</span>
+          </div>
         </div>
-        <div class="kpi-value">₱${metrics.discounts.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
-        <div class="kpi-sub">Senior & PWD Applied</div>
-      </div>
 
-      <!-- 3. In - Out Stock Movements -->
-      <div class="kpi-card mint">
-        <div class="kpi-header">
-          <i data-lucide="arrow-left-right" style="width: 16px; height: 16px;"></i> In - Out Movements
+        <!-- 6. In - Out Stock Movements -->
+        <div class="kpi-card-desktop" style="border-left: 4px solid #0d9488;">
+          <div class="kpi-head">
+            <span class="kpi-title">Stock Movements</span>
+            <div class="kpi-icon-box" style="background: #f0fdfa; color: #0d9488;">
+              <i data-lucide="arrow-left-right" style="width: 17px; height: 17px;"></i>
+            </div>
+          </div>
+          <div class="kpi-val">${metrics.transactionCount} <span style="font-size: 0.9rem; font-weight: 600; color: var(--text-muted);">logs</span></div>
+          <div class="kpi-footnote">
+            <i data-lucide="clock" style="width: 13px; height: 13px;"></i>
+            <span>Across current shift window</span>
+          </div>
         </div>
-        <div class="kpi-value">${metrics.transactionCount}</div>
-        <div class="kpi-sub">${metrics.transactionCount ? `${metrics.transactionCount} stock logs recorded` : 'No logs recorded today'}</div>
-      </div>
 
-      <!-- 4. Cost of Goods (COGS) -->
-      <div class="kpi-card orange">
-        <div class="kpi-header">
-          <i data-lucide="tag" style="width: 16px; height: 16px;"></i> Cost of Goods
+        <!-- 7. Total Refunds -->
+        <div class="kpi-card-desktop" style="border-left: 4px solid #8b5cf6;">
+          <div class="kpi-head">
+            <span class="kpi-title">Returns / Refunds</span>
+            <div class="kpi-icon-box" style="background: #f5f3ff; color: #7c3aed;">
+              <i data-lucide="rotate-ccw" style="width: 17px; height: 17px;"></i>
+            </div>
+          </div>
+          <div class="kpi-val">₱${metrics.totalRefunds.toFixed(2)}</div>
+          <div class="kpi-footnote">
+            <i data-lucide="smile" style="width: 13px; height: 13px; color: #16a34a;"></i>
+            <span>Zero customer return issues today</span>
+          </div>
         </div>
-        <div class="kpi-value">₱${metrics.costOfGoods.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
-        <div class="kpi-sub">Direct inventory cost</div>
-      </div>
 
-      <!-- 5. No. of Items Dispensed -->
-      <div class="kpi-card cyan">
-        <div class="kpi-header">
-          <i data-lucide="pill" style="width: 16px; height: 16px;"></i> Dispensed Items
+        <!-- 8. Batch & Expiry Alerts -->
+        <div class="kpi-card-desktop" onclick="goToAlertsTab()" style="border-left: 4px solid ${metrics.expiringSoonCount + metrics.lowStockCount > 0 ? '#eab308' : '#10b981'}; cursor: pointer;" title="Click to view Expiring and Low Stock Medicines">
+          <div class="kpi-head">
+            <span class="kpi-title">Batch & Stock Alerts</span>
+            <div class="kpi-icon-box" style="background: ${metrics.expiringSoonCount + metrics.lowStockCount > 0 ? '#fefce8' : '#ecfdf5'}; color: ${metrics.expiringSoonCount + metrics.lowStockCount > 0 ? '#ca8a04' : '#059669'};">
+              <i data-lucide="alert-triangle" style="width: 17px; height: 17px;"></i>
+            </div>
+          </div>
+          <div class="kpi-val" style="color: ${metrics.expiringSoonCount + metrics.lowStockCount > 0 ? '#b45309' : '#047857'};">
+            ${metrics.expiringSoonCount + metrics.lowStockCount}
+            <span style="font-size: 0.8rem; font-weight: 700; color: var(--primary); margin-left: 6px;">View →</span>
+          </div>
+          <div class="kpi-footnote">
+            <span>${metrics.expiringSoonCount} Expiring Soon • ${metrics.lowStockCount} Needs Restock</span>
+          </div>
         </div>
-        <div class="kpi-value">${metrics.itemsDispensed}</div>
-        <div class="kpi-sub">Tablets, bottles, packs sold</div>
-      </div>
-
-      <!-- 6. Gross Profit -->
-      <div class="kpi-card coral">
-        <div class="kpi-header">
-          <i data-lucide="banknote" style="width: 16px; height: 16px;"></i> Gross Profit
-        </div>
-        <div class="kpi-value">₱${metrics.grossProfit.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
-        <div class="kpi-sub">${metrics.netSales ? ((metrics.grossProfit / metrics.netSales) * 100).toFixed(1) : 0}% Gross Margin</div>
-      </div>
-
-      <!-- 7. Total Refunds -->
-      <div class="kpi-card orange">
-        <div class="kpi-header">
-          <i data-lucide="rotate-ccw" style="width: 16px; height: 16px;"></i> Total Refunds
-        </div>
-        <div class="kpi-value">₱${metrics.totalRefunds.toFixed(2)}</div>
-        <div class="kpi-sub">Zero return issues today</div>
-      </div>
-
-      <!-- 8. Expiring Soon / Low Stock -->
-      <div class="kpi-card mint" onclick="goToAlertsTab()" style="cursor: pointer; transition: transform 0.15s ease;" title="Click to view Expiring and Low Stock Medicines">
-        <div class="kpi-header" style="display: flex; justify-content: space-between; align-items: center;">
-          <span style="display: inline-flex; align-items: center; gap: 6px;"><i data-lucide="alert-triangle" style="width: 16px; height: 16px;"></i> Batch Alerts</span>
-          <span style="font-size: 0.7rem; font-weight: 700; color: #028090;">View Details →</span>
-        </div>
-        <div class="kpi-value">${metrics.expiringSoonCount + metrics.lowStockCount}</div>
-        <div class="kpi-sub">${metrics.expiringSoonCount} Expiring Soon / ${metrics.lowStockCount} Needs Restock</div>
       </div>
     </div>
 
-    <!-- Branch Subheader & Date Picker -->
+    <!-- Branch Subheader & Live Desktop Sync Status -->
     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.25rem; flex-wrap: wrap; gap: 0.75rem;">
-      <h3 style="font-size: 1.05rem; font-weight: 800; color: var(--text-main); margin: 0;">
-        ${greeting}, <span style="color: var(--primary);">${userName}</span>! Welcome to <span style="color: var(--text-muted); font-weight: 600;">${settings.pharmacyName} (${settings.branch})</span>
+      <h3 style="font-size: 1.05rem; font-weight: 800; color: var(--text-main); margin: 0; display: flex; align-items: center; gap: 6px;">
+        <span>${greeting},</span>
+        <span style="color: var(--primary);">${userName}!</span>
+        <span style="font-size: 0.82rem; font-weight: 600; color: var(--text-muted);">Counter station ready at ${settings.pharmacyName} (${settings.branch})</span>
       </h3>
-      <div style="background: white; border: 1px solid var(--border-color); border-radius: var(--radius-sm); padding: 0.4rem 0.85rem; display: flex; align-items: center; gap: 0.5rem; font-size: 0.82rem; color: var(--text-muted); box-shadow: var(--shadow-sm);">
-        <span>Date Filter:</span>
-        <strong style="color: var(--text-main);">Today (12:00am - 11:59pm)</strong>
-        <i data-lucide="calendar" style="width: 14px; height: 14px; color: var(--text-muted);"></i>
+      <div style="display: flex; align-items: center; gap: 0.6rem;">
+        <div style="background: white; border: 1px solid var(--border-color); border-radius: var(--radius-sm); padding: 0.4rem 0.85rem; display: flex; align-items: center; gap: 0.5rem; font-size: 0.82rem; color: var(--text-muted); box-shadow: var(--shadow-sm);">
+          <span>Date Filter:</span>
+          <strong style="color: var(--text-main);">Today (12:00am - 11:59pm)</strong>
+          <i data-lucide="calendar" style="width: 14px; height: 14px; color: var(--text-muted);"></i>
+        </div>
+        <div style="background: #f8fafc; border: 1px solid var(--border-color); border-radius: var(--radius-sm); padding: 0.4rem 0.75rem; font-size: 0.78rem; color: var(--text-muted);">
+          Synced at <strong>${timeStr}</strong>
+        </div>
       </div>
     </div>
 
-    <!-- Middle Section: Sales by Date Area Chart + Payment Types Breakdown -->
-    <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 1.25rem; align-items: start; margin-bottom: 1.5rem;">
+    <!-- Middle Section: Sales Area Chart (Left) + Top Selling Medicines & Payment Breakdown (Right) -->
+    <div style="display: grid; grid-template-columns: 1.55fr 1fr; gap: 1.25rem; align-items: start; margin-bottom: 1.5rem;">
       <!-- Left Chart Card -->
-      <div class="card" style="padding: 1.5rem;">
+      <div class="card" style="padding: 1.5rem; margin-bottom: 0;">
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.25rem; flex-wrap: wrap; gap: 0.5rem;">
           <div>
-            <h4 style="font-size: 1.05rem; font-weight: 700; color: var(--text-main); margin: 0;">Sales by Date</h4>
-            <div style="font-size: 0.75rem; color: var(--text-muted);">
-              ${currentChartPeriod === 'hourly' ? 'Hourly Pharmacy POS & In-Out Volume Today' : (currentChartPeriod === 'daily' ? 'Past 7 Days Sales Trend' : 'Past 6 Months Sales Volume')}
+            <h4 style="font-size: 1.05rem; font-weight: 800; color: var(--text-main); margin: 0; display: flex; align-items: center; gap: 6px;">
+              <i data-lucide="line-chart" style="width: 18px; height: 18px; color: var(--primary);"></i>
+              <span>Sales by Date Trend</span>
+            </h4>
+            <div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 2px;">
+              ${currentChartPeriod === 'hourly' ? 'Hourly Pharmacy POS & In-Out Volume Today' : (currentChartPeriod === 'daily' ? 'Past 5 Days Daily Sales Trend' : 'Past 5 Months Sales Volume')}
             </div>
           </div>
           <!-- Time Interval Toggles -->
-          <div style="display: flex; gap: 0.5rem; font-size: 0.78rem;">
+          <div style="display: flex; gap: 0.4rem; font-size: 0.78rem;">
             <button class="chart-tab ${currentChartPeriod === 'hourly' ? 'active' : ''}" onclick="switchDashboardChartPeriod('hourly')" style="padding: 4px 10px; border-radius: 4px; border: 1px solid ${currentChartPeriod === 'hourly' ? 'var(--primary)' : '#cbd5e1'}; background: ${currentChartPeriod === 'hourly' ? 'var(--primary-light)' : 'white'}; color: ${currentChartPeriod === 'hourly' ? 'var(--primary)' : 'var(--text-muted)'}; font-weight: ${currentChartPeriod === 'hourly' ? '700' : '500'}; cursor: pointer;">Hourly</button>
             <button class="chart-tab ${currentChartPeriod === 'daily' ? 'active' : ''}" onclick="switchDashboardChartPeriod('daily')" style="padding: 4px 10px; border-radius: 4px; border: 1px solid ${currentChartPeriod === 'daily' ? 'var(--primary)' : '#cbd5e1'}; background: ${currentChartPeriod === 'daily' ? 'var(--primary-light)' : 'white'}; color: ${currentChartPeriod === 'daily' ? 'var(--primary)' : 'var(--text-muted)'}; font-weight: ${currentChartPeriod === 'daily' ? '700' : '500'}; cursor: pointer;">Daily</button>
             <button class="chart-tab ${currentChartPeriod === 'monthly' ? 'active' : ''}" onclick="switchDashboardChartPeriod('monthly')" style="padding: 4px 10px; border-radius: 4px; border: 1px solid ${currentChartPeriod === 'monthly' ? 'var(--primary)' : '#cbd5e1'}; background: ${currentChartPeriod === 'monthly' ? 'var(--primary-light)' : 'white'}; color: ${currentChartPeriod === 'monthly' ? 'var(--primary)' : 'var(--text-muted)'}; font-weight: ${currentChartPeriod === 'monthly' ? '700' : '500'}; cursor: pointer;">Monthly</button>
@@ -197,94 +274,165 @@ function renderDashboardView(container) {
         ${renderDynamicAreaChartSvg(chartData)}
       </div>
 
-      <!-- Right Payment Types Breakdown Card -->
-      <div class="card" style="padding: 1.5rem;">
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
-          <h4 style="font-size: 1.05rem; font-weight: 700; color: var(--text-main); margin: 0;">Payment Types</h4>
-          <span style="color: var(--text-muted); font-size: 0.9rem; cursor: pointer;">•••</span>
+      <!-- Right Column: Top Selling Medicines + Payment Types -->
+      <div style="display: flex; flex-direction: column; gap: 1.25rem;">
+        <!-- Top Fast-Moving Medicines Widget -->
+        <div class="card" style="padding: 1.25rem 1.4rem; margin-bottom: 0;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem;">
+            <div>
+              <h4 style="font-size: 0.95rem; font-weight: 800; color: var(--text-main); margin: 0; display: flex; align-items: center; gap: 6px;">
+                <i data-lucide="flame" style="width: 17px; height: 17px; color: #ea580c;"></i>
+                <span>Fast-Moving Medicines</span>
+              </h4>
+              <div style="font-size: 0.72rem; color: var(--text-muted);">Top dispensing SKUs today</div>
+            </div>
+            <button onclick="window.appRouter.navigate('inventory')" class="btn-outline" style="font-size: 0.7rem; padding: 2px 8px;" title="View in Inventory">
+              Inventory →
+            </button>
+          </div>
+
+          ${(() => {
+            // Group sold items by medicine name
+            const medicineTotals = {};
+            (metrics.recentSold || []).forEach(s => {
+              const name = s.name || 'Medicine';
+              if (!medicineTotals[name]) {
+                medicineTotals[name] = { qty: 0, revenue: 0 };
+              }
+              medicineTotals[name].qty += Number(s.qty || 0);
+              medicineTotals[name].revenue += Number(s.totalPrice || 0);
+            });
+
+            const topList = Object.entries(medicineTotals)
+              .sort((a, b) => b[1].qty - a[1].qty)
+              .slice(0, 4);
+
+            if (topList.length === 0) {
+              return `
+                <div style="text-align: center; padding: 1.25rem 0.5rem; color: var(--text-muted); font-size: 0.78rem;">
+                  <i data-lucide="package" style="width: 24px; height: 24px; opacity: 0.4; margin-bottom: 4px;"></i>
+                  <div>No medicines dispensed yet today</div>
+                </div>
+              `;
+            }
+
+            const maxSoldQty = Math.max(...topList.map(item => item[1].qty), 1);
+
+            return `
+              <div style="display: flex; flex-direction: column; gap: 0.7rem;">
+                ${topList.map(([name, data], idx) => {
+                  const percent = Math.round((data.qty / maxSoldQty) * 100);
+                  return `
+                    <div>
+                      <div style="display: flex; justify-content: space-between; align-items: baseline; font-size: 0.8rem; margin-bottom: 3px;">
+                        <span style="font-weight: 700; color: var(--text-main); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 210px;" title="${escapeHtml(name)}">
+                          <span style="color: var(--primary); font-family: monospace; margin-right: 4px;">#${idx + 1}</span>
+                          ${escapeHtml(name)}
+                        </span>
+                        <span style="font-weight: 800; color: var(--brand-charcoal); font-size: 0.82rem;">
+                          ${data.qty} <span style="font-size: 0.7rem; font-weight: 600; color: var(--text-muted);">dispensed</span>
+                        </span>
+                      </div>
+                      <div style="width: 100%; height: 5px; background: #f1f5f9; border-radius: 9999px; overflow: hidden;">
+                        <div style="width: ${percent}%; height: 100%; background: linear-gradient(90deg, #f97316, #ea580c); border-radius: 9999px;"></div>
+                      </div>
+                    </div>
+                  `;
+                }).join('')}
+              </div>
+            `;
+          })()}
         </div>
-        <div style="font-size: 0.75rem; color: var(--text-muted); margin-bottom: 1.2rem;">
-          Breakdown of collected methods today
-        </div>
 
-        <div style="display: flex; flex-direction: column; gap: 0.9rem;">
-          <!-- Cash -->
-          <div style="display: flex; align-items: center; justify-content: space-between;">
-            <div style="display: flex; align-items: center; gap: 0.75rem;">
-              <div style="width: 32px; height: 32px; border-radius: 6px; background: #dcfce7; color: #16a34a; display: flex; align-items: center; justify-content: center;">
-                <i data-lucide="banknote" style="width: 17px; height: 17px;"></i>
-              </div>
-              <div>
-                <div style="font-size: 0.88rem; font-weight: 600; color: var(--text-main);">Cash</div>
-                <div style="font-size: 0.72rem; color: var(--text-muted);">Drawer register</div>
-              </div>
-            </div>
-            <div style="font-size: 0.95rem; font-weight: 700; color: var(--text-main);">
-              ₱${(metrics.paymentTotals.Cash || 0).toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-            </div>
+        <!-- Payment Types Breakdown Card -->
+        <div class="card" style="padding: 1.25rem 1.4rem; margin-bottom: 0;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.35rem;">
+            <h4 style="font-size: 0.95rem; font-weight: 800; color: var(--text-main); margin: 0; display: flex; align-items: center; gap: 6px;">
+              <i data-lucide="wallet" style="width: 16px; height: 16px; color: var(--primary);"></i>
+              <span>Payment Breakdown</span>
+            </h4>
+            <span style="font-size: 0.75rem; font-weight: 700; color: #16a34a; background: #dcfce7; padding: 2px 7px; border-radius: 4px;">
+              ₱${metrics.netSales.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+            </span>
+          </div>
+          <div style="font-size: 0.72rem; color: var(--text-muted); margin-bottom: 0.9rem;">
+            Collected methods across counter registers today
           </div>
 
-          <!-- GrabMart -->
-          <div style="display: flex; align-items: center; justify-content: space-between;">
-            <div style="display: flex; align-items: center; gap: 0.75rem;">
-              <div style="width: 32px; height: 32px; border-radius: 6px; background: #ecfdf5; color: #059669; display: flex; align-items: center; justify-content: center;">
-                <i data-lucide="bike" style="width: 17px; height: 17px;"></i>
+          <div style="display: flex; flex-direction: column; gap: 0.75rem;">
+            <!-- Cash -->
+            <div style="display: flex; align-items: center; justify-content: space-between;">
+              <div style="display: flex; align-items: center; gap: 0.65rem;">
+                <div style="width: 28px; height: 28px; border-radius: 6px; background: #dcfce7; color: #16a34a; display: flex; align-items: center; justify-content: center;">
+                  <i data-lucide="banknote" style="width: 15px; height: 15px;"></i>
+                </div>
+                <div>
+                  <div style="font-size: 0.82rem; font-weight: 600; color: var(--text-main);">Cash Drawer</div>
+                </div>
               </div>
-              <div>
-                <div style="font-size: 0.88rem; font-weight: 600; color: var(--text-main);">GrabMart</div>
-                <div style="font-size: 0.72rem; color: var(--text-muted);">Online Delivery</div>
+              <div style="font-size: 0.88rem; font-weight: 700; color: var(--text-main);">
+                ₱${(metrics.paymentTotals.Cash || 0).toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
               </div>
             </div>
-            <div style="font-size: 0.95rem; font-weight: 700; color: var(--text-main);">
-              ₱${(metrics.paymentTotals.Grab || 0).toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-            </div>
-          </div>
 
-          <!-- Maya QR -->
-          <div style="display: flex; align-items: center; justify-content: space-between;">
-            <div style="display: flex; align-items: center; gap: 0.75rem;">
-              <div style="width: 32px; height: 32px; border-radius: 6px; background: #f7fee7; color: #65a30d; display: flex; align-items: center; justify-content: center;">
-                <i data-lucide="credit-card" style="width: 17px; height: 17px;"></i>
+            <!-- GrabMart -->
+            <div style="display: flex; align-items: center; justify-content: space-between;">
+              <div style="display: flex; align-items: center; gap: 0.65rem;">
+                <div style="width: 28px; height: 28px; border-radius: 6px; background: #ecfdf5; color: #059669; display: flex; align-items: center; justify-content: center;">
+                  <i data-lucide="bike" style="width: 15px; height: 15px;"></i>
+                </div>
+                <div>
+                  <div style="font-size: 0.82rem; font-weight: 600; color: var(--text-main);">GrabMart Delivery</div>
+                </div>
               </div>
-              <div>
-                <div style="font-size: 0.88rem; font-weight: 600; color: var(--text-main);">Maya QR</div>
-                <div style="font-size: 0.72rem; color: var(--text-muted);">Digital Wallet</div>
+              <div style="font-size: 0.88rem; font-weight: 700; color: var(--text-main);">
+                ₱${(metrics.paymentTotals.Grab || 0).toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
               </div>
             </div>
-            <div style="font-size: 0.95rem; font-weight: 700; color: var(--text-main);">
-              ₱${(metrics.paymentTotals.Maya || 0).toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-            </div>
-          </div>
 
-          <!-- GCash QR -->
-          <div style="display: flex; align-items: center; justify-content: space-between;">
-            <div style="display: flex; align-items: center; gap: 0.75rem;">
-              <div style="width: 32px; height: 32px; border-radius: 6px; background: #e0f2fe; color: #0284c7; display: flex; align-items: center; justify-content: center;">
-                <i data-lucide="smartphone" style="width: 17px; height: 17px;"></i>
+            <!-- Maya QR -->
+            <div style="display: flex; align-items: center; justify-content: space-between;">
+              <div style="display: flex; align-items: center; gap: 0.65rem;">
+                <div style="width: 28px; height: 28px; border-radius: 6px; background: #f7fee7; color: #65a30d; display: flex; align-items: center; justify-content: center;">
+                  <i data-lucide="credit-card" style="width: 15px; height: 15px;"></i>
+                </div>
+                <div>
+                  <div style="font-size: 0.82rem; font-weight: 600; color: var(--text-main);">Maya QR</div>
+                </div>
               </div>
-              <div>
-                <div style="font-size: 0.88rem; font-weight: 600; color: var(--text-main);">GCash QR</div>
-                <div style="font-size: 0.72rem; color: var(--text-muted);">Merchant Code</div>
+              <div style="font-size: 0.88rem; font-weight: 700; color: var(--text-main);">
+                ₱${(metrics.paymentTotals.Maya || 0).toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
               </div>
             </div>
-            <div style="font-size: 0.95rem; font-weight: 700; color: var(--text-main);">
-              ₱${(metrics.paymentTotals.GCash || 0).toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-            </div>
-          </div>
 
-          <!-- Card / FoodPanda -->
-          <div style="display: flex; align-items: center; justify-content: space-between;">
-            <div style="display: flex; align-items: center; gap: 0.75rem;">
-              <div style="width: 32px; height: 32px; border-radius: 6px; background: #fdf2f8; color: #db2777; display: flex; align-items: center; justify-content: center;">
-                <i data-lucide="shopping-bag" style="width: 17px; height: 17px;"></i>
+            <!-- GCash QR -->
+            <div style="display: flex; align-items: center; justify-content: space-between;">
+              <div style="display: flex; align-items: center; gap: 0.65rem;">
+                <div style="width: 28px; height: 28px; border-radius: 6px; background: #e0f2fe; color: #0284c7; display: flex; align-items: center; justify-content: center;">
+                  <i data-lucide="smartphone" style="width: 15px; height: 15px;"></i>
+                </div>
+                <div>
+                  <div style="font-size: 0.82rem; font-weight: 600; color: var(--text-main);">GCash QR</div>
+                </div>
               </div>
-              <div>
-                <div style="font-size: 0.88rem; font-weight: 600; color: var(--text-main);">FoodPanda / Card</div>
-                <div style="font-size: 0.72rem; color: var(--text-muted);">Delivery / Terminal</div>
+              <div style="font-size: 0.88rem; font-weight: 700; color: var(--text-main);">
+                ₱${(metrics.paymentTotals.GCash || 0).toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
               </div>
             </div>
-            <div style="font-size: 0.95rem; font-weight: 700; color: var(--text-main);">
-              ₱${((metrics.paymentTotals.Card || 0) + (metrics.paymentTotals.FoodPanda || 0)).toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+
+            <!-- Card / FoodPanda -->
+            <div style="display: flex; align-items: center; justify-content: space-between;">
+              <div style="display: flex; align-items: center; gap: 0.65rem;">
+                <div style="width: 28px; height: 28px; border-radius: 6px; background: #fdf2f8; color: #db2777; display: flex; align-items: center; justify-content: center;">
+                  <i data-lucide="shopping-bag" style="width: 15px; height: 15px;"></i>
+                </div>
+                <div>
+                  <div style="font-size: 0.82rem; font-weight: 600; color: var(--text-main);">FoodPanda / Card</div>
+                </div>
+              </div>
+              <div style="font-size: 0.88rem; font-weight: 700; color: var(--text-main);">
+                ₱${((metrics.paymentTotals.Card || 0) + (metrics.paymentTotals.FoodPanda || 0)).toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              </div>
             </div>
           </div>
         </div>
@@ -522,13 +670,13 @@ function generateDashboardChartData(txns, period) {
 function renderDynamicAreaChartSvg(dataPoints) {
   const values = dataPoints.map(d => d.total);
   const maxVal = Math.max(...values, 500);
-  const ceilVal = Math.ceil(maxVal / 100) * 100;
+  const ceilVal = Math.ceil((maxVal * 1.18) / 100) * 100;
 
   // Chart coordinates
   const leftX = 60;
   const rightX = 640;
   const stepX = (rightX - leftX) / (dataPoints.length - 1);
-  const topY = 40;
+  const topY = 48;
   const bottomY = 210;
   const height = bottomY - topY;
 

@@ -115,8 +115,8 @@ function renderStaffView(container) {
                   </div>
                 </td>
                 <td style="padding: 12px 16px;">
-                  <span class="badge" style="${levelBadgeStyle} font-weight: 800; font-size: 0.72rem; padding: 3px 8px; border-radius: 6px;">
-                    ${isOwner ? '👑 Owner' : (isAdmin ? '⚡ Admin' : '👤 Staff')}
+                  <span class="badge" style="${levelBadgeStyle} font-weight: 800; font-size: 0.72rem; padding: 4px 8px; border-radius: 6px; display: inline-flex; align-items: center; gap: 4px;">
+                    ${isOwner ? '<i data-lucide="crown" style="width: 13px; height: 13px;"></i> Owner' : (isAdmin ? '<i data-lucide="zap" style="width: 13px; height: 13px;"></i> Admin' : '<i data-lucide="user" style="width: 13px; height: 13px;"></i> Staff')}
                   </span>
                 </td>
                 <td style="padding: 12px 16px;">
@@ -134,8 +134,8 @@ function renderStaffView(container) {
                         const def = allPerms.find(ap => ap.id === p);
                         const label = def ? def.label.split(' ')[0] : p;
                         return `
-                          <span style="font-size: 0.68rem; background: #f8fafc; color: var(--text-main); padding: 2px 6px; border-radius: 4px; border: 1px solid #e2e8f0; font-weight: 600;">
-                            ✓ ${label}
+                          <span style="font-size: 0.68rem; background: #f8fafc; color: var(--text-main); padding: 2px 6px; border-radius: 4px; border: 1px solid #e2e8f0; font-weight: 600; display: inline-flex; align-items: center; gap: 3px;">
+                            <i data-lucide="check" style="width: 11px; height: 11px; color: var(--primary);"></i> ${label}
                           </span>
                         `;
                       }).join('')}
@@ -275,8 +275,9 @@ function renderStaffView(container) {
                   </label>
                 `).join('')}
               </div>
-              <div id="adminNoticePerms" style="display: none; margin-top: 0.5rem; font-size: 0.72rem; color: #c2410c; background: #fff7ed; padding: 6px 10px; border-radius: 6px; border: 1px solid #ffedd5;">
-                💡 <strong>affordaLABS Notice:</strong> As an Owner or Admin account, full access to all modules is granted unconditionally.
+              <div id="adminNoticePerms" style="display: none; margin-top: 0.5rem; font-size: 0.72rem; color: #c2410c; background: #fff7ed; padding: 6px 10px; border-radius: 6px; border: 1px solid #ffedd5; align-items: center; gap: 6px;">
+                <i data-lucide="lightbulb" style="width: 14px; height: 14px; flex-shrink: 0;"></i>
+                <span><strong>affordaLABS Notice:</strong> As an Owner or Admin account, full access to all modules is granted unconditionally.</span>
               </div>
             </div>
 
@@ -374,7 +375,10 @@ window.handleStaffLevelChange = function() {
     checkboxes.forEach(cb => {
       cb.checked = true;
     });
-    if (adminNotice) adminNotice.style.display = 'block';
+    if (adminNotice) {
+      adminNotice.style.display = 'flex';
+      if (typeof lucide !== 'undefined') lucide.createIcons();
+    }
   } else {
     if (adminNotice) adminNotice.style.display = 'none';
   }
