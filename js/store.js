@@ -53,7 +53,7 @@ const INITIAL_DRAWER = {
 
 class PharmacyStore {
   constructor() {
-    this.serverVersion = 0;
+    this.serverVersion = Number(localStorage.getItem('al_pharmacy_server_version')) || 0;
     this.isSyncing = false;
     this.init();
     this.syncFromServer();
@@ -61,6 +61,15 @@ class PharmacyStore {
   }
 
   init() {
+    // Clean out any test/corrupted items with "undefined" as brand or generic name
+    try {
+      const storedItems = JSON.parse(localStorage.getItem(STORAGE_KEYS.ITEMS)) || [];
+      const validStored = storedItems.filter(i => i && i.brandName !== 'undefined' && i.genericName !== 'undefined' && i.id !== 'test1');
+      if (validStored.length !== storedItems.length) {
+        localStorage.setItem(STORAGE_KEYS.ITEMS, JSON.stringify(validStored));
+      }
+    } catch (e) {}
+
     // If first time with cleared items or user wants fresh clean inventory
     const existingClean = localStorage.getItem('al_pharmacy_items_cleared_v2');
     if (!existingClean) {
@@ -117,37 +126,27 @@ class PharmacyStore {
       if (!data) return;
 
       const remoteVersion = Number(data.version) || 0;
-      let hasUpdated = false;
-
+      // Only accept remote server data if remoteVersion is newer than our local serverVersion,
+      // preventing background poll from overwriting deletions made on this client
       // 1. Items synchronization
       const localItemsStr = localStorage.getItem(STORAGE_KEYS.ITEMS);
-      const localItems = localItemsStr ? JSON.parse(localItemsStr) : [];
       if (Array.isArray(data.items)) {
-        if (data.items.length > 0) {
-          if (JSON.stringify(data.items) !== localItemsStr) {
-            localStorage.setItem(STORAGE_KEYS.ITEMS, JSON.stringify(data.items));
+        // Filter out corrupt test entries (e.g. "undefined (undefined)")
+        const cleanRemoteItems = data.items.filter(i => i && i.brandName !== 'undefined' && i.genericName !== 'undefined' && i.id !== 'test1');
+        if (remoteVersion > this.serverVersion) {
+          if (JSON.stringify(cleanRemoteItems) !== localItemsStr) {
+            localStorage.setItem(STORAGE_KEYS.ITEMS, JSON.stringify(cleanRemoteItems));
             window.dispatchEvent(new CustomEvent('pharmacy:items-updated'));
-            hasUpdated = true;
           }
-        } else if (localItems.length > 0) {
-          // If server items are empty but local has items, populate server
-          this.pushToServer({ items: localItems });
         }
       }
 
       // 2. Transactions synchronization
       const localTxnsStr = localStorage.getItem(STORAGE_KEYS.TRANSACTIONS);
-      const localTxns = localTxnsStr ? JSON.parse(localTxnsStr) : [];
-      if (Array.isArray(data.transactions)) {
-        if (data.transactions.length > 0) {
-          if (JSON.stringify(data.transactions) !== localTxnsStr) {
-            localStorage.setItem(STORAGE_KEYS.TRANSACTIONS, JSON.stringify(data.transactions));
-            window.dispatchEvent(new CustomEvent('pharmacy:txns-updated'));
-            hasUpdated = true;
-          }
-        } else if (localTxns.length > 0) {
-          // If server txns are empty but local has txns, populate server
-          this.pushToServer({ transactions: localTxns });
+      if (Array.isArray(data.transactions) && remoteVersion > this.serverVersion) {
+        if (JSON.stringify(data.transactions) !== localTxnsStr) {
+          localStorage.setItem(STORAGE_KEYS.TRANSACTIONS, JSON.stringify(data.transactions));
+          window.dispatchEvent(new CustomEvent('pharmacy:txns-updated'));
         }
       }
 
@@ -182,7 +181,10 @@ class PharmacyStore {
         window.authStore.syncUsersFromRemote(data.users);
       }
 
-      this.serverVersion = remoteVersion;
+      if (remoteVersion > this.serverVersion) {
+        this.serverVersion = remoteVersion;
+        localStorage.setItem('al_pharmacy_server_version', String(this.serverVersion));
+      }
     } catch (err) {
       // Offline fallback to localStorage
     } finally {
@@ -202,6 +204,7 @@ class PharmacyStore {
         const resp = await res.json();
         if (resp && resp.version) {
           this.serverVersion = resp.version;
+          localStorage.setItem('al_pharmacy_server_version', String(this.serverVersion));
         }
       }
     } catch (err) {
@@ -377,6 +380,112 @@ class PharmacyStore {
     const filtered = items.filter(i => !idSet.has(i.id));
     this.saveItems(filtered);
     return items.length - filtered.length;
+  }
+
+  backupItems() {
+    const raw = localStorage.getItem(STORAGE_KEYS.ITEMS);
+    const backupKey = 'al_pharmacy_items_backup_' + Date.now();
+    localStorage.setItem(backupKey, raw || '[]');
+    localStorage.setItem('al_pharmacy_items_latest_backup', backupKey);
+    return backupKey;
+  }
+
+  restoreItemsBackup(backupKey) {
+    const key = backupKey || localStorage.getItem('al_pharmacy_items_latest_backup');
+    if (!key) return false;
+    const backupData = localStorage.getItem(key);
+    if (!backupData) return false;
+    localStorage.setItem(STORAGE_KEYS.ITEMS, backupData);
+    window.dispatchEvent(new CustomEvent('pharmacy:items-updated'));
+    this.pushToServer({ items: JSON.parse(backupData) });
+    return true;
+  }
+
+  bulkImportItems(newItemsList, updateExisting = false) {
+    // 1. Automatically create backup before importing
+    this.backupItems();
+
+    const currentItems = this.getItems();
+    // Index current items for duplicate check
+    const makeKey = (brand, generic, dosage, form) => {
+      return `${(brand || '').trim().toLowerCase()}|${(generic || '').trim().toLowerCase()}|${(dosage || '').trim().toLowerCase()}|${(form || '').trim().toLowerCase()}`;
+    };
+
+    const itemMap = new Map();
+    currentItems.forEach(i => {
+      itemMap.set(makeKey(i.brandName, i.genericName, i.dosage, i.dosageForm), i);
+    });
+
+    let addedCount = 0;
+    let updatedCount = 0;
+    let skippedCount = 0;
+
+    newItemsList.forEach(rawItem => {
+      const key = makeKey(rawItem.brandName, rawItem.genericName, rawItem.dosage, rawItem.dosageForm);
+      const existing = itemMap.get(key);
+
+      if (existing) {
+        if (updateExisting) {
+          // Update prices, expiry, supplier, batch without wiping out currentStock unless specified
+          existing.costPrice = Number(rawItem.costPrice !== undefined ? rawItem.costPrice : existing.costPrice);
+          existing.unitPrice = Number(rawItem.unitPrice !== undefined ? rawItem.unitPrice : existing.unitPrice || existing.costPrice);
+          existing.netPrice = Number(rawItem.netPrice !== undefined ? rawItem.netPrice : existing.netPrice);
+          existing.sellingPrice = Number(rawItem.sellingPrice !== undefined ? rawItem.sellingPrice : existing.sellingPrice);
+          existing.qtyPerBox = Number(rawItem.qtyPerBox !== undefined ? rawItem.qtyPerBox : existing.qtyPerBox || 1);
+          if (rawItem.company || rawItem.supplier) {
+            existing.company = rawItem.company || rawItem.supplier;
+            existing.supplier = rawItem.company || rawItem.supplier;
+          }
+          if (rawItem.dosageForm) existing.dosageForm = rawItem.dosageForm;
+          if (rawItem.expiryDate) existing.expiryDate = rawItem.expiryDate;
+          if (rawItem.batchLot) existing.batchLot = rawItem.batchLot;
+          existing.name = this.formatItemName(existing);
+          updatedCount++;
+        } else {
+          skippedCount++;
+        }
+      } else {
+        const formattedName = this.formatItemName(rawItem);
+        const qty = Number(rawItem.initialQty !== undefined ? rawItem.initialQty : (rawItem.qty !== undefined ? rawItem.qty : rawItem.currentStock || 0));
+        const newItem = {
+          id: 'med-' + Date.now().toString(36) + Math.random().toString(36).substring(2, 6),
+          name: formattedName,
+          brandName: (rawItem.brandName || '').trim(),
+          genericName: (rawItem.genericName || '').trim(),
+          dosage: (rawItem.dosage || '').trim(),
+          dosageForm: (rawItem.dosageForm || 'Tablet').trim(),
+          category: rawItem.category || 'General Medicine',
+          isRx: !!rawItem.isRx,
+          unit: (rawItem.unit || rawItem.dosageForm || 'pcs').trim(),
+          beginningStock: qty,
+          addedStock: 0,
+          deductedStock: 0,
+          currentStock: qty,
+          reorderLevel: Number(rawItem.reorderLevel || 20),
+          batchLot: rawItem.batchLot || 'LOT-' + new Date().getFullYear() + '-' + Math.floor(1000 + Math.random() * 9000),
+          expiryDate: rawItem.expiryDate || '2028-12-31',
+          costPrice: Number(rawItem.costPrice || rawItem.unitPrice || 0),
+          unitPrice: Number(rawItem.unitPrice || rawItem.costPrice || 0),
+          netPrice: Number(rawItem.netPrice || 0),
+          sellingPrice: Number(rawItem.sellingPrice || 0),
+          qtyPerBox: Number(rawItem.qtyPerBox || 1),
+          company: rawItem.company || rawItem.supplier || 'General Distributor',
+          supplier: rawItem.company || rawItem.supplier || 'General Distributor'
+        };
+        currentItems.unshift(newItem);
+        itemMap.set(key, newItem);
+        addedCount++;
+      }
+    });
+
+    this.saveItems(currentItems);
+    return {
+      success: true,
+      addedCount,
+      updatedCount,
+      skippedCount,
+      totalProcessed: newItemsList.length
+    };
   }
 
   clearAllItems() {
