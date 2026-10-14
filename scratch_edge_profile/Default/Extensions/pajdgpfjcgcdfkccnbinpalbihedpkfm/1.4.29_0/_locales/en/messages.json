@@ -1,0 +1,26 @@
+{
+   "commandCycleTargetLanguage": {
+      "message": "Cycle recent target language"
+   },
+   "commandExtractImageText": {
+      "message": "Extracting text from image"
+   },
+   "commandImageTranslate": {
+      "message": "Translate specified image"
+   },
+   "commandPolishText": {
+      "message": "Improving writing"
+   },
+   "commandSelectTranslate": {
+      "message": "Translate selected text"
+   },
+   "commandTranslatePage": {
+      "message": "Translate current page"
+   },
+   "extensionDescription": {
+      "message": "Handwritten notes, course reading, creased scans, TED/Coursera lectures: layout kept, bilingual subtitles. Web instant, auto match."
+   },
+   "extensionName": {
+      "message": "AnyDoc Translator - Translate Web and PDF"
+   }
+}

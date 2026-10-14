@@ -1,0 +1,64 @@
+{
+   "action": {
+      "default_popup": "src/popup/index.html"
+   },
+   "background": {
+      "service_worker": "service-worker-loader.js",
+      "type": "module"
+   },
+   "commands": {
+      "cycle-target-language": {
+         "description": "__MSG_commandCycleTargetLanguage__",
+         "suggested_key": {
+            "default": "Alt+L"
+         }
+      },
+      "extract-image-text": {
+         "description": "__MSG_commandExtractImageText__"
+      },
+      "image-translate": {
+         "description": "__MSG_commandImageTranslate__"
+      },
+      "polish-text": {
+         "description": "__MSG_commandPolishText__"
+      },
+      "select-translate": {
+         "description": "__MSG_commandSelectTranslate__"
+      },
+      "translate-page": {
+         "description": "__MSG_commandTranslatePage__",
+         "suggested_key": {
+            "default": "Alt+T"
+         }
+      }
+   },
+   "content_scripts": [ {
+      "all_frames": true,
+      "js": [ "assets/index.ts-loader-CSfchUov.js" ],
+      "matches": [ "*://*/*", "file://*/*" ],
+      "run_at": "document_end"
+   } ],
+   "default_locale": "en",
+   "description": "__MSG_extensionDescription__",
+   "externally_connectable": {
+      "ids": [ "kdpelmjpfafjppnhbloffcjpeomlnpah", "mjdgandcagmikhlbjnilkmfnjeamfikk" ]
+   },
+   "host_permissions": [ "*://*/*" ],
+   "icons": {
+      "128": "public/logo/icon-128.png",
+      "16": "public/logo/icon-16.png",
+      "32": "public/logo/icon-32.png",
+      "48": "public/logo/icon-48.png"
+   },
+   "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAr9GHyPboRR56WLvc1KSHSkJBDh5MRMGThzqmEZ4aiSa/PE597t/kybRSVSAtWxPXRKmcfjBZOzLJAc7EhfVFH8wxAavhWckoedlxS6L+//Cl5tJX/UwfZGJyp2tGtvPcLX3AmW+D28P3yX9VZNHrPRf1PusfTKvFUUFeqXVnjp/GKOZuOH392vFa7VHiTGRkOAxtX18QihAKQGrE3wdedKCDyMg+HKhK2cVBPv3KPWFf0CBLWHcmyTfAR7IhKSz8pO5Y5905kNzP2YjWZoYV48IWoZYoGHOiXoLqM7+aoXTT0ROPeLjrTzbxOCvB1H5O4QIAlFULBPKKL8egJsCw4QIDAQAB",
+   "manifest_version": 3,
+   "name": "__MSG_extensionName__",
+   "permissions": [ "contextMenus", "storage", "unlimitedStorage", "clipboardWrite", "tabs", "scripting", "webNavigation", "activeTab", "cookies", "nativeMessaging" ],
+   "update_url": "https://edge.microsoft.com/extensionwebstorebase/v1/crx",
+   "version": "1.4.29",
+   "web_accessible_resources": [ {
+      "matches": [ "*://*/*", "file://*/*" ],
+      "resources": [ "locales/*", "public/**/*", "_locales/**/*", "assets/shortcutFormat-qcS6scda.js", "assets/useViewportBoundary-BWKoiqj7.js", "assets/scholarPdfReader-BObrC0Z-.js", "assets/index.ts-Cks22Xig.js" ],
+      "use_dynamic_url": false
+   } ]
+}

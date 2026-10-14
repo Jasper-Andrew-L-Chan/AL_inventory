@@ -1,0 +1,26 @@
+{
+   "commandCycleTargetLanguage": {
+      "message": "Cycle recent target language"
+   },
+   "commandExtractImageText": {
+      "message": "ดึงข้อความจากรูปภาพ"
+   },
+   "commandImageTranslate": {
+      "message": "แปลรูปภาพที่ระบุ"
+   },
+   "commandPolishText": {
+      "message": "ปรับปรุงการเขียน"
+   },
+   "commandSelectTranslate": {
+      "message": "แปลข้อความที่เลือก"
+   },
+   "commandTranslatePage": {
+      "message": "แปลหน้าปัจจุบัน"
+   },
+   "extensionDescription": {
+      "message": "โน้ตลายมือ, course reading, สแกนพับยับ, บรรยาย TED/Coursera: คงรูปแบบ ซับไตเติลสองภาษา. เว็บแปลทันที จับคู่โมเดลอัตโนมัติ"
+   },
+   "extensionName": {
+      "message": "AnyDoc Translator - แปลเว็บไซต์และ PDF ฟรี"
+   }
+}

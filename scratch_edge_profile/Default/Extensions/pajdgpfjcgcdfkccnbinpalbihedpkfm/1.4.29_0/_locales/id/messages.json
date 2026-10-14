@@ -1,0 +1,26 @@
+{
+   "commandCycleTargetLanguage": {
+      "message": "Cycle recent target language"
+   },
+   "commandExtractImageText": {
+      "message": "Ekstrak teks dari gambar"
+   },
+   "commandImageTranslate": {
+      "message": "Terjemahkan gambar tertentu"
+   },
+   "commandPolishText": {
+      "message": "Perbaiki penulisan"
+   },
+   "commandSelectTranslate": {
+      "message": "Terjemahkan teks terpilih"
+   },
+   "commandTranslatePage": {
+      "message": "Terjemahkan halaman saat ini"
+   },
+   "extensionDescription": {
+      "message": "Catatan tangan, course reading, scan kusut, kuliah TED/Coursera: layout terjaga, subtitle dwibahasa. Web instan, model otomatis."
+   },
+   "extensionName": {
+      "message": "AnyDoc Translator - Menerjemahkan Web dan PDF Gratis"
+   }
+}

@@ -1,0 +1,26 @@
+{
+   "commandCycleTargetLanguage": {
+      "message": "Cycle recent target language"
+   },
+   "commandExtractImageText": {
+      "message": "Text aus Bild extrahieren"
+   },
+   "commandImageTranslate": {
+      "message": "Bestimmtes Bild übersetzen"
+   },
+   "commandPolishText": {
+      "message": "Text verbessern"
+   },
+   "commandSelectTranslate": {
+      "message": "Markierten Text übersetzen"
+   },
+   "commandTranslatePage": {
+      "message": "Aktuelle Seite übersetzen"
+   },
+   "extensionDescription": {
+      "message": "Handnotizen, course reading, Knitterscans, TED/Coursera: Layout erhalten, zweisprachige Untertitel. Web sofort, Auto-Modell."
+   },
+   "extensionName": {
+      "message": "AnyDoc Translator – Webseiten und PDF-Dateien kostenlos übersetzen"
+   }
+}

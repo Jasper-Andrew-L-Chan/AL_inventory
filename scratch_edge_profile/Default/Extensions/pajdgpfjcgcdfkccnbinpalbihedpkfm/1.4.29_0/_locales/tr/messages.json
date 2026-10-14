@@ -1,0 +1,26 @@
+{
+   "commandCycleTargetLanguage": {
+      "message": "Cycle recent target language"
+   },
+   "commandExtractImageText": {
+      "message": "Resimden metin çıkar"
+   },
+   "commandImageTranslate": {
+      "message": "Belirtilen resmi çevir"
+   },
+   "commandPolishText": {
+      "message": "Giriş metnini iyileştir"
+   },
+   "commandSelectTranslate": {
+      "message": "Seçili metni çevir"
+   },
+   "commandTranslatePage": {
+      "message": "Mevcut sayfayı çevir"
+   },
+   "extensionDescription": {
+      "message": "El notları, course reading, kırışık taramalar, TED/Coursera videoları: düzen korunur, çift dil altyazı. Web anında, otomatik model."
+   },
+   "extensionName": {
+      "message": "AnyDoc Translator - Web ve PDF'yi Ücretsiz olarak Çevir"
+   }
+}

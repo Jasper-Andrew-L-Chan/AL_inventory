@@ -1,0 +1,26 @@
+{
+   "commandCycleTargetLanguage": {
+      "message": "循環切換最近目標語種"
+   },
+   "commandExtractImageText": {
+      "message": "提取圖片中的文字"
+   },
+   "commandImageTranslate": {
+      "message": "翻譯指定圖片"
+   },
+   "commandPolishText": {
+      "message": "潤色輸入框文字"
+   },
+   "commandSelectTranslate": {
+      "message": "翻譯選取文字"
+   },
+   "commandTranslatePage": {
+      "message": "翻譯當前網頁"
+   },
+   "extensionDescription": {
+      "message": "手寫筆記、course reading、折痕掃描件、TED/Coursera 講課影片：都能翻，文件保留版式、影片出雙語字幕。網頁打開即譯、自動匹配模型。WPS 旗下團隊出品。"
+   },
+   "extensionName": {
+      "message": "AnyDoc Translator - 免費翻譯網頁和 PDF"
+   }
+}

@@ -1,0 +1,26 @@
+{
+   "commandCycleTargetLanguage": {
+      "message": "Cycle recent target language"
+   },
+   "commandExtractImageText": {
+      "message": "استخراج متن از تصویر"
+   },
+   "commandImageTranslate": {
+      "message": "ترجمه تصویر مشخص‌شده"
+   },
+   "commandPolishText": {
+      "message": "بهبود نوشتار"
+   },
+   "commandSelectTranslate": {
+      "message": "ترجمه متن انتخاب‌شده"
+   },
+   "commandTranslatePage": {
+      "message": "ترجمه صفحه فعلی"
+   },
+   "extensionDescription": {
+      "message": "یادداشت‌های دستی، course reading، اسکن‌های تاخورده، TED/Coursera: حفظ قالب و زیرنویس دوزبانه. وب فوری، انتخاب خودکار مدل."
+   },
+   "extensionName": {
+      "message": "AnyDoc Translator - ترجمه رایگان وب‌سایت‌ها و فایل‌های PDF"
+   }
+}

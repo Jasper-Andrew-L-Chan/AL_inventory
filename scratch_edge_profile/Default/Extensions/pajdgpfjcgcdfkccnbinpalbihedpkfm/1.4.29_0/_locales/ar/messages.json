@@ -1,0 +1,26 @@
+{
+   "commandCycleTargetLanguage": {
+      "message": "Cycle recent target language"
+   },
+   "commandExtractImageText": {
+      "message": "استخراج النص من الصورة"
+   },
+   "commandImageTranslate": {
+      "message": "ترجمة الصورة المحددة"
+   },
+   "commandPolishText": {
+      "message": "تحسين نص الإدخال"
+   },
+   "commandSelectTranslate": {
+      "message": "ترجمة النص المحدد"
+   },
+   "commandTranslatePage": {
+      "message": "ترجمة الصفحة الحالية"
+   },
+   "extensionDescription": {
+      "message": "الملاحظات اليدوية، الممسوحات المجعدة، محاضرات TED/Coursera: ترجمة تحفظ التنسيق مع ترجمات ثنائية. الويب فوري بنموذج تلقائي."
+   },
+   "extensionName": {
+      "message": "AnyDoc Translator - ترجمة الويب وملفات PDF مجانًا"
+   }
+}

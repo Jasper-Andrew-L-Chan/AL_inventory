@@ -1,0 +1,26 @@
+{
+   "commandCycleTargetLanguage": {
+      "message": "Cycle recent target language"
+   },
+   "commandExtractImageText": {
+      "message": "Wyodrębnij tekst z obrazu"
+   },
+   "commandImageTranslate": {
+      "message": "Przetłumacz wskazany obraz"
+   },
+   "commandPolishText": {
+      "message": "Ulepszanie pisania"
+   },
+   "commandSelectTranslate": {
+      "message": "Przetłumacz zaznaczony tekst"
+   },
+   "commandTranslatePage": {
+      "message": "Przetłumacz bieżącą stronę"
+   },
+   "extensionDescription": {
+      "message": "Notatki odręczne, course reading, pogniecione skany, TED/Coursera: układ zachowany, napisy dwujęzyczne. Web od razu, auto model."
+   },
+   "extensionName": {
+      "message": "AnyDoc Translator - bezpłatne tłumaczenie stron internetowych i PDF"
+   }
+}

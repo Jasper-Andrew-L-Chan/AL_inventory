@@ -53,14 +53,20 @@ const INITIAL_DRAWER = {
 
 class PharmacyStore {
   constructor() {
+    this.serverVersion = 0;
+    this.isSyncing = false;
     this.init();
+    this.syncFromServer();
+    this.startPeriodicSync();
   }
 
   init() {
     // If first time with cleared items or user wants fresh clean inventory
     const existingClean = localStorage.getItem('al_pharmacy_items_cleared_v2');
     if (!existingClean) {
-      localStorage.setItem(STORAGE_KEYS.ITEMS, JSON.stringify([]));
+      if (!localStorage.getItem(STORAGE_KEYS.ITEMS)) {
+        localStorage.setItem(STORAGE_KEYS.ITEMS, JSON.stringify([]));
+      }
       localStorage.setItem('al_pharmacy_items_cleared_v2', 'true');
     } else if (!localStorage.getItem(STORAGE_KEYS.ITEMS)) {
       localStorage.setItem(STORAGE_KEYS.ITEMS, JSON.stringify([]));
@@ -69,7 +75,9 @@ class PharmacyStore {
     // Clear transactions as requested
     const existingTxnsClean = localStorage.getItem('al_pharmacy_txns_cleared_v1');
     if (!existingTxnsClean) {
-      localStorage.setItem(STORAGE_KEYS.TRANSACTIONS, JSON.stringify([]));
+      if (!localStorage.getItem(STORAGE_KEYS.TRANSACTIONS)) {
+        localStorage.setItem(STORAGE_KEYS.TRANSACTIONS, JSON.stringify([]));
+      }
       localStorage.setItem('al_pharmacy_txns_cleared_v1', 'true');
     } else if (!localStorage.getItem(STORAGE_KEYS.TRANSACTIONS)) {
       localStorage.setItem(STORAGE_KEYS.TRANSACTIONS, JSON.stringify([]));
@@ -96,6 +104,116 @@ class PharmacyStore {
 
     // Verify and synchronize shift opening (6:00 AM) and closing (9:00 PM)
     this.checkAndResetShiftStock();
+  }
+
+  /** Fetch shared central database from server */
+  async syncFromServer() {
+    if (this.isSyncing) return;
+    try {
+      this.isSyncing = true;
+      const res = await fetch('/api/data', { cache: 'no-store' });
+      if (!res.ok) return;
+      const data = await res.json();
+      if (!data) return;
+
+      const remoteVersion = Number(data.version) || 0;
+      let hasUpdated = false;
+
+      // 1. Items synchronization
+      const localItemsStr = localStorage.getItem(STORAGE_KEYS.ITEMS);
+      const localItems = localItemsStr ? JSON.parse(localItemsStr) : [];
+      if (Array.isArray(data.items)) {
+        if (data.items.length > 0) {
+          if (JSON.stringify(data.items) !== localItemsStr) {
+            localStorage.setItem(STORAGE_KEYS.ITEMS, JSON.stringify(data.items));
+            window.dispatchEvent(new CustomEvent('pharmacy:items-updated'));
+            hasUpdated = true;
+          }
+        } else if (localItems.length > 0) {
+          // If server items are empty but local has items, populate server
+          this.pushToServer({ items: localItems });
+        }
+      }
+
+      // 2. Transactions synchronization
+      const localTxnsStr = localStorage.getItem(STORAGE_KEYS.TRANSACTIONS);
+      const localTxns = localTxnsStr ? JSON.parse(localTxnsStr) : [];
+      if (Array.isArray(data.transactions)) {
+        if (data.transactions.length > 0) {
+          if (JSON.stringify(data.transactions) !== localTxnsStr) {
+            localStorage.setItem(STORAGE_KEYS.TRANSACTIONS, JSON.stringify(data.transactions));
+            window.dispatchEvent(new CustomEvent('pharmacy:txns-updated'));
+            hasUpdated = true;
+          }
+        } else if (localTxns.length > 0) {
+          // If server txns are empty but local has txns, populate server
+          this.pushToServer({ transactions: localTxns });
+        }
+      }
+
+      // 3. Settings
+      if (data.settings && typeof data.settings === 'object') {
+        const curSettingsStr = localStorage.getItem(STORAGE_KEYS.SETTINGS);
+        if (JSON.stringify(data.settings) !== curSettingsStr) {
+          localStorage.setItem(STORAGE_KEYS.SETTINGS, JSON.stringify(data.settings));
+          window.dispatchEvent(new CustomEvent('pharmacy:settings-updated'));
+        }
+      }
+
+      // 4. Staff
+      if (Array.isArray(data.staff) && data.staff.length > 0) {
+        const curStaffStr = localStorage.getItem(STORAGE_KEYS.STAFF);
+        if (JSON.stringify(data.staff) !== curStaffStr) {
+          localStorage.setItem(STORAGE_KEYS.STAFF, JSON.stringify(data.staff));
+        }
+      }
+
+      // 5. Drawer
+      if (data.drawer && typeof data.drawer === 'object') {
+        const curDrawerStr = localStorage.getItem(STORAGE_KEYS.DRAWER);
+        if (JSON.stringify(data.drawer) !== curDrawerStr) {
+          localStorage.setItem(STORAGE_KEYS.DRAWER, JSON.stringify(data.drawer));
+          window.dispatchEvent(new CustomEvent('pharmacy:drawer-updated'));
+        }
+      }
+
+      // 6. Users (auth system)
+      if (Array.isArray(data.users) && data.users.length > 0 && window.authStore && typeof window.authStore.syncUsersFromRemote === 'function') {
+        window.authStore.syncUsersFromRemote(data.users);
+      }
+
+      this.serverVersion = remoteVersion;
+    } catch (err) {
+      // Offline fallback to localStorage
+    } finally {
+      this.isSyncing = false;
+    }
+  }
+
+  /** Write through to central server */
+  async pushToServer(payload) {
+    try {
+      const res = await fetch('/api/data', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      if (res.ok) {
+        const resp = await res.json();
+        if (resp && resp.version) {
+          this.serverVersion = resp.version;
+        }
+      }
+    } catch (err) {
+      console.warn('[AffordaLabs Sync] Server push failed, using local storage cache:', err.message);
+    }
+  }
+
+  /** Automatic 3-second sync poll across all connected devices */
+  startPeriodicSync() {
+    setInterval(() => {
+      this.syncFromServer();
+    }, 3000);
   }
 
   /**
@@ -179,6 +297,7 @@ class PharmacyStore {
   saveItems(items) {
     localStorage.setItem(STORAGE_KEYS.ITEMS, JSON.stringify(items));
     window.dispatchEvent(new CustomEvent('pharmacy:items-updated'));
+    this.pushToServer({ items });
   }
 
   // Helper to compute a standardized medicine display name (e.g. Biogesic, Lazartan)
@@ -264,13 +383,18 @@ class PharmacyStore {
     this.saveItems([]);
   }
 
-  adjustStock(id, changeAmount, reason = 'Adjustment') {
+  adjustStock(id, changeAmount, reason = 'Adjustment', isReturn = false) {
     const items = this.getItems();
     const item = items.find(i => i.id === id);
     if (item) {
       const amount = Number(changeAmount);
       if (amount > 0) {
-        item.addedStock = (Number(item.addedStock) || 0) + amount;
+        if (isReturn) {
+          // If returning/restocking previously sold items, reduce deductedStock
+          item.deductedStock = Math.max(0, (Number(item.deductedStock) || 0) - amount);
+        } else {
+          item.addedStock = (Number(item.addedStock) || 0) + amount;
+        }
       } else {
         item.deductedStock = (Number(item.deductedStock) || 0) + Math.abs(amount);
       }
@@ -289,15 +413,17 @@ class PharmacyStore {
   saveTransactions(txns) {
     localStorage.setItem(STORAGE_KEYS.TRANSACTIONS, JSON.stringify(txns));
     window.dispatchEvent(new CustomEvent('pharmacy:txns-updated'));
+    this.pushToServer({ transactions: txns });
   }
 
   addTransaction(txnData) {
     const txns = this.getTransactions();
     const receiptNum = 2760 + txns.length;
     const now = new Date();
+    const uniqueSuffix = Math.random().toString(36).substring(2, 8) + '-' + Math.random().toString(36).substring(2, 6);
     
     const newTxn = {
-      id: 'txn-' + Date.now(),
+      id: 'txn-' + Date.now() + '-' + uniqueSuffix,
       receiptNo: txnData.receiptNo || 'IO-' + receiptNum,
       customerName: txnData.customerName || 'Walk-in Customer',
       budget: Number(txnData.budget || 0),
@@ -341,7 +467,7 @@ class PharmacyStore {
       oldTxn.items.forEach(item => {
         const oldTargetId = item.actualInventoryId || item.id;
         if (oldTargetId) {
-          this.adjustStock(oldTargetId, Math.abs(Number(item.qty || 0)), 'Restock before edit ' + oldTxn.receiptNo);
+          this.adjustStock(oldTargetId, Math.abs(Number(item.qty || 0)), 'Restock before edit ' + oldTxn.receiptNo, true);
         }
       });
     }
@@ -361,7 +487,7 @@ class PharmacyStore {
       updatedTxn.items.forEach(item => {
         const newTargetId = item.actualInventoryId || item.id;
         if (newTargetId) {
-          this.adjustStock(newTargetId, -Math.abs(Number(item.qty || 0)), 'Deduct edited ' + updatedTxn.receiptNo);
+          this.adjustStock(newTargetId, -Math.abs(Number(item.qty || 0)), 'Deduct edited ' + updatedTxn.receiptNo, false);
         }
       });
     }
@@ -384,7 +510,7 @@ class PharmacyStore {
       txn.items.forEach(item => {
         const targetInvId = item.actualInventoryId || item.id;
         if (targetInvId) {
-          this.adjustStock(targetInvId, Math.abs(Number(item.qty || 0)), 'Restock ' + txn.receiptNo);
+          this.adjustStock(targetInvId, Math.abs(Number(item.qty || 0)), 'Restock ' + txn.receiptNo, true);
         }
       });
 
@@ -403,7 +529,7 @@ class PharmacyStore {
       txn.items.forEach(item => {
         const targetInvId = item.actualInventoryId || item.id;
         if (targetInvId) {
-          this.adjustStock(targetInvId, Math.abs(Number(item.qty || 0)), 'Restock on delete ' + txn.receiptNo);
+          this.adjustStock(targetInvId, Math.abs(Number(item.qty || 0)), 'Restock on delete ' + txn.receiptNo, true);
         }
       });
     }
@@ -523,6 +649,7 @@ class PharmacyStore {
   saveSettings(settings) {
     localStorage.setItem(STORAGE_KEYS.SETTINGS, JSON.stringify(settings));
     window.dispatchEvent(new CustomEvent('pharmacy:settings-updated'));
+    this.pushToServer({ settings });
   }
 
   // --- Staff ---
@@ -554,6 +681,7 @@ class PharmacyStore {
   saveDrawer(drawer) {
     localStorage.setItem(STORAGE_KEYS.DRAWER, JSON.stringify(drawer));
     window.dispatchEvent(new CustomEvent('pharmacy:drawer-updated'));
+    this.pushToServer({ drawer });
   }
 }
 

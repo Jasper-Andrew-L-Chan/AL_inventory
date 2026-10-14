@@ -1,0 +1,44 @@
+﻿<!DOCTYPE html>
+<html>
+<head><title>Debug</title></head>
+<body>
+<script src="js/auth.js"></script>
+<script src="js/store.js"></script>
+<script>
+  localStorage.clear();
+  authStore.init();
+  var store = new PharmacyStore();
+
+  var medBiogesic = store.addItem({
+    brandName: 'Biogesic 500mg',
+    genericName: 'Paracetamol',
+    currentStock: 100,
+    qty: 100,
+    costPrice: 4.50,
+    sellingPrice: 8.00
+  });
+
+  var txn1 = store.addTransaction({
+    receiptNo: 'IO-001',
+    customerName: 'Juan',
+    items: [{ id: medBiogesic.id, actualInventoryId: medBiogesic.id, qty: 10 }]
+  });
+  var stockAfterTxn1 = store.getItemById(medBiogesic.id).currentStock;
+
+  var updatedTxn1 = store.updateTransaction(txn1.id, {
+    items: [{ id: medBiogesic.id, actualInventoryId: medBiogesic.id, qty: 6 }]
+  });
+  var stockAfterUpdate = store.getItemById(medBiogesic.id).currentStock;
+
+  var xhr = new XMLHttpRequest();
+  xhr.open('POST', '/api/test-results', false);
+  xhr.setRequestHeader('Content-Type', 'application/json');
+  xhr.send(JSON.stringify({
+    stockAfterTxn1: stockAfterTxn1,
+    stockAfterUpdate: stockAfterUpdate,
+    txn1_id: txn1.id,
+    updated_items: updatedTxn1 ? updatedTxn1.items : null
+  }));
+</script>
+</body>
+</html>

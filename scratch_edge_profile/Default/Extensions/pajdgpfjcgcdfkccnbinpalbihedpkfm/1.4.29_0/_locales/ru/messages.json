@@ -1,0 +1,26 @@
+{
+   "commandCycleTargetLanguage": {
+      "message": "Cycle recent target language"
+   },
+   "commandExtractImageText": {
+      "message": "Извлечь текст из изображения"
+   },
+   "commandImageTranslate": {
+      "message": "Перевести выбранное изображение"
+   },
+   "commandPolishText": {
+      "message": "Улучшить текст в поле"
+   },
+   "commandSelectTranslate": {
+      "message": "Перевести выбранный текст"
+   },
+   "commandTranslatePage": {
+      "message": "Перевести текущую страницу"
+   },
+   "extensionDescription": {
+      "message": "Рукописные конспекты, course reading, сканы, лекции TED/Coursera: вёрстка и двуязычные субтитры. Веб мгновенно, автоподбор модели."
+   },
+   "extensionName": {
+      "message": "AnyDoc Translator — бесплатный перевод веб-страниц и PDF-файлов"
+   }
+}

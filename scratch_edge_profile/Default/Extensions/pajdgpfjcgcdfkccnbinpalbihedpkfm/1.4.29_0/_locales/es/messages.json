@@ -1,0 +1,26 @@
+{
+   "commandCycleTargetLanguage": {
+      "message": "Cycle recent target language"
+   },
+   "commandExtractImageText": {
+      "message": "Extraer texto de la imagen"
+   },
+   "commandImageTranslate": {
+      "message": "Traducir imagen especificada"
+   },
+   "commandPolishText": {
+      "message": "Mejorar texto de entrada"
+   },
+   "commandSelectTranslate": {
+      "message": "Traducir texto seleccionado"
+   },
+   "commandTranslatePage": {
+      "message": "Traducir página actual"
+   },
+   "extensionDescription": {
+      "message": "Lecturas del curso, escaneos plegados, vídeos TED/Coursera: formato y subtítulos bilingües. Web al instante, modelo automático."
+   },
+   "extensionName": {
+      "message": "AnyDoc Translator: traduzca sitios web y PDF gratis"
+   }
+}

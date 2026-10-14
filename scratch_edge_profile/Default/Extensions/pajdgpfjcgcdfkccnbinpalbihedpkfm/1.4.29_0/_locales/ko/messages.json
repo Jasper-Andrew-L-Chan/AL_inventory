@@ -1,0 +1,26 @@
+{
+   "commandCycleTargetLanguage": {
+      "message": "Cycle recent target language"
+   },
+   "commandExtractImageText": {
+      "message": "이미지에서 텍스트 추출"
+   },
+   "commandImageTranslate": {
+      "message": "지정 이미지 번역"
+   },
+   "commandPolishText": {
+      "message": "글쓰기 개선"
+   },
+   "commandSelectTranslate": {
+      "message": "선택 텍스트 번역"
+   },
+   "commandTranslatePage": {
+      "message": "현재 페이지 번역"
+   },
+   "extensionDescription": {
+      "message": "손글씨 노트, course reading, 접힌 스캔, TED/Coursera 강의: 레이아웃 유지·이중 자막. 웹 즉시 번역, 모델 자동 매칭. WPS."
+   },
+   "extensionName": {
+      "message": "AnyDoc Translator - 웹 및 PDF 무료 번역"
+   }
+}

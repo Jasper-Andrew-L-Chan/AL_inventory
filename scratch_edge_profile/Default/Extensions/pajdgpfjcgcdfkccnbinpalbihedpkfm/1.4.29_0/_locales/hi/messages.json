@@ -1,0 +1,26 @@
+{
+   "commandCycleTargetLanguage": {
+      "message": "Cycle recent target language"
+   },
+   "commandExtractImageText": {
+      "message": "छवि से टेक्स्ट निकालें"
+   },
+   "commandImageTranslate": {
+      "message": "निर्दिष्ट छवि का अनुवाद करें"
+   },
+   "commandPolishText": {
+      "message": "लेखन सुधारें"
+   },
+   "commandSelectTranslate": {
+      "message": "चयनित पाठ का अनुवाद करें"
+   },
+   "commandTranslatePage": {
+      "message": "वर्तमान पेज का अनुवाद करें"
+   },
+   "extensionDescription": {
+      "message": "हस्तलिखित नोट्स, course reading, मुड़े स्कैन, TED/Coursera व्याख्यान: लेआउट बनाए रखें, द्विभाषी उपशीर्षक। वेब तुरंत, ऑटो मैच।"
+   },
+   "extensionName": {
+      "message": "AnyDoc Translator - वेब और PDF का अनुवाद मुफ़्त में करें"
+   }
+}

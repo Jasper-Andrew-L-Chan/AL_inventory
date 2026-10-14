@@ -140,6 +140,22 @@ const authStore = {
     }
   },
 
+  syncUsersFromRemote(remoteUsers) {
+    if (!Array.isArray(remoteUsers) || remoteUsers.length === 0) return;
+    const curStr = localStorage.getItem(USERS_KEY);
+    if (JSON.stringify(remoteUsers) !== curStr) {
+      localStorage.setItem(USERS_KEY, JSON.stringify(remoteUsers));
+      window.dispatchEvent(new CustomEvent('pharmacy:users-updated'));
+    }
+  },
+
+  pushUsersToServer() {
+    if (window.pharmacyStore && typeof window.pharmacyStore.pushToServer === 'function') {
+      const users = this.getUsers();
+      window.pharmacyStore.pushToServer({ users });
+    }
+  },
+
   getDefaultPermissionsForRole(role = '', level = 'Staff') {
     if (level === 'Owner' || level === 'Admin' || (role || '').toLowerCase().includes('owner') || (role || '').toLowerCase().includes('admin')) {
       return [...ALL_PERMISSIONS];
@@ -209,6 +225,7 @@ const authStore = {
     users.push(newUser);
     localStorage.setItem(USERS_KEY, JSON.stringify(users));
     window.dispatchEvent(new CustomEvent('pharmacy:users-updated'));
+    this.pushUsersToServer();
     return newUser;
   },
 
@@ -257,6 +274,7 @@ const authStore = {
     }
 
     window.dispatchEvent(new CustomEvent('pharmacy:users-updated'));
+    this.pushUsersToServer();
     return updated;
   },
 
@@ -277,6 +295,7 @@ const authStore = {
     user.password = newPassword;
     localStorage.setItem(USERS_KEY, JSON.stringify(users));
     window.dispatchEvent(new CustomEvent('pharmacy:users-updated'));
+    this.pushUsersToServer();
     return true;
   },
 
@@ -290,6 +309,7 @@ const authStore = {
     if (filtered.length !== users.length) {
       localStorage.setItem(USERS_KEY, JSON.stringify(filtered));
       window.dispatchEvent(new CustomEvent('pharmacy:users-updated'));
+      this.pushUsersToServer();
       return true;
     }
     return false;

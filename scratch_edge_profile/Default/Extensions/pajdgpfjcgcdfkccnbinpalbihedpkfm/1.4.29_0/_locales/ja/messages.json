@@ -1,0 +1,26 @@
+{
+   "commandCycleTargetLanguage": {
+      "message": "Cycle recent target language"
+   },
+   "commandExtractImageText": {
+      "message": "画像からテキストを抽出"
+   },
+   "commandImageTranslate": {
+      "message": "指定画像を翻訳"
+   },
+   "commandPolishText": {
+      "message": "文章の改善"
+   },
+   "commandSelectTranslate": {
+      "message": "選択テキストを翻訳"
+   },
+   "commandTranslatePage": {
+      "message": "現在のページを翻訳"
+   },
+   "extensionDescription": {
+      "message": "手書きノート、course reading、折れスキャン、TED/Coursera講義：体裁保持・二言語字幕。ウェブ即訳、モデル自動マッチ。WPS製。"
+   },
+   "extensionName": {
+      "message": "AnyDoc Translatorー無料でウェブサイトとPDFを翻訳できる"
+   }
+}

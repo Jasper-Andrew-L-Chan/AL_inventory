@@ -1,0 +1,215 @@
+﻿<!DOCTYPE html>
+<html>
+<head>
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <title>AffordaLabs Automation Runner</title>
+</head>
+<body>
+  <h1>Running Simulation...</h1>
+  <div id="output"></div>
+
+  <script src="js/auth.js"></script>
+  <script src="js/store.js"></script>
+  <script>
+    var logs = [];
+    function log(msg) { logs.push(msg); }
+
+    try {
+      log('=== 1. MULTI-USER LOGIN & SESSION TESTS ===');
+      authStore.init();
+      var users = authStore.getUsers();
+      log('Total registered users: ' + users.length);
+
+      var adminSess = authStore.login('admin', 'admin123');
+      log('Admin login: ' + (adminSess ? 'PASS' : 'FAIL'));
+      log('Admin can access staff: ' + authStore.hasPermission('staff'));
+      log('Admin can access settings: ' + authStore.hasPermission('settings'));
+
+      var sarahSess = authStore.login('sarah', 'sarah123');
+      log('Sarah login: ' + (sarahSess ? 'PASS' : 'FAIL'));
+      log('Sarah can access staff: ' + authStore.hasPermission('staff'));
+      log('Sarah can access settings: ' + authStore.hasPermission('settings'));
+      log('Sarah can access transactions: ' + authStore.hasPermission('transactions'));
+
+      var markSess = authStore.login('mark', 'mark123');
+      log('Mark login: ' + (markSess ? 'PASS' : 'FAIL'));
+      log('Mark can access transactions: ' + authStore.hasPermission('transactions'));
+      log('Mark can access inventory: ' + authStore.hasPermission('inventory'));
+
+      // Check wrong password
+      var failSess = authStore.login('admin', 'wrongpass');
+      log('Wrong password rejected: ' + (failSess === null ? 'PASS' : 'FAIL'));
+
+      log('=== 2. INVENTORY & BATCH OPERATIONS ===');
+      var store = new PharmacyStore();
+      
+      // Seed test medicines
+      var medBiogesic = store.addItem({
+        brandName: 'Biogesic 500mg',
+        genericName: 'Paracetamol',
+        dosage: '500mg',
+        category: 'Analgesic',
+        unit: 'tablets',
+        currentStock: 100,
+        qty: 100,
+        costPrice: 4.50,
+        sellingPrice: 8.00,
+        reorderLevel: 20,
+        batchLot: 'LOT-2026-BIO1',
+        expiryDate: '2028-12-31'
+      });
+      log('Added Biogesic: ID=' + medBiogesic.id + ', stock=' + medBiogesic.currentStock);
+
+      var medTempra = store.addItem({
+        brandName: 'Tempra 500mg',
+        genericName: 'Paracetamol',
+        dosage: '500mg',
+        category: 'Analgesic',
+        unit: 'tablets',
+        currentStock: 50,
+        qty: 50,
+        costPrice: 5.00,
+        sellingPrice: 9.00,
+        reorderLevel: 15,
+        batchLot: 'LOT-2026-TMP1',
+        expiryDate: '2028-12-31'
+      });
+      log('Added Tempra (substitute): ID=' + medTempra.id + ', stock=' + medTempra.currentStock);
+
+      var medAmox = store.addItem({
+        brandName: 'Amoxil 500mg',
+        genericName: 'Amoxicillin',
+        dosage: '500mg',
+        category: 'Antibiotic',
+        unit: 'capsule',
+        currentStock: 25,
+        qty: 25,
+        costPrice: 8.00,
+        sellingPrice: 15.00,
+        reorderLevel: 10,
+        batchLot: 'LOT-2026-AMX1',
+        expiryDate: '2027-06-30',
+        isRx: true
+      });
+      log('Added Amoxil: ID=' + medAmox.id + ', stock=' + medAmox.currentStock);
+
+      log('=== 3. IN-OUT SALE & STOCK DEDUCTION ===');
+      // User Sarah performs sale of 10 Biogesic
+      authStore.login('sarah', 'sarah123');
+      var txn1 = store.addTransaction({
+        receiptNo: 'IO-TEST-001',
+        customerName: 'Juan Dela Cruz',
+        barangay: 'Kapasigan',
+        budget: 500,
+        date: '2026-10-14',
+        time: '09:30 AM',
+        cashier: authStore.getSession().fullName,
+        items: [
+          {
+            id: medBiogesic.id,
+            actualInventoryId: medBiogesic.id,
+            name: medBiogesic.name,
+            qty: 10,
+            unitPrice: 4.50,
+            sellingPrice: 8.00,
+            subtotal: 80.00
+          }
+        ],
+        subtotal: 80.00,
+        netTotal: 80.00,
+        paymentMethod: 'Cash'
+      });
+      log('Txn 1 recorded by ' + txn1.cashier + ' (Net: ₱' + txn1.netTotal + ')');
+
+      var checkBiogesic = store.getItemById(medBiogesic.id);
+      log('Biogesic Stock after Txn 1: ' + checkBiogesic.currentStock + ' (Expected: 90) -> ' + (checkBiogesic.currentStock === 90 ? 'PASS' : 'FAIL'));
+      log('Biogesic Deducted Stock: ' + checkBiogesic.deductedStock + ' (Expected: 10)');
+
+      log('=== 4. MEDICINE SUBSTITUTION TEST ===');
+      // Customer asked for Biogesic but Lionel substitutes Tempra
+      authStore.login('lionel', 'lionel123');
+      var txn2 = store.addTransaction({
+        receiptNo: 'IO-TEST-002',
+        customerName: 'Maria Santos',
+        barangay: 'San Nicolas',
+        budget: 200,
+        date: '2026-10-14',
+        time: '10:15 AM',
+        cashier: authStore.getSession().fullName,
+        items: [
+          {
+            id: medTempra.id,
+            actualInventoryId: medTempra.id,
+            name: medTempra.name,
+            requestedName: 'Biogesic 500mg (Paracetamol 500mg)',
+            actualSuppliedName: medTempra.name,
+            isSubstitute: true,
+            qty: 5,
+            unitPrice: 5.00,
+            sellingPrice: 9.00,
+            subtotal: 45.00
+          }
+        ],
+        subtotal: 45.00,
+        netTotal: 45.00,
+        paymentMethod: 'Cash'
+      });
+      log('Txn 2 substitution recorded by ' + txn2.cashier);
+      var checkTempra = store.getItemById(medTempra.id);
+      var checkBiogesic2 = store.getItemById(medBiogesic.id);
+      log('Tempra Stock after substitution: ' + checkTempra.currentStock + ' (Expected: 45) -> ' + (checkTempra.currentStock === 45 ? 'PASS' : 'FAIL'));
+      log('Biogesic Stock unchanged: ' + checkBiogesic2.currentStock + ' (Expected: 90) -> ' + (checkBiogesic2.currentStock === 90 ? 'PASS' : 'FAIL'));
+
+      log('=== 5. TRANSACTION EDIT & RESTOCK TEST ===');
+      // Customer Juan returns 4 Biogesic, changing qty from 10 to 6
+      var updatedTxn1 = store.updateTransaction(txn1.id, {
+        customerName: 'Juan Dela Cruz',
+        barangay: 'Kapasigan',
+        budget: 500,
+        date: '2026-10-14',
+        time: '09:30 AM',
+        items: [
+          {
+            id: medBiogesic.id,
+            actualInventoryId: medBiogesic.id,
+            name: medBiogesic.name,
+            qty: 6,
+            unitPrice: 4.50,
+            sellingPrice: 8.00,
+            subtotal: 48.00
+          }
+        ],
+        subtotal: 48.00,
+        netTotal: 48.00
+      });
+      var checkBiogesicAfterEdit = store.getItemById(medBiogesic.id);
+      log('Biogesic Stock after editing qty from 10 to 6: ' + checkBiogesicAfterEdit.currentStock + ' (Expected: 94) -> ' + (checkBiogesicAfterEdit.currentStock === 94 ? 'PASS' : 'FAIL'));
+
+      log('=== 6. TRANSACTION VOID / REFUND TEST ===');
+      store.refundTransaction(txn2.id, 'Customer cancellation');
+      var checkTempraAfterRefund = store.getItemById(medTempra.id);
+      log('Tempra Stock after Txn 2 refunded: ' + checkTempraAfterRefund.currentStock + ' (Expected: 50) -> ' + (checkTempraAfterRefund.currentStock === 50 ? 'PASS' : 'FAIL'));
+
+      log('=== 7. CASH DRAWER & FINANCIAL METRICS ===');
+      var metrics = store.getDashboardMetrics();
+      log('Net Sales: ₱' + metrics.netSales + ' (Expected: ₱48.00 since Txn2 was refunded)');
+      log('Transaction Count: ' + metrics.transactionCount + ' (Expected: 1 active)');
+      log('Items Dispensed: ' + metrics.itemsDispensed + ' (Expected: 6)');
+      log('Cost of Goods: ₱' + metrics.costOfGoods + ' (Expected: 6 * 4.50 = ₱27.00)');
+      log('Gross Profit: ₱' + metrics.grossProfit + ' (Expected: 48.00 - 27.00 = ₱21.00)');
+
+      var fso = new ActiveXObject('Scripting.FileSystemObject');
+      var outFile = fso.CreateTextFile('c:\\Users\\Admin\\Documents\\GitHub\\AL_inventory\\simulation_results.txt', true);
+      outFile.Write(logs.join('\r\n'));
+      outFile.Close();
+    } catch(e) {
+      log('CRITICAL EXCEPTION: ' + e.message);
+      var fso = new ActiveXObject('Scripting.FileSystemObject');
+      var outFile = fso.CreateTextFile('c:\\Users\\Admin\\Documents\\GitHub\\AL_inventory\\simulation_results.txt', true);
+      outFile.Write(logs.join('\r\n') + '\r\nERROR: ' + e.message);
+      outFile.Close();
+    }
+    window.close();
+  </script>
+</body>
+</html>

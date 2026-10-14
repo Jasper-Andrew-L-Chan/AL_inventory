@@ -1,0 +1,26 @@
+{
+   "commandCycleTargetLanguage": {
+      "message": "Cycle recent target language"
+   },
+   "commandExtractImageText": {
+      "message": "חלץ טקסט מתמונה"
+   },
+   "commandImageTranslate": {
+      "message": "תרגם תמונה מסוימת"
+   },
+   "commandPolishText": {
+      "message": "שיפור כתיבה"
+   },
+   "commandSelectTranslate": {
+      "message": "תרגם טקסט נבחר"
+   },
+   "commandTranslatePage": {
+      "message": "תרגם דף נוכחי"
+   },
+   "extensionDescription": {
+      "message": "פתקים בכתב יד, course reading, סריקות מקומטות, הרצאות TED/Coursera: פריסה נשמרת, כתוביות דו-לשוניות. ווב מיידי, התאמת מודל."
+   },
+   "extensionName": {
+      "message": "AnyDoc Translator - תרגם אינטרנט ו-PDF בחינם"
+   }
+}

@@ -1,0 +1,26 @@
+{
+   "commandCycleTargetLanguage": {
+      "message": "Cycle recent target language"
+   },
+   "commandExtractImageText": {
+      "message": "Trích xuất văn bản từ hình ảnh"
+   },
+   "commandImageTranslate": {
+      "message": "Dịch hình ảnh được chỉ định"
+   },
+   "commandPolishText": {
+      "message": "Cải thiện văn bản đã nhập"
+   },
+   "commandSelectTranslate": {
+      "message": "Dịch văn bản đã chọn"
+   },
+   "commandTranslatePage": {
+      "message": "Dịch trang hiện tại"
+   },
+   "extensionDescription": {
+      "message": "Ghi chép tay, course reading, scan nhăn, bài giảng TED/Coursera: giữ bố cục, phụ đề song ngữ. Web tức thì, tự chọn mô hình. Từ WPS."
+   },
+   "extensionName": {
+      "message": "AnyDoc Translator - Dịch trang Web và PDF miễnpPhí"
+   }
+}

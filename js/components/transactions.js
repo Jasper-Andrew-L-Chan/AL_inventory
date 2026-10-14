@@ -1217,6 +1217,7 @@ window.handleStartEditTxn = function (txnId) {
   };
 
   editingTxnId = txnId;
+  txnCurrentTab = 'DETAILS';
 
   // Re-render and scroll smoothly to the In-Out builder
   renderTransactionsView(document.getElementById('main-content'));
@@ -1236,14 +1237,22 @@ window.saveCustomerTransaction = function () {
 
   // 1. Validate Customer Name
   if (!currentTxnForm.customerName || !currentTxnForm.customerName.trim()) {
-    alert('Please enter a Customer Name before saving the transaction.');
-    document.getElementById('custName')?.focus();
+    showNoticeDialog({
+      title: 'Customer Name Required',
+      message: 'Please enter a customer or recipient name before saving this transaction.',
+      iconType: 'warning',
+      onOk: () => document.getElementById('custName')?.focus()
+    });
     return;
   }
 
   // 2. Validate Items List
   if (!currentTxnForm.items || currentTxnForm.items.length === 0) {
-    alert('Please add at least one medicine item to the transaction.');
+    showNoticeDialog({
+      title: 'No Medicines Added',
+      message: 'Please add at least one medicine item to the transaction list before saving.',
+      iconType: 'warning'
+    });
     return;
   }
 
@@ -1258,7 +1267,11 @@ window.saveCustomerTransaction = function () {
     if (row.selectedMedId === '__CUSTOM__' || row.selectedMedId === '') {
       requestedName = (row.customMedName || '').trim();
       if (!requestedName) {
-        alert(`Line ${rowNum}: Please specify or select a medicine name.`);
+        showNoticeDialog({
+          title: 'Missing Medicine Name',
+          message: `Line ${rowNum}: Please specify or select a medicine name.`,
+          iconType: 'warning'
+        });
         return;
       }
     } else if (row.selectedMedId) {
@@ -1269,13 +1282,21 @@ window.saveCustomerTransaction = function () {
     // Determine actual inventory item to supply and deduct
     const targetInvId = row.actualInventoryId || (row.selectedMedId && row.selectedMedId !== '__CUSTOM__' ? row.selectedMedId : null);
     if (!targetInvId) {
-      alert(`Line ${rowNum}: No inventory item assigned for deduction. If this item was out of stock or custom, please select an available substitute from inventory.`);
+      showNoticeDialog({
+        title: 'Inventory Item Required',
+        message: `Line ${rowNum}: No inventory item assigned for deduction. If this item was out of stock or custom, please select an available substitute from inventory.`,
+        iconType: 'warning'
+      });
       return;
     }
 
     const actualItem = inventoryItems.find(i => i.id === targetInvId);
     if (!actualItem) {
-      alert(`Line ${rowNum}: The selected inventory item could not be found.`);
+      showNoticeDialog({
+        title: 'Medicine Not Found',
+        message: `Line ${rowNum}: The selected inventory item could not be found in active inventory.`,
+        iconType: 'warning'
+      });
       return;
     }
 
@@ -1290,10 +1311,19 @@ window.saveCustomerTransaction = function () {
       }
     }
 
-    // Rule: Prevent deducting more units than available in stock
+    // Accumulate previously allocated units across earlier lines in this transaction
+    const priorAllocated = transactionItems
+      .filter(ti => ti.actualInventoryId === targetInvId)
+      .reduce((sum, ti) => sum + (Number(ti.qty) || 0), 0);
+
     const actualDisplayName = getMedicineDisplayName(actualItem);
-    if (qty > availableStock) {
-      alert(`Line ${rowNum}: Cannot deduct ${qty} units of "${actualDisplayName}". Only ${availableStock} units are currently available (including restocked units).`);
+    if ((qty + priorAllocated) > availableStock) {
+      const remainingAllocatable = Math.max(0, availableStock - priorAllocated);
+      showNoticeDialog({
+        title: 'Insufficient Inventory Stock',
+        message: `Line ${rowNum}: Cannot deduct ${qty} unit(s) of "${actualDisplayName}". Only <strong>${remainingAllocatable}</strong> unit(s) remain available for allocation across transaction lines.`,
+        iconType: 'warning'
+      });
       return;
     }
 
@@ -1334,19 +1364,174 @@ window.saveCustomerTransaction = function () {
 
   if (editingTxnId) {
     // Perform update: restocks original items and deducts new/substituted items
+    const targetId = editingTxnId;
     const updated = window.pharmacyStore.updateTransaction(editingTxnId, txnPayload);
     const receiptName = updated ? updated.receiptNo : (txnPayload.receiptNo || 'Transaction');
-    alert(`✓ Transaction ${receiptName} updated successfully!\nOriginal medicines have been restocked into inventory, and new/substituted medicines have been deducted.`);
+
+    showCustomTxnModal({
+      title: 'Transaction Updated Successfully',
+      receiptNo: receiptName,
+      message: `Transaction <strong>${receiptName}</strong> has been updated. Original medicines have been returned to inventory, and new items or substitutes have been deducted.`,
+      iconType: 'success',
+      onKeepEditing: () => {
+        // Keep in edit mode so user can continue modifying or checking details
+        handleStartEditTxn(targetId);
+      },
+      onDone: () => {
+        // Reset form and view IN - OUT LOGS
+        resetCustomerForm();
+        switchTxnTab('IN - OUT LOGS');
+      }
+    });
   } else {
     // Normal new transaction
     const newTxn = window.pharmacyStore.addTransaction(txnPayload);
-    alert(`✓ Transaction ${newTxn.receiptNo} completed!\n${transactionItems.length} medicine item(s) deducted from inventory.`);
+    showCustomTxnModal({
+      title: 'Transaction Completed',
+      receiptNo: newTxn.receiptNo,
+      message: `Transaction <strong>${newTxn.receiptNo}</strong> has been successfully recorded. <strong>${transactionItems.length}</strong> medicine item(s) have been deducted from inventory.`,
+      iconType: 'success',
+      onKeepEditing: () => {
+        // Open the newly created transaction directly in Edit/Restock mode
+        handleStartEditTxn(newTxn.id);
+      },
+      onDone: () => {
+        resetCustomerForm();
+        switchTxnTab('IN - OUT LOGS');
+      }
+    });
   }
-
-  // 4. Reset form and refresh view
-  resetCustomerForm();
-  renderTransactionsView(document.getElementById('main-content'));
 };
+
+/**
+ * Modern Custom Modal Dialog for Transaction Success
+ * Offers options to either:
+ * - "Keep Editing / Modify Details" (stays on the form)
+ * - "Done / View Logs" (switches to IN - OUT LOGS)
+ */
+function showCustomTxnModal({ title, receiptNo, message, iconType = 'success', onKeepEditing, onDone }) {
+  // Remove any existing modal first
+  const existing = document.getElementById('customTxnModal');
+  if (existing) existing.remove();
+
+  const backdrop = document.createElement('div');
+  backdrop.id = 'customTxnModal';
+  backdrop.className = 'custom-modal-backdrop';
+
+  backdrop.innerHTML = `
+    <div class="custom-modal-card" role="dialog" aria-modal="true">
+      <div class="custom-modal-header">
+        <div class="custom-modal-icon-badge ${iconType}">
+          <i data-lucide="${iconType === 'success' ? 'check-circle-2' : 'alert-circle'}" style="width: 26px; height: 26px;"></i>
+        </div>
+        <div style="flex: 1;">
+          <h3 style="margin: 0; font-size: 1.05rem; font-weight: 700; color: var(--text-main); line-height: 1.3;">
+            ${title}
+          </h3>
+          <span style="display: inline-block; margin-top: 0.25rem; font-size: 0.76rem; font-weight: 700; color: var(--primary); background: var(--primary-light); padding: 2px 8px; border-radius: 4px; border: 1px solid var(--primary-border);">
+            Receipt: ${receiptNo}
+          </span>
+        </div>
+        <button type="button" id="closeCustomModalX" style="background: transparent; border: none; color: var(--text-muted); cursor: pointer; padding: 4px; border-radius: 6px; display: flex; align-items: center; justify-content: center; transition: all 0.15s ease;" onmouseover="this.style.background='#f1f5f9';" onmouseout="this.style.background='transparent';">
+          <i data-lucide="x" style="width: 18px; height: 18px;"></i>
+        </button>
+      </div>
+
+      <div class="custom-modal-body">
+        <p style="margin: 0; font-size: 0.88rem; color: var(--text-muted); line-height: 1.5;">
+          ${message}
+        </p>
+      </div>
+
+      <div class="custom-modal-footer">
+        <button type="button" id="btnModalKeepEditing" class="btn-outline" style="font-size: 0.82rem; font-weight: 700; padding: 0.5rem 1rem; border-color: #cbd5e1; color: var(--text-main); display: inline-flex; align-items: center; gap: 0.4rem; cursor: pointer; border-radius: 8px;">
+          <i data-lucide="edit-3" style="width: 14px; height: 14px;"></i>
+          <span>Go Back &amp; Edit</span>
+        </button>
+
+        <button type="button" id="btnModalDone" class="btn-primary" style="background: var(--primary); font-size: 0.82rem; font-weight: 700; padding: 0.5rem 1.25rem; color: #ffffff; border: none; display: inline-flex; align-items: center; gap: 0.4rem; cursor: pointer; border-radius: 8px; box-shadow: var(--shadow-sm);">
+          <i data-lucide="check" style="width: 15px; height: 15px;"></i>
+          <span>View In-Out Logs</span>
+        </button>
+      </div>
+    </div>
+  `;
+
+  document.body.appendChild(backdrop);
+  if (typeof lucide !== 'undefined') lucide.createIcons();
+
+  const closeDialog = () => {
+    backdrop.remove();
+  };
+
+  document.getElementById('closeCustomModalX')?.addEventListener('click', () => {
+    closeDialog();
+    if (typeof onDone === 'function') onDone();
+  });
+
+  document.getElementById('btnModalKeepEditing')?.addEventListener('click', () => {
+    closeDialog();
+    if (typeof onKeepEditing === 'function') onKeepEditing();
+  });
+
+  document.getElementById('btnModalDone')?.addEventListener('click', () => {
+    closeDialog();
+    if (typeof onDone === 'function') onDone();
+  });
+}
+
+/**
+ * Modern Notice/Alert Dialog for Validations & Errors
+ */
+function showNoticeDialog({ title, message, iconType = 'warning', onOk }) {
+  const existing = document.getElementById('customNoticeModal');
+  if (existing) existing.remove();
+
+  const backdrop = document.createElement('div');
+  backdrop.id = 'customNoticeModal';
+  backdrop.className = 'custom-modal-backdrop';
+
+  backdrop.innerHTML = `
+    <div class="custom-modal-card" style="max-width: 420px;" role="dialog" aria-modal="true">
+      <div class="custom-modal-header">
+        <div class="custom-modal-icon-badge ${iconType}">
+          <i data-lucide="${iconType === 'warning' ? 'alert-triangle' : 'info'}" style="width: 24px; height: 24px;"></i>
+        </div>
+        <div style="flex: 1;">
+          <h3 style="margin: 0; font-size: 1.05rem; font-weight: 700; color: var(--text-main); line-height: 1.3;">
+            ${title}
+          </h3>
+        </div>
+        <button type="button" id="closeNoticeModalX" style="background: transparent; border: none; color: var(--text-muted); cursor: pointer; padding: 4px; border-radius: 6px; display: flex; align-items: center; justify-content: center;" onmouseover="this.style.background='#f1f5f9';" onmouseout="this.style.background='transparent';">
+          <i data-lucide="x" style="width: 18px; height: 18px;"></i>
+        </button>
+      </div>
+
+      <div class="custom-modal-body">
+        <p style="margin: 0; font-size: 0.88rem; color: var(--text-muted); line-height: 1.5;">
+          ${message}
+        </p>
+      </div>
+
+      <div class="custom-modal-footer">
+        <button type="button" id="btnNoticeOk" class="btn-primary" style="background: var(--primary); font-size: 0.82rem; font-weight: 700; padding: 0.5rem 1.25rem; color: #ffffff; border: none; display: inline-flex; align-items: center; gap: 0.4rem; cursor: pointer; border-radius: 8px;">
+          <span>Understand &amp; Fix</span>
+        </button>
+      </div>
+    </div>
+  `;
+
+  document.body.appendChild(backdrop);
+  if (typeof lucide !== 'undefined') lucide.createIcons();
+
+  const closeNotice = () => {
+    backdrop.remove();
+    if (typeof onOk === 'function') onOk();
+  };
+
+  document.getElementById('closeNoticeModalX')?.addEventListener('click', closeNotice);
+  document.getElementById('btnNoticeOk')?.addEventListener('click', closeNotice);
+}
 
 // --- General Navigation & Filters ---
 

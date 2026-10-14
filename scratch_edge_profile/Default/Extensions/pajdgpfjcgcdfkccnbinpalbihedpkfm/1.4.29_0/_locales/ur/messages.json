@@ -1,0 +1,26 @@
+{
+   "commandCycleTargetLanguage": {
+      "message": "Cycle recent target language"
+   },
+   "commandExtractImageText": {
+      "message": "تصویر سے متن نکالیں"
+   },
+   "commandImageTranslate": {
+      "message": "مخصوص تصویر کا ترجمہ کریں"
+   },
+   "commandPolishText": {
+      "message": "تحریر بہتر بنائیں"
+   },
+   "commandSelectTranslate": {
+      "message": "منتخب متن کا ترجمہ کریں"
+   },
+   "commandTranslatePage": {
+      "message": "موجودہ صفحہ کا ترجمہ کریں"
+   },
+   "extensionDescription": {
+      "message": "ہاتھ سے لکھے نوٹس، course reading، مڑے اسکین، TED/Coursera لیکچرز: لے آؤٹ محفوظ، دو لسانی سب ٹائٹل۔ ویب فوری، آٹو میچ۔"
+   },
+   "extensionName": {
+      "message": "AnyDoc Translator - ویب اور PDF کا مفت میں ترجمہ کریں"
+   }
+}

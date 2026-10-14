@@ -1,0 +1,52 @@
+﻿<!DOCTYPE html>
+<html>
+<head>
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <title>AffordaLabs Automation Runner</title>
+</head>
+<body>
+  <h1>AffordaLabs Test Runner Active</h1>
+  <div id="status">Running tests...</div>
+  <pre id="output"></pre>
+
+  <script src="js/auth.js"></script>
+  <script src="js/store.js"></script>
+  <script>
+    var logLines = [];
+    function log(msg) {
+      logLines.push(msg);
+      document.getElementById('output').innerText = logLines.join('\n');
+    }
+
+    try {
+      log('1. Checking authStore...');
+      authStore.init();
+      var users = authStore.getUsers();
+      log('Loaded ' + users.length + ' users: ' + users.map(function(u){ return u.username; }).join(', '));
+
+      log('2. Testing logins...');
+      var adminSession = authStore.login('admin', 'admin123');
+      log('Admin login: ' + (adminSession ? 'SUCCESS (Role: ' + adminSession.role + ')' : 'FAIL'));
+
+      var sarahSession = authStore.login('sarah', 'sarah123');
+      log('Sarah login: ' + (sarahSession ? 'SUCCESS (Permissions: ' + sarahSession.permissions.join(',') + ')' : 'FAIL'));
+
+      log('3. Checking pharmacyStore...');
+      var store = new PharmacyStore();
+      log('Store initialized. Current items: ' + store.getItems().length);
+
+      // Report back to server
+      var xhr = new XMLHttpRequest();
+      xhr.open('POST', '/api/test-results', true);
+      xhr.setRequestHeader('Content-Type', 'application/json');
+      xhr.send(JSON.stringify({ status: 'SUCCESS', logs: logLines }));
+    } catch(err) {
+      log('ERROR: ' + err.message + '\n' + err.stack);
+      var xhr = new XMLHttpRequest();
+      xhr.open('POST', '/api/test-results', true);
+      xhr.setRequestHeader('Content-Type', 'application/json');
+      xhr.send(JSON.stringify({ status: 'ERROR', error: err.message, logs: logLines }));
+    }
+  </script>
+</body>
+</html>
