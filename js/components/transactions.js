@@ -239,15 +239,16 @@ function renderDetailsTabHtml(editingTxnId, currentTxnForm, allTxns, inventoryIt
               type="text" 
               id="custName" 
               value="${escapeHtml(currentTxnForm.customerName)}" 
-              placeholder="e.g. Juan Dela Cruz" 
+              placeholder="e.g. JUAN DELA CRUZ" 
               class="form-input" 
-              oninput="updateCustFormField('customerName', this.value)"
+              style="text-transform: uppercase;"
+              oninput="this.value = this.value.toUpperCase(); updateCustFormField('customerName', this.value);"
             />
           </div>
 
           <div class="input-group">
             <label style="font-size: 0.78rem; font-weight: 700; color: #334155; margin-bottom: 0.3rem;">
-              Budget (₱)
+              GL (₱)
             </label>
             <input 
               type="number" 
@@ -263,13 +264,13 @@ function renderDetailsTabHtml(editingTxnId, currentTxnForm, allTxns, inventoryIt
 
           <div class="input-group">
             <label style="font-size: 0.78rem; font-weight: 700; color: #334155; margin-bottom: 0.3rem;">
-              GL
+              Barangay
             </label>
             <input 
               type="text" 
               id="custBrgy" 
               value="${escapeHtml(currentTxnForm.barangay)}" 
-              placeholder="e.g. GL / Barangay" 
+              placeholder="e.g. Barangay Name" 
               class="form-input" 
               oninput="updateCustFormField('barangay', this.value)"
             />
@@ -452,7 +453,7 @@ function renderLogsTabHtml(filteredTxns, totalTxnCount, totalTxnPages, startTxnI
             <tr style="background: #f8fafc; color: var(--text-main); border-bottom: 2px solid var(--border-color);">
               <th style="width: 30px; background: #f8fafc; color: var(--text-muted);"></th>
               <th style="background: #f8fafc; color: var(--brand-charcoal); font-weight: 700;">Date & Ref</th>
-              <th style="background: #f8fafc; color: var(--brand-charcoal); font-weight: 700;">Customer / GL</th>
+              <th style="background: #f8fafc; color: var(--brand-charcoal); font-weight: 700;">Customer / Barangay</th>
               <th style="background: #f8fafc; color: var(--brand-charcoal); font-weight: 700;">Receipt No.</th>
               <th style="background: #f8fafc; color: var(--brand-charcoal); font-weight: 700;">Cashier</th>
               <th style="background: #f8fafc; color: var(--brand-charcoal); font-weight: 700;">Medicines Supplied</th>
@@ -512,12 +513,12 @@ function renderLogsTabHtml(filteredTxns, totalTxnCount, totalTxnPages, startTxnI
                     ${t.barangay ? `
                       <div style="font-size: 0.73rem; color: #64748b; display: inline-flex; align-items: center; gap: 0.25rem; margin-top: 2px;">
                         <i data-lucide="map-pin" style="width: 12px; height: 12px; color: #94a3b8;"></i>
-                        <span>GL: ${escapeHtml(t.barangay)}</span>
+                        <span>Brgy: ${escapeHtml(t.barangay)}</span>
                       </div>
                     ` : ''}
                     ${t.budget > 0 ? `
                       <div style="font-size: 0.7rem; color: var(--primary); font-weight: 600;">
-                        Budget: ₱${Number(t.budget).toFixed(2)}
+                        GL: ₱${Number(t.budget).toFixed(2)}
                       </div>
                     ` : ''}
                   </td>
@@ -525,18 +526,25 @@ function renderLogsTabHtml(filteredTxns, totalTxnCount, totalTxnPages, startTxnI
                     ${t.receiptNo}
                   </td>
                   <td style="font-size: 0.82rem;">${t.cashier}</td>
-                  <td style="font-size: 0.82rem;">
-                    <div style="font-weight: 500; color: var(--text-main);">
+                  <td style="font-size: 0.82rem; padding: 0.6rem 0.75rem;">
+                    <div style="display: flex; flex-direction: column; gap: 4px; font-weight: 500; color: var(--text-main);">
                       ${t.items.map(i => {
               const wasSubstituted = i.isSubstitute || (i.actualSuppliedName && i.actualSuppliedName !== i.name);
+              const medText = `${escapeHtml(i.actualSuppliedName || i.name)} (x${i.qty})`;
               if (wasSubstituted) {
-                return `<span style="display: inline-block; margin-bottom: 2px;">
+                return `<div style="display: flex; align-items: flex-start; gap: 6px; line-height: 1.35;">
+                          <span style="color: var(--primary); font-weight: 700; user-select: none;">•</span>
+                          <div>
                             <strong>${escapeHtml(i.actualSuppliedName || i.name)}</strong> (x${i.qty})
-                            <span style="font-size: 0.7rem; color: #d97706; background: #fef3c7; padding: 1px 4px; border-radius: 3px;">Substituted for ${escapeHtml(i.requestedName || i.name)}</span>
-                          </span>`;
+                            <span style="font-size: 0.7rem; color: #d97706; background: #fef3c7; padding: 1px 5px; border-radius: 3px; margin-left: 4px;">Substituted for ${escapeHtml(i.requestedName || i.name)}</span>
+                          </div>
+                        </div>`;
               }
-              return `<span>${escapeHtml(i.name)} (x${i.qty})</span>`;
-            }).join(', ')}
+              return `<div style="display: flex; align-items: flex-start; gap: 6px; line-height: 1.35;">
+                        <span style="color: var(--primary); font-weight: 700; user-select: none;">•</span>
+                        <span>${escapeHtml(i.name)} (x${i.qty})</span>
+                      </div>`;
+            }).join('')}
                     </div>
                   </td>
                   <td style="text-align: right; font-weight: 800; font-size: 0.95rem; color: var(--text-main);">
@@ -582,8 +590,8 @@ function renderLogsTabHtml(filteredTxns, totalTxnCount, totalTxnPages, startTxnI
                         </h4>
                         <div style="font-size: 0.78rem; color: var(--text-muted); margin-bottom: 0.6rem;">
                           <strong>Customer:</strong> ${escapeHtml(t.customerName)} | 
-                          <strong>GL:</strong> ${escapeHtml(t.barangay || 'N/A')} | 
-                          <strong>Budget:</strong> ${t.budget ? '₱' + Number(t.budget).toFixed(2) : 'N/A'} |
+                          <strong>Barangay:</strong> ${escapeHtml(t.barangay || 'N/A')} | 
+                          <strong>GL:</strong> ${t.budget ? '₱' + Number(t.budget).toFixed(2) : 'N/A'} |
                           <strong>Staff:</strong> ${escapeHtml(t.cashier)}
                         </div>
 
@@ -757,23 +765,27 @@ function renderMedRowHtml(row, idx, inventoryItems) {
       <!-- Medicine Selection -->
       <td style="padding: 0.6rem 0.5rem;">
         <div style="display: flex; flex-direction: column; gap: 0.35rem;">
-          <!-- Primary Medicine Selection -->
+          <!-- Primary Medicine Selection with Searchable Input -->
           <div style="display: flex; gap: 0.4rem; align-items: center;">
-            <select 
+            <input 
+              type="text"
+              list="medList_${row.id}"
+              id="medSearchInput_${row.id}"
               class="form-input" 
+              placeholder="🔍 Search or type medicine (e.g. Pantoprazole, Omeprazole)..."
+              value="${selectedItem ? escapeHtml(getMedicineDisplayName(selectedItem)) : (row.selectedMedId === '__CUSTOM__' ? '+ Custom / Unlisted Medicine...' : '')}"
               style="flex: 1; padding: 0.48rem 0.65rem; font-size: 0.84rem; font-weight: 600; color: #1e293b;" 
-              onchange="onSelectPrimaryMedicine('${row.id}', this.value)"
-            >
-              <option value="">-- Select Medicine from Inventory --</option>
+              oninput="onSearchPrimaryMedicineInput('${row.id}', this.value)"
+              onfocus="this.select()"
+            />
+            <datalist id="medList_${row.id}">
+              <option value="+ Custom / Unlisted Medicine...">+ Custom / Unlisted Medicine...</option>
               ${inventoryItems.map(item => `
-                <option value="${item.id}" ${row.selectedMedId === item.id ? 'selected' : ''}>
-                  ${escapeHtml(getMedicineDisplayName(item))} — (${item.currentStock} units available)
+                <option value="${escapeHtml(getMedicineDisplayName(item))}" data-id="${item.id}">
+                  [${item.currentStock > 0 ? item.currentStock + ' in stock' : 'OUT OF STOCK'}] ₱${Number(item.sellingPrice || 0).toFixed(2)}
                 </option>
               `).join('')}
-              <option value="__CUSTOM__" ${row.selectedMedId === '__CUSTOM__' ? 'selected' : ''}>
-                + Custom / Unlisted Medicine...
-              </option>
-            </select>
+            </datalist>
           </div>
 
           <!-- Custom medicine text input if selected -->
@@ -838,20 +850,28 @@ function renderMedRowHtml(row, idx, inventoryItems) {
                 <div style="font-weight: 700; font-size: 0.72rem; margin-bottom: 2px; color: #92400e;">
                   Actual Medicine Supplied (Deducted from Inventory):
                 </div>
-                <select 
-                  class="form-input" 
-                  style="width: 100%; padding: 0.35rem 0.5rem; font-size: 0.78rem; background: #ffffff; border-color: #f59e0b;" 
-                  onchange="onSelectActualSubstitute('${row.id}', this.value)"
-                >
-                  <option value="">-- Select Available Inventory Substitute --</option>
-                  ${inventoryItems
-        .filter(item => item.id !== row.selectedMedId)
-        .map(item => `
-                      <option value="${item.id}" ${row.actualInventoryId === item.id ? 'selected' : ''}>
-                        ${escapeHtml(getMedicineDisplayName(item))} — (${item.currentStock} in stock, ₱${Number(item.sellingPrice || 0).toFixed(2)})
-                      </option>
-                    `).join('')}
-                </select>
+                <div style="display: flex; gap: 0.35rem; align-items: center;">
+                  <input 
+                    type="text"
+                    list="subList_${row.id}"
+                    id="subSearchInput_${row.id}"
+                    class="form-input" 
+                    placeholder="🔍 Search or type substitute medicine..."
+                    value="${actualItem ? escapeHtml(getMedicineDisplayName(actualItem)) : ''}"
+                    style="width: 100%; padding: 0.35rem 0.5rem; font-size: 0.78rem; background: #ffffff; border-color: #f59e0b; font-weight: 600;" 
+                    oninput="onSearchActualSubstituteInput('${row.id}', this.value)"
+                    onfocus="this.select()"
+                  />
+                  <datalist id="subList_${row.id}">
+                    ${inventoryItems
+          .filter(item => item.id !== row.selectedMedId)
+          .map(item => `
+                        <option value="${escapeHtml(getMedicineDisplayName(item))}" data-id="${item.id}">
+                          (${item.currentStock} in stock, ₱${Number(item.sellingPrice || 0).toFixed(2)})
+                        </option>
+                      `).join('')}
+                  </datalist>
+                </div>
                 ${actualItem ? `
                   <div style="font-size: 0.7rem; color: #047857; margin-top: 3px; font-weight: 600; display: inline-flex; align-items: center; gap: 0.25rem;">
                     <i data-lucide="check" style="width: 12px; height: 12px;"></i>
@@ -1005,6 +1025,91 @@ window.resetCustomerForm = function () {
     items: [createEmptyMedRow()]
   };
   renderTransactionsView(document.getElementById('main-content'));
+};
+
+window.onSearchPrimaryMedicineInput = function (rowId, inputVal) {
+  const row = currentTxnForm.items.find(r => r.id === rowId);
+  if (!row) return;
+
+  const rawVal = (inputVal || '').trim();
+  if (!rawVal) {
+    window.onSelectPrimaryMedicine(rowId, '');
+    return;
+  }
+
+  if (rawVal.toLowerCase().includes('+ custom') || rawVal.toLowerCase() === '__custom__') {
+    window.onSelectPrimaryMedicine(rowId, '__CUSTOM__');
+    return;
+  }
+
+  const items = window.pharmacyStore.getItems();
+  const lower = rawVal.toLowerCase();
+
+  // 1. Check exact match with display name
+  let found = items.find(i => getMedicineDisplayName(i).toLowerCase() === lower);
+
+  // 2. Check exact match with item name, brandName or genericName
+  if (!found) {
+    found = items.find(i => (i.name || '').toLowerCase() === lower ||
+      (i.brandName || '').toLowerCase() === lower ||
+      (i.genericName || '').toLowerCase() === lower);
+  }
+
+  // 3. Check if input matches one unique prefix or partial in display name
+  if (!found && lower.length >= 3) {
+    const matched = items.filter(i => {
+      const disp = getMedicineDisplayName(i).toLowerCase();
+      const generic = (i.genericName || '').toLowerCase();
+      const brand = (i.brandName || '').toLowerCase();
+      const name = (i.name || '').toLowerCase();
+      return disp.includes(lower) || generic.includes(lower) || brand.includes(lower) || name.includes(lower);
+    });
+    // If user clicked or typed full unique match from datalist
+    if (matched.length === 1) {
+      found = matched[0];
+    }
+  }
+
+  if (found) {
+    window.onSelectPrimaryMedicine(rowId, found.id);
+  }
+};
+
+window.onSearchActualSubstituteInput = function (rowId, inputVal) {
+  const row = currentTxnForm.items.find(r => r.id === rowId);
+  if (!row) return;
+
+  const rawVal = (inputVal || '').trim();
+  if (!rawVal) {
+    window.onSelectActualSubstitute(rowId, '');
+    return;
+  }
+
+  const items = window.pharmacyStore.getItems().filter(item => item.id !== row.selectedMedId);
+  const lower = rawVal.toLowerCase();
+
+  let found = items.find(i => getMedicineDisplayName(i).toLowerCase() === lower);
+  if (!found) {
+    found = items.find(i => (i.name || '').toLowerCase() === lower ||
+      (i.brandName || '').toLowerCase() === lower ||
+      (i.genericName || '').toLowerCase() === lower);
+  }
+  if (!found && lower.length >= 3) {
+    const matched = items.filter(i => {
+      const disp = getMedicineDisplayName(i).toLowerCase();
+      const generic = (i.genericName || '').toLowerCase();
+      const brand = (i.brandName || '').toLowerCase();
+      const name = (i.name || '').toLowerCase();
+      return disp.includes(lower) || generic.includes(lower) || brand.includes(lower) || name.includes(lower);
+    });
+    if (matched.length === 1) {
+      found = matched[0];
+    }
+  }
+
+  if (found) {
+    window.onSelectActualSubstitute(rowId, found.id);
+  }
 };
 
 window.onSelectPrimaryMedicine = function (rowId, selectedId) {
@@ -1564,6 +1669,7 @@ window.exportTransactionsCSV = function () {
   const txns = window.pharmacyStore.getTransactions();
   const headers = [
     'NAME',
+    'BARANGAY',
     'GL',
     'DESCRIPTION',
     'QTY',
@@ -1582,7 +1688,8 @@ window.exportTransactionsCSV = function () {
 
   txns.forEach(t => {
     const customer = (t.customerName || 'Walk-in').trim();
-    const gl = (t.barangay || '').trim();
+    const barangay = (t.barangay || '').trim();
+    const gl = t.budget > 0 ? Number(t.budget).toFixed(2) : '';
     const receiveDate = t.date ? formatDateMMDDYY(t.date) : '';
     const deliveryDate = t.deliveryDate || '';
     const items = t.items && t.items.length > 0 ? t.items : [
@@ -1605,10 +1712,11 @@ window.exportTransactionsCSV = function () {
       const unitTotal = (qty * unit).toFixed(2);
       const sellingTotal = (qty * selling).toFixed(2);
 
-      // On first row of transaction: include Customer Name, GL, grand TOTAL, and dates
+      // On first row of transaction: include Customer Name, Barangay, GL, grand TOTAL, and dates
       // On subsequent item rows: leave them blank just like in the CONG Excel sheet
       rows.push([
         escapeCsv(isFirst ? customer : ''),
+        escapeCsv(isFirst ? barangay : ''),
         escapeCsv(isFirst ? gl : ''),
         escapeCsv(desc),
         qty,
