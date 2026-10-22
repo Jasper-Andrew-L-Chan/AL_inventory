@@ -113,9 +113,12 @@ function renderTransactionsView(container) {
         // Item exists in inventory: keep unit and selling price aligned unless custom edited
         const curItem = inventoryItems.find(i => i.id === row.selectedMedId);
         if (curItem && !row.isSubstitute) {
+          const curCong = Number(curItem.congPrice || 0);
+          const curSell = Number(curItem.sellingPrice || 0);
+          const curRef = curCong > 0 ? curCong : curSell;
           if (!row.unitPrice) row.unitPrice = Number(curItem.costPrice || 0);
-          if (row.congPrice === undefined || row.congPrice === null) row.congPrice = Number(curItem.congPrice || 0);
-          if (!row.sellingPrice) row.sellingPrice = Number(curItem.sellingPrice || 0);
+          if (row.congPrice === undefined || row.congPrice === null) row.congPrice = curCong;
+          if (!row.sellingPrice) row.sellingPrice = curRef;
           row.totalSellingPrice = (Number(row.qty) || 1) * (Number(row.sellingPrice) || 0);
         }
       }
@@ -339,10 +342,10 @@ function renderDetailsTabHtml(editingTxnId, currentTxnForm, allTxns, inventoryIt
                   <th style="min-width: 240px;">Medicine Selection</th>
                   <th style="width: 100px; text-align: center;">Quantity (QTY)</th>
                   <th style="width: 120px; text-align: right;">Unit Price (Cost)</th>
-                  <th style="width: 120px; text-align: right;">Cong Price</th>
+                  <th style="width: 130px; text-align: right; background: #e0f2fe; color: #0369a1; font-weight: 800;">★ Cong Price (Main)</th>
                   <th style="width: 120px; text-align: right;">Selling Price</th>
                   <th style="width: 90px; text-align: center;">Total Unit</th>
-                  <th style="width: 130px; text-align: right;">Total Selling Price</th>
+                  <th style="width: 130px; text-align: right;">Total Amount</th>
                   <th style="width: 50px; text-align: center;"></th>
                 </tr>
               </thead>
@@ -363,7 +366,7 @@ function renderDetailsTabHtml(editingTxnId, currentTxnForm, allTxns, inventoryIt
               </span>
             </div>
             <div>
-              <span style="font-size: 0.75rem; color: #64748b; font-weight: 600;">Total Selling Price:</span>
+              <span style="font-size: 0.75rem; color: #64748b; font-weight: 600;">Total Amount (Cong's Price):</span>
               <span id="formGrandTotalSelling" style="font-size: 1.15rem; font-weight: 800; color: var(--primary); margin-left: 0.35rem;">
                 ₱${formGrandTotalSelling.toFixed(2)}
               </span>
@@ -881,11 +884,15 @@ function renderMedRowHtml(row, idx, inventoryItems) {
             />
             <datalist id="medList_${row.id}">
               <option value="+ Custom / Unlisted Medicine...">+ Custom / Unlisted Medicine...</option>
-              ${inventoryItems.map(item => `
+              ${inventoryItems.map(item => {
+                const congP = Number(item.congPrice || 0);
+                const sellP = Number(item.sellingPrice || 0);
+                const displayPrice = congP > 0 ? `Cong: ₱${congP.toFixed(2)}` : `₱${sellP.toFixed(2)}`;
+                return `
                 <option value="${escapeHtml(getMedicineDisplayName(item))}" data-id="${item.id}">
-                  [${item.currentStock > 0 ? item.currentStock + ' in stock' : 'OUT OF STOCK'}] ₱${Number(item.sellingPrice || 0).toFixed(2)}
+                  [${item.currentStock > 0 ? item.currentStock + ' in stock' : 'OUT OF STOCK'}] ${displayPrice}
                 </option>
-              `).join('')}
+              `;}).join('')}
             </datalist>
           </div>
 
@@ -931,8 +938,11 @@ function renderMedRowHtml(row, idx, inventoryItems) {
                 <span><strong>Unit:</strong> ${escapeHtml(selectedItem.unit || 'unit')}</span>
                 <span><strong>Batch:</strong> ${escapeHtml(selectedItem.batchLot || 'N/A')}</span>
                 <span><strong>Cost:</strong> ₱${Number(selectedItem.costPrice || 0).toFixed(2)}</span>
-                <span><strong>Cong's Price:</strong> <strong style="color: #0369a1;">₱${Number(selectedItem.congPrice || 0).toFixed(2)}</strong></span>
+                <span><strong>Cong's Price:</strong> <strong style="color: #0369a1; font-weight: 800;">₱${Number(selectedItem.congPrice || 0).toFixed(2)}</strong></span>
                 <span><strong>Selling:</strong> ₱${Number(selectedItem.sellingPrice || 0).toFixed(2)}</span>
+                ${(!selectedItem.congPrice || Number(selectedItem.congPrice) <= 0) ? `
+                  <span style="color: #ea580c; font-weight: 700;">⚠ Missing Cong's Price</span>
+                ` : ''}
               </div>
             </div>
           ` : (row.selectedMedId === '__CUSTOM__' ? `
@@ -967,11 +977,15 @@ function renderMedRowHtml(row, idx, inventoryItems) {
                   <datalist id="subList_${row.id}">
                     ${inventoryItems
           .filter(item => item.id !== row.selectedMedId)
-          .map(item => `
+          .map(item => {
+            const congP = Number(item.congPrice || 0);
+            const sellP = Number(item.sellingPrice || 0);
+            const priceLabel = congP > 0 ? `Cong: ₱${congP.toFixed(2)}` : `₱${sellP.toFixed(2)}`;
+            return `
                         <option value="${escapeHtml(getMedicineDisplayName(item))}" data-id="${item.id}">
-                          (${item.currentStock} in stock, ₱${Number(item.sellingPrice || 0).toFixed(2)})
+                          (${item.currentStock} in stock, ${priceLabel})
                         </option>
-                      `).join('')}
+                      `;}).join('')}
                   </datalist>
                 </div>
                 ${actualItem ? `
@@ -1024,10 +1038,10 @@ function renderMedRowHtml(row, idx, inventoryItems) {
         </div>
       </td>
 
-      <!-- Cong Price -->
-      <td style="text-align: right; vertical-align: top; padding-top: 0.9rem;">
+      <!-- Cong Price (Main Reference Price) -->
+      <td style="text-align: right; vertical-align: top; padding-top: 0.9rem; background: rgba(224, 242, 254, 0.25);">
         <div style="display: flex; align-items: center; justify-content: flex-end; gap: 2px;">
-          <span style="font-size: 0.75rem; color: #64748b;">₱</span>
+          <span style="font-size: 0.75rem; color: #0369a1; font-weight: 700;">₱</span>
           <input 
             type="number" 
             id="row-congPrice-${row.id}"
@@ -1035,7 +1049,7 @@ function renderMedRowHtml(row, idx, inventoryItems) {
             step="0.01" 
             value="${row.congPrice || 0}" 
             class="form-input" 
-            style="width: 90px; text-align: right; font-size: 0.82rem;" 
+            style="width: 90px; text-align: right; font-size: 0.82rem; font-weight: 700; color: #0369a1; border-color: #7dd3fc; background: #f0f9ff;" 
             oninput="updateMedRowField('${row.id}', 'congPrice', this.value)"
             onkeydown="if(event.key==='Enter'){event.preventDefault(); this.blur();}"
           />
@@ -1225,20 +1239,24 @@ window.onSelectPrimaryMedicine = function (rowId, selectedId) {
   if (found) {
     row.customMedName = '';
     const stock = Number(found.currentStock || 0);
+    const congP = Number(found.congPrice || 0);
+    const origSell = Number(found.sellingPrice || 0);
+    // Primary reference price: Cong's price takes precedence as the main price
+    const primaryRefPrice = congP > 0 ? congP : origSell;
 
     // If stock is 0, prompt substitute automatically
     if (stock <= 0) {
       row.isSubstitute = true;
       row.actualInventoryId = '';
       row.unitPrice = Number(found.costPrice || 0);
-      row.congPrice = Number(found.congPrice || 0);
-      row.sellingPrice = Number(found.sellingPrice || 0);
+      row.congPrice = congP;
+      row.sellingPrice = primaryRefPrice;
     } else {
       row.isSubstitute = false;
       row.actualInventoryId = found.id;
       row.unitPrice = Number(found.costPrice || 0);
-      row.congPrice = Number(found.congPrice || 0);
-      row.sellingPrice = Number(found.sellingPrice || 0);
+      row.congPrice = congP;
+      row.sellingPrice = primaryRefPrice;
     }
   } else if (selectedId === '__CUSTOM__') {
     row.isSubstitute = true;
@@ -1269,10 +1287,14 @@ window.toggleSubstituteMode = function (rowId) {
     const items = window.pharmacyStore.getItems();
     const orig = items.find(i => i.id === row.selectedMedId);
     if (orig) {
+      const congP = Number(orig.congPrice || 0);
+      const origSell = Number(orig.sellingPrice || 0);
+      const primaryRefPrice = congP > 0 ? congP : origSell;
+
       row.actualInventoryId = orig.id;
       row.unitPrice = Number(orig.costPrice || 0);
-      row.congPrice = Number(orig.congPrice || 0);
-      row.sellingPrice = Number(orig.sellingPrice || 0);
+      row.congPrice = congP;
+      row.sellingPrice = primaryRefPrice;
       row.totalSellingPrice = row.totalUnit * row.sellingPrice;
     }
   }
@@ -1288,9 +1310,13 @@ window.onSelectActualSubstitute = function (rowId, actualInvId) {
   const subItem = items.find(i => i.id === actualInvId);
 
   if (subItem) {
+    const congP = Number(subItem.congPrice || 0);
+    const origSell = Number(subItem.sellingPrice || 0);
+    const primaryRefPrice = congP > 0 ? congP : origSell;
+
     row.unitPrice = Number(subItem.costPrice || 0);
-    row.congPrice = Number(subItem.congPrice || 0);
-    row.sellingPrice = Number(subItem.sellingPrice || 0);
+    row.congPrice = congP;
+    row.sellingPrice = primaryRefPrice;
   }
 
   row.totalUnit = Number(row.qty) || 1;
@@ -1809,6 +1835,7 @@ window.exportTransactionsCSV = function () {
     'GL',
     'DESCRIPTION',
     'QTY',
+    'CONG PRICE',
     'SELLING',
     'UNIT',
     'UNIT TOTAL',
@@ -1832,6 +1859,7 @@ window.exportTransactionsCSV = function () {
       {
         name: 'No items recorded',
         qty: 0,
+        congPrice: 0,
         sellingPrice: 0,
         unitPrice: 0
       }
@@ -1843,6 +1871,7 @@ window.exportTransactionsCSV = function () {
       const isFirst = index === 0;
       const desc = item.actualSuppliedName || item.name || '';
       const qty = Number(item.qty || 0);
+      const cong = Number(item.congPrice || 0);
       const selling = Number(item.sellingPrice || item.price || 0);
       const unit = Number(item.unitPrice || 0);
       const unitTotal = (qty * unit).toFixed(2);
@@ -1856,6 +1885,7 @@ window.exportTransactionsCSV = function () {
         escapeCsv(isFirst ? gl : ''),
         escapeCsv(desc),
         qty,
+        cong.toFixed(2),
         selling.toFixed(2),
         unit.toFixed(2),
         unitTotal,

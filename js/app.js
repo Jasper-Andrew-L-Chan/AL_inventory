@@ -559,9 +559,9 @@ window.applyThemeMode = function (isDark) {
 
 // ── System Version & Build Telemetry ─────────────────────────────────────────
 window.APP_CONFIG = {
-  version: '2.2.0',
-  build: 'rev.19',
-  commit: 'f45a89e',
+  version: '2.2.1',
+  build: 'rev.20',
+  commit: 'b71e84a',
   buildDate: '2026-10-22',
   environment: window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' ? 'Local Development' : 'Production Cloud'
 };
