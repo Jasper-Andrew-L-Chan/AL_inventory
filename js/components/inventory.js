@@ -695,7 +695,22 @@ function getFilteredInventoryItems() {
     });
   }
 
-  return filtered;
+  // Sort medicines alphabetically A-Z with out-of-stock items placed at the bottom
+  return filtered.sort((a, b) => {
+    const stockA = Number(a.currentStock) || 0;
+    const stockB = Number(b.currentStock) || 0;
+    const aOutOfStock = stockA <= 0;
+    const bOutOfStock = stockB <= 0;
+
+    // In-stock items appear first; out-of-stock items go to the bottom
+    if (!aOutOfStock && bOutOfStock) return -1;
+    if (aOutOfStock && !bOutOfStock) return 1;
+
+    // Both are in-stock or both are out-of-stock: sort alphabetically by generic name, then brand name
+    const nameA = ((a.genericName || a.brandName || a.name || '')).trim().toLowerCase();
+    const nameB = ((b.genericName || b.brandName || b.name || '')).trim().toLowerCase();
+    return nameA.localeCompare(nameB, undefined, { numeric: true, sensitivity: 'base' });
+  });
 }
 
 function renderInventoryTableRows(displayedItems) {

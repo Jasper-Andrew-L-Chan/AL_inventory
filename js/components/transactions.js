@@ -77,7 +77,25 @@ function createEmptyMedRow() {
 
 function renderTransactionsView(container) {
   const allTxns = window.pharmacyStore.getTransactions();
-  const inventoryItems = window.pharmacyStore.getItems();
+  const rawInventoryItems = window.pharmacyStore.getItems();
+  
+  // Sort medicines alphabetically A-Z, placing out-of-stock items at the bottom
+  const inventoryItems = [...rawInventoryItems].sort((a, b) => {
+    const stockA = Number(a.currentStock) || 0;
+    const stockB = Number(b.currentStock) || 0;
+    const aOutOfStock = stockA <= 0;
+    const bOutOfStock = stockB <= 0;
+
+    // If one is out of stock and the other is in stock, in-stock comes first
+    if (!aOutOfStock && bOutOfStock) return -1;
+    if (aOutOfStock && !bOutOfStock) return 1;
+
+    // Both are either in-stock or out-of-stock: sort alphabetically A-Z by display name (or generic/brand)
+    const nameA = getMedicineDisplayName(a).toLowerCase();
+    const nameB = getMedicineDisplayName(b).toLowerCase();
+    return nameA.localeCompare(nameB, undefined, { numeric: true, sensitivity: 'base' });
+  });
+
   const inventoryIdSet = new Set(inventoryItems.map(i => i.id));
 
   // Ensure active form rows reflect current inventory status (e.g. if an item was deleted or updated)
