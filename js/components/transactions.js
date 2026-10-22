@@ -1560,32 +1560,65 @@ window.handleRefundTxn = function (id) {
 
 window.exportTransactionsCSV = function () {
   const txns = window.pharmacyStore.getTransactions();
-  const headers = ['Receipt No,Date,Time,Customer,GL,Budget,Items Supplied,Net Total,Status'];
-  const rows = txns.map(t => {
-    // Escape double quotes for CSV safety
-    const safeCustomer = (t.customerName || 'Walk-in').replace(/"/g, '""');
-    const safeGL = (t.barangay || '').replace(/"/g, '""');
-    const safeTime = (t.time || '').replace(/"/g, '""');
-    
-    // Format items with Unit Price and Cong Price: e.g. "DAPAGLIFLOXIN 10MG (x1, Unit Price: ₱0.00, Cong Price: ₱0.00)"
-    const itemsStr = (t.items || []).map(i => {
-      const medName = (i.name || i.actualSuppliedName || 'Medicine').replace(/"/g, '""');
-      const unitP = Number(i.unitPrice || 0).toFixed(2);
-      const congP = Number(i.congPrice || 0).toFixed(2);
-      return `${medName} (x${i.qty}, Unit Price: ₱${unitP}, Cong Price: ₱${congP})`;
-    }).join('; ').replace(/"/g, '""');
+  const headers = [
+    'NAME',
+    'GL',
+    'DESCRIPTION',
+    'QTY',
+    'SELLING',
+    'UNIT',
+    'UNIT TOTAL',
+    'SELLING TOTAL',
+    'TOTAL',
+    'RECEIVE DATE',
+    'DELIVERY DATE'
+  ];
 
-    return [
-      `"${t.receiptNo || ''}"`,
-      `"${t.date || ''}"`,
-      `"${safeTime}"`,
-      `"${safeCustomer}"`,
-      `"${safeGL}"`,
-      Number(t.budget || 0).toFixed(2),
-      `"${itemsStr}"`,
-      Number(t.netTotal || 0).toFixed(2),
-      `"${t.status || 'Completed'}"`
-    ].join(',');
+  const escapeCsv = val => `"${String(val ?? '').replace(/"/g, '""')}"`;
+
+  const rows = [];
+
+  txns.forEach(t => {
+    const customer = (t.customerName || 'Walk-in').trim();
+    const gl = (t.barangay || '').trim();
+    const receiveDate = t.date ? formatDateMMDDYY(t.date) : '';
+    const deliveryDate = t.deliveryDate || '';
+    const items = t.items && t.items.length > 0 ? t.items : [
+      {
+        name: 'No items recorded',
+        qty: 0,
+        sellingPrice: 0,
+        unitPrice: 0
+      }
+    ];
+
+    const grandTotal = Number(t.netTotal || 0).toFixed(2);
+
+    items.forEach((item, index) => {
+      const isFirst = index === 0;
+      const desc = item.actualSuppliedName || item.name || '';
+      const qty = Number(item.qty || 0);
+      const selling = Number(item.sellingPrice || item.price || 0);
+      const unit = Number(item.unitPrice || 0);
+      const unitTotal = (qty * unit).toFixed(2);
+      const sellingTotal = (qty * selling).toFixed(2);
+
+      // On first row of transaction: include Customer Name, GL, grand TOTAL, and dates
+      // On subsequent item rows: leave them blank just like in the CONG Excel sheet
+      rows.push([
+        escapeCsv(isFirst ? customer : ''),
+        escapeCsv(isFirst ? gl : ''),
+        escapeCsv(desc),
+        qty,
+        selling.toFixed(2),
+        unit.toFixed(2),
+        unitTotal,
+        sellingTotal,
+        isFirst ? grandTotal : '',
+        escapeCsv(isFirst ? receiveDate : ''),
+        escapeCsv(isFirst ? deliveryDate : '')
+      ].join(','));
+    });
   });
 
   const csvContent = '\uFEFF' + [headers.join(','), ...rows].join('\r\n');
