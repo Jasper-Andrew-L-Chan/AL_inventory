@@ -92,7 +92,7 @@ function renderLoginPage() {
           <div class="login-demo-label">Select user account to sign in:</div>
           <div class="login-demo-accounts">
             ${users.map(u => `
-              <button type="button" class="login-demo-pill" onclick="fillDemo('${u.username}','${u.password}')" title="${u.fullName} (${u.role})" style="display: inline-flex; align-items: center; gap: 4px;">
+              <button type="button" class="login-demo-pill" onclick="fillDemo('${u.username}')" title="${u.fullName} (${u.role})" style="display: inline-flex; align-items: center; gap: 4px;">
                 <i data-lucide="user" style="width: 14px; height: 14px;"></i> <strong>${u.username}</strong>
               </button>
             `).join('')}
@@ -195,12 +195,12 @@ function togglePasswordVisibility() {
   }
 }
 
-function fillDemo(username, password) {
+function fillDemo(username) {
   const u = document.getElementById('loginUsername');
   const p = document.getElementById('loginPassword');
   if (u && p) {
     u.value = username;
-    p.value = password;
+    p.value = '';
     p.focus();
   }
 }

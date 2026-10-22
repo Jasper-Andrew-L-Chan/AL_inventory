@@ -123,13 +123,8 @@ const authStore = {
           }
         });
 
-        DEFAULT_USERS.forEach(defUser => {
-          const found = parsed.find(u => u.username.toLowerCase() === defUser.username.toLowerCase());
-          if (!found) {
-            parsed.push(defUser);
-            updated = true;
-          }
-        });
+        // NOTE: default users are seeded only on first run (above). They are NOT re-added
+        // here, otherwise accounts deleted by an Owner/Admin would reappear after refresh.
 
         if (updated) {
           localStorage.setItem(USERS_KEY, JSON.stringify(parsed));
