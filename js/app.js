@@ -11,7 +11,11 @@ class AppRouter {
   }
 
   init() {
-    this.bindEvents();
+    if (!this._listenersBound) {
+      this._listenersBound = true;
+      this.bindEvents();
+      this.bindGlobalShortcuts();
+    }
     this.navigate('home');
   }
 
@@ -29,6 +33,39 @@ class AppRouter {
         this.renderCurrent();
       }
     });
+
+    // Changes made by OTHER PCs arrive through the central database sync.
+    // Re-render the affected screen, but never while the user is typing or a dialog is open.
+    window.addEventListener('pharmacy:remote-sync', (e) => {
+      const c = (e && e.detail) || {};
+      this.updateBadges();
+      const viewsFor = {
+        items: ['home', 'inventory', 'transactions', 'dashboard', 'reports'],
+        txns: ['home', 'transactions', 'dashboard', 'reports', 'cashdrawer'],
+        settings: ['home', 'settings'],
+        drawer: ['cashdrawer'],
+        users: ['staff']
+      };
+      const affected = Object.keys(viewsFor).some(k => c[k] && viewsFor[k].includes(this.currentView));
+      if (affected) this.safeRender();
+    });
+  }
+
+  safeRender() {
+    const active = document.activeElement;
+    const typing = active && /^(INPUT|TEXTAREA|SELECT)$/.test(active.tagName);
+    const dialogOpen = document.querySelector('.modal-overlay.active');
+    if (typing || dialogOpen) {
+      clearTimeout(this._safeRenderTimer);
+      this._safeRenderTimer = setTimeout(() => this.safeRender(), 2500);
+      return;
+    }
+    if (window.authStore && window.authStore.hasPermission(this.currentView)) {
+      this.renderCurrent();
+    }
+  }
+
+  bindGlobalShortcuts() {
 
     // Keyboard shortcuts: Esc for modals
     window.addEventListener('keydown', (e) => {

@@ -1,15 +1,23 @@
 /**
  * AffordaLabs Pharmacy POS & Inventory System
- * Data Store & State Management (LocalStorage with default pharmacy seed)
+ * Data Store & State Management
+ *
+ * The CENTRAL database (Upstash Redis behind /api/*) is the single source of truth.
+ * This store keeps a per-device *cache* of it so the screens stay instant:
+ *   - every change is applied locally right away AND queued as a small operation
+ *     (the "outbox") that is sent to the central database (/api/mutate)
+ *   - every few seconds the store checks the central version (/api/sync) and
+ *     replaces the cache with the shared data when another PC changed something
+ * If the connection drops, changes stay in the outbox and upload when it returns.
  */
 
 const STORAGE_KEYS = {
-  ITEMS: 'al_pharmacy_items',
-  TRANSACTIONS: 'al_pharmacy_transactions',
-  SETTINGS: 'al_pharmacy_settings',
-  STAFF: 'al_pharmacy_staff',
-  DRAWER: 'al_pharmacy_drawer',
-  SHIFT_TRACKER: 'al_pharmacy_shift_tracker'
+  ITEMS: 'al_cache_items',
+  TRANSACTIONS: 'al_cache_transactions',
+  SETTINGS: 'al_cache_settings',
+  STAFF: 'al_cache_staff',
+  DRAWER: 'al_cache_drawer',
+  OUTBOX: 'al_outbox_v1'
 };
 
 const INITIAL_MEDICINES = [];
@@ -53,178 +61,274 @@ const INITIAL_DRAWER = {
 
 class PharmacyStore {
   constructor() {
-    this.serverVersion = Number(localStorage.getItem('al_pharmacy_server_version')) || 0;
+    this.serverVersion = -1;
     this.isSyncing = false;
+    this.isFlushing = false;
+    this.localSeq = 0;          // bumps on every local change (guards against stale poll responses)
+    this.pollTimer = null;
+    this.flushTimer = null;
+    this.POLL_MS = 10000;       // other PCs' changes appear within ~10 seconds
+    this.status = { state: 'idle', message: '', at: null };
     this.init();
-    this.syncFromServer();
-    this.startPeriodicSync();
+    this.outbox = this.loadOutbox();
+    this.bindLifecycle();
+    if (window.authStore && window.authStore.isLoggedIn()) {
+      this.startSync();
+    }
   }
 
   init() {
-    // Clean out any test/corrupted items with "undefined" as brand or generic name
-    try {
-      const storedItems = JSON.parse(localStorage.getItem(STORAGE_KEYS.ITEMS)) || [];
-      const validStored = storedItems.filter(i => i && i.brandName !== 'undefined' && i.genericName !== 'undefined' && i.id !== 'test1');
-      if (validStored.length !== storedItems.length) {
-        localStorage.setItem(STORAGE_KEYS.ITEMS, JSON.stringify(validStored));
-      }
-    } catch (e) {}
-
-    // If first time with cleared items or user wants fresh clean inventory
-    const existingClean = localStorage.getItem('al_pharmacy_items_cleared_v2');
-    if (!existingClean) {
-      if (!localStorage.getItem(STORAGE_KEYS.ITEMS)) {
-        localStorage.setItem(STORAGE_KEYS.ITEMS, JSON.stringify([]));
-      }
-      localStorage.setItem('al_pharmacy_items_cleared_v2', 'true');
-    } else if (!localStorage.getItem(STORAGE_KEYS.ITEMS)) {
-      localStorage.setItem(STORAGE_KEYS.ITEMS, JSON.stringify([]));
-    }
-
-    // Clear transactions as requested
-    const existingTxnsClean = localStorage.getItem('al_pharmacy_txns_cleared_v1');
-    if (!existingTxnsClean) {
-      if (!localStorage.getItem(STORAGE_KEYS.TRANSACTIONS)) {
-        localStorage.setItem(STORAGE_KEYS.TRANSACTIONS, JSON.stringify([]));
-      }
-      localStorage.setItem('al_pharmacy_txns_cleared_v1', 'true');
-    } else if (!localStorage.getItem(STORAGE_KEYS.TRANSACTIONS)) {
-      localStorage.setItem(STORAGE_KEYS.TRANSACTIONS, JSON.stringify([]));
-    } else {
-      // Clean up deleted/voided transactions for ALLYANE and JO if previously purged
-      const currentTxns = JSON.parse(localStorage.getItem(STORAGE_KEYS.TRANSACTIONS)) || [];
-      const cleaned = currentTxns.filter(t => {
-        const name = (t.customerName || '').toUpperCase().trim();
-        return name !== 'ALLYANE' && name !== 'JO';
-      });
-      if (cleaned.length !== currentTxns.length) {
-        localStorage.setItem(STORAGE_KEYS.TRANSACTIONS, JSON.stringify(cleaned));
-      }
-    }
-    if (!localStorage.getItem(STORAGE_KEYS.SETTINGS)) {
-      localStorage.setItem(STORAGE_KEYS.SETTINGS, JSON.stringify(INITIAL_SETTINGS));
-    }
-    if (!localStorage.getItem(STORAGE_KEYS.STAFF)) {
-      localStorage.setItem(STORAGE_KEYS.STAFF, JSON.stringify(INITIAL_STAFF));
-    }
-    if (!localStorage.getItem(STORAGE_KEYS.DRAWER)) {
-      localStorage.setItem(STORAGE_KEYS.DRAWER, JSON.stringify(INITIAL_DRAWER));
-    }
-
-    // Verify and synchronize shift opening (6:00 AM) and closing (9:00 PM)
-    this.checkAndResetShiftStock();
+    const ensure = (key, value) => {
+      if (!localStorage.getItem(key)) localStorage.setItem(key, JSON.stringify(value));
+    };
+    ensure(STORAGE_KEYS.ITEMS, []);
+    ensure(STORAGE_KEYS.TRANSACTIONS, []);
+    ensure(STORAGE_KEYS.SETTINGS, INITIAL_SETTINGS);
+    ensure(STORAGE_KEYS.STAFF, INITIAL_STAFF);
+    ensure(STORAGE_KEYS.DRAWER, INITIAL_DRAWER);
   }
 
-  /** Fetch shared central database from server */
-  async syncFromServer() {
-    if (this.isSyncing) return;
+  /** Forget this device's copy of the shared data (called on logout). */
+  resetCache() {
+    [STORAGE_KEYS.ITEMS, STORAGE_KEYS.TRANSACTIONS, STORAGE_KEYS.SETTINGS, STORAGE_KEYS.STAFF, STORAGE_KEYS.DRAWER]
+      .forEach(k => localStorage.removeItem(k));
+    this.serverVersion = -1;
+    this.init();
+  }
+
+  // ── Central database sync ────────────────────────────────────────────────
+
+  bindLifecycle() {
+    document.addEventListener('visibilitychange', () => {
+      if (!document.hidden) this.syncFromServer();
+    });
+    window.addEventListener('online', () => this.syncFromServer(true));
+    window.addEventListener('focus', () => this.syncFromServer());
+  }
+
+  /** Begin polling the central database. Resolves after the first full sync. */
+  startSync() {
+    this.stopSync();
+    this.pollTimer = setInterval(() => {
+      if (!document.hidden) this.syncFromServer();
+    }, this.POLL_MS);
+    return this.syncFromServer(true);
+  }
+
+  stopSync() {
+    if (this.pollTimer) {
+      clearInterval(this.pollTimer);
+      this.pollTimer = null;
+    }
+    this.setStatus('idle');
+  }
+
+  /**
+   * Pull the shared data. Skipped while this device still has changes waiting
+   * to upload, so a poll can never overwrite what the user just did.
+   */
+  async syncFromServer(force = false) {
+    if (!window.authStore || !window.authStore.isLoggedIn()) return false;
+    if (this.outbox.length && !this.isFlushing) {
+      await this.flushOutbox();
+      return false;
+    }
+    if (this.isSyncing || this.isFlushing) return false;
+
+    this.isSyncing = true;
+    const seq = this.localSeq;
+    if (force) this.setStatus('syncing');
     try {
-      this.isSyncing = true;
-      const res = await fetch('/api/data', { cache: 'no-store' });
-      if (!res.ok) return;
-      const data = await res.json();
-      if (!data) return;
-
-      const remoteVersion = Number(data.version) || 0;
-      // Only accept remote server data if remoteVersion is newer than our local serverVersion,
-      // preventing background poll from overwriting deletions made on this client
-      // 1. Items synchronization
-      const localItemsStr = localStorage.getItem(STORAGE_KEYS.ITEMS);
-      if (Array.isArray(data.items)) {
-        // Filter out corrupt test entries (e.g. "undefined (undefined)")
-        const cleanRemoteItems = data.items.filter(i => i && i.brandName !== 'undefined' && i.genericName !== 'undefined' && i.id !== 'test1');
-        if (remoteVersion > this.serverVersion) {
-          if (JSON.stringify(cleanRemoteItems) !== localItemsStr) {
-            localStorage.setItem(STORAGE_KEYS.ITEMS, JSON.stringify(cleanRemoteItems));
-            window.dispatchEvent(new CustomEvent('pharmacy:items-updated'));
-          }
-        }
+      const data = await window.alApi('/api/sync?v=' + (force ? -1 : this.serverVersion));
+      if (data.unchanged) {
+        this.setStatus('ok');
+        return false;
       }
-
-      // 2. Transactions synchronization
-      const localTxnsStr = localStorage.getItem(STORAGE_KEYS.TRANSACTIONS);
-      if (Array.isArray(data.transactions) && remoteVersion > this.serverVersion) {
-        if (JSON.stringify(data.transactions) !== localTxnsStr) {
-          localStorage.setItem(STORAGE_KEYS.TRANSACTIONS, JSON.stringify(data.transactions));
-          window.dispatchEvent(new CustomEvent('pharmacy:txns-updated'));
-        }
-      }
-
-      // 3. Settings
-      if (data.settings && typeof data.settings === 'object') {
-        const curSettingsStr = localStorage.getItem(STORAGE_KEYS.SETTINGS);
-        if (JSON.stringify(data.settings) !== curSettingsStr) {
-          localStorage.setItem(STORAGE_KEYS.SETTINGS, JSON.stringify(data.settings));
-          window.dispatchEvent(new CustomEvent('pharmacy:settings-updated'));
-        }
-      }
-
-      // 4. Staff
-      if (Array.isArray(data.staff) && data.staff.length > 0) {
-        const curStaffStr = localStorage.getItem(STORAGE_KEYS.STAFF);
-        if (JSON.stringify(data.staff) !== curStaffStr) {
-          localStorage.setItem(STORAGE_KEYS.STAFF, JSON.stringify(data.staff));
-        }
-      }
-
-      // 5. Drawer
-      if (data.drawer && typeof data.drawer === 'object') {
-        const curDrawerStr = localStorage.getItem(STORAGE_KEYS.DRAWER);
-        if (JSON.stringify(data.drawer) !== curDrawerStr) {
-          localStorage.setItem(STORAGE_KEYS.DRAWER, JSON.stringify(data.drawer));
-          window.dispatchEvent(new CustomEvent('pharmacy:drawer-updated'));
-        }
-      }
-
-      // 6. Users (auth system)
-      if (Array.isArray(data.users) && data.users.length > 0 && window.authStore && typeof window.authStore.syncUsersFromRemote === 'function') {
-        window.authStore.syncUsersFromRemote(data.users);
-      }
-
-      if (remoteVersion > this.serverVersion) {
-        this.serverVersion = remoteVersion;
-        localStorage.setItem('al_pharmacy_server_version', String(this.serverVersion));
-      }
+      // The user changed something while we were fetching: discard, the next poll fetches fresh data.
+      if (seq !== this.localSeq || this.outbox.length || this.isFlushing) return false;
+      this.applyServerState(data);
+      this.serverVersion = data.version;
+      this.setStatus('ok');
+      return true;
     } catch (err) {
-      // Offline fallback to localStorage
+      this.setStatus(err.network ? 'offline' : 'error', err.message);
+      return false;
     } finally {
       this.isSyncing = false;
     }
   }
 
-  /** Write through to central server */
-  async pushToServer(payload) {
-    try {
-      const res = await fetch('/api/data', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
-      });
-      if (res.ok) {
-        const resp = await res.json();
-        if (resp && resp.version) {
-          this.serverVersion = resp.version;
-          localStorage.setItem('al_pharmacy_server_version', String(this.serverVersion));
-        }
+  applyServerState(d) {
+    const changed = { items: false, txns: false, settings: false, drawer: false, users: false };
+    const put = (key, value) => {
+      const s = JSON.stringify(value);
+      if (s === localStorage.getItem(key)) return false;
+      try {
+        localStorage.setItem(key, s);
+        return true;
+      } catch (e) {
+        console.warn('[AffordaLabs Sync] Could not cache ' + key + ':', e.message);
+        return false;
       }
-    } catch (err) {
-      console.warn('[AffordaLabs Sync] Server push failed, using local storage cache:', err.message);
+    };
+
+    if (Array.isArray(d.items)) changed.items = put(STORAGE_KEYS.ITEMS, d.items);
+    if (Array.isArray(d.transactions)) changed.txns = put(STORAGE_KEYS.TRANSACTIONS, d.transactions);
+    if (d.settings && typeof d.settings === 'object') changed.settings = put(STORAGE_KEYS.SETTINGS, d.settings);
+    if (d.drawer && typeof d.drawer === 'object') changed.drawer = put(STORAGE_KEYS.DRAWER, d.drawer);
+    if (window.authStore) changed.users = window.authStore.syncUsersFromRemote(d.users, d.me);
+
+    if (Object.values(changed).some(Boolean)) {
+      window.dispatchEvent(new CustomEvent('pharmacy:remote-sync', { detail: changed }));
     }
   }
 
-  /** Automatic 3-second sync poll across all connected devices */
-  startPeriodicSync() {
-    setInterval(() => {
-      this.syncFromServer();
-    }, 3000);
+  // ── Outbox: changes waiting to be written to the central database ────────
+
+  loadOutbox() {
+    try {
+      const o = JSON.parse(localStorage.getItem(STORAGE_KEYS.OUTBOX));
+      return Array.isArray(o) ? o : [];
+    } catch (e) {
+      return [];
+    }
+  }
+
+  saveOutbox() {
+    try {
+      localStorage.setItem(STORAGE_KEYS.OUTBOX, JSON.stringify(this.outbox));
+    } catch (e) {
+      console.warn('[AffordaLabs Sync] Could not persist outbox:', e.message);
+    }
+  }
+
+  uid() {
+    if (window.crypto && typeof window.crypto.randomUUID === 'function') return window.crypto.randomUUID();
+    return Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 12) + Math.random().toString(36).slice(2, 8);
+  }
+
+  enqueue(op) {
+    op.opId = op.opId || this.uid();
+    this.outbox.push(op);
+    this.localSeq++;
+    this.saveOutbox();
+    this.renderStatusBadge();
+    this.scheduleFlush();
+  }
+
+  scheduleFlush() {
+    if (this.flushTimer) return;
+    this.flushTimer = setTimeout(() => {
+      this.flushTimer = null;
+      this.flushOutbox();
+    }, 50);
+  }
+
+  async flushOutbox() {
+    if (this.isFlushing || !this.outbox.length) return;
+    if (!window.authStore || !window.authStore.isLoggedIn()) return;
+
+    this.isFlushing = true;
+    this.setStatus('syncing');
+    const batch = this.outbox.slice(0, 100);
+    let proceed = false;
+    try {
+      const res = await window.alApi('/api/mutate', { method: 'POST', body: { ops: batch } });
+      this.outbox = this.outbox.slice(batch.length);
+      this.saveOutbox();
+      proceed = true;
+
+      const rejected = [];
+      (res.results || []).forEach((r, i) => {
+        if (!r) return;
+        if (r.receiptNo && batch[i].type === 'txn.add') this.patchReceipt(batch[i].txn.id, r.receiptNo);
+        if (r.ok === false) rejected.push(r.error || 'The server rejected a change.');
+      });
+      if (rejected.length) {
+        alert('Some changes could not be saved to the shared database:\n\n' + rejected[0] +
+          '\n\nThe screen will now refresh to show the current shared data.');
+      }
+    } catch (err) {
+      const clientError = err.status && err.status >= 400 && err.status < 500 && err.status !== 401 && err.status !== 429;
+      if (clientError) {
+        // A request the server will never accept: drop it so it cannot block everything behind it.
+        this.outbox = this.outbox.slice(batch.length);
+        this.saveOutbox();
+        proceed = true;
+        alert('A change could not be saved: ' + err.message);
+      } else {
+        this.setStatus(err.network ? 'offline' : 'error', err.message);
+      }
+    } finally {
+      this.isFlushing = false;
+    }
+
+    if (!proceed) return;
+    if (this.outbox.length) this.scheduleFlush();
+    else this.syncFromServer(true);
+  }
+
+  /** The server may assign a different receipt number if two PCs picked the same one. */
+  patchReceipt(txnId, receiptNo) {
+    try {
+      const txns = JSON.parse(localStorage.getItem(STORAGE_KEYS.TRANSACTIONS)) || [];
+      const t = txns.find(x => x.id === txnId);
+      if (t && t.receiptNo !== receiptNo) {
+        t.receiptNo = receiptNo;
+        localStorage.setItem(STORAGE_KEYS.TRANSACTIONS, JSON.stringify(txns));
+        window.dispatchEvent(new CustomEvent('pharmacy:txns-updated'));
+      }
+    } catch (e) { /* ignore */ }
+  }
+
+  // ── Sync status badge (bottom-right) ─────────────────────────────────────
+
+  setStatus(state, message = '') {
+    this.status = { state, message, at: new Date() };
+    this.renderStatusBadge();
+  }
+
+  renderStatusBadge() {
+    if (!document.body) return;
+    let el = document.getElementById('syncStatusBadge');
+    if (!window.authStore || !window.authStore.isLoggedIn()) {
+      if (el) el.remove();
+      return;
+    }
+    if (!el) {
+      el = document.createElement('div');
+      el.id = 'syncStatusBadge';
+      el.style.cssText = 'position:fixed;right:14px;bottom:12px;z-index:9999;font:600 11px Inter,system-ui,sans-serif;' +
+        'padding:5px 11px;border-radius:999px;box-shadow:0 2px 10px rgba(0,0,0,.18);cursor:default;user-select:none;';
+      document.body.appendChild(el);
+    }
+    const pending = this.outbox.length;
+    const time = this.status.at ? this.status.at.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }) : '';
+    let text, bg, fg;
+    if (this.status.state === 'offline' || this.status.state === 'error') {
+      text = '⚠ ' + (this.status.state === 'offline' ? 'Offline' : 'Sync problem') +
+        (pending ? ` – ${pending} change${pending === 1 ? '' : 's'} waiting to upload` : ' – retrying');
+      bg = '#fef2f2'; fg = '#b91c1c';
+    } else if (this.status.state === 'syncing' || pending) {
+      text = '⟳ Syncing' + (pending ? ` (${pending})` : '…');
+      bg = '#eff6ff'; fg = '#1d4ed8';
+    } else {
+      text = '● Shared database · synced ' + time;
+      bg = '#ecfdf5'; fg = '#047857';
+    }
+    el.textContent = text;
+    el.title = this.status.message || 'All PCs use the same central database.';
+    el.style.background = bg;
+    el.style.color = fg;
   }
 
   /**
-   * Shift Window Identifier:
+   * Shift Window Identifier (informational):
    * The pharmacy operating hours are 6:00 AM (06:00) to 9:00 PM (21:00).
    * - 'open' (Day Shift): 06:00 to 20:59:59 (6:00 AM to 9:00 PM)
    * - 'closed' (Night / Closed Period): 21:00 to 05:59:59 (9:00 PM to 6:00 AM next day)
-   * Whenever transitioning into Open (6 AM) or Closed (9 PM), Added and Deducted reset to 0.
+   * The reset of Added / Deducted to 0 at each transition is now performed ONCE,
+   * centrally, by the server (api/sync.js) so every PC always agrees.
    */
   getCurrentShiftId(now = new Date()) {
     const yyyy = now.getFullYear();
@@ -242,50 +346,13 @@ class PharmacyStore {
     }
   }
 
+  /** Kept for backward compatibility: the shift reset is handled by the server now. */
   checkAndResetShiftStock() {
-    const currentShift = this.getCurrentShiftId();
-    const recordedShift = localStorage.getItem(STORAGE_KEYS.SHIFT_TRACKER);
-
-    if (recordedShift !== currentShift) {
-      // New shift started (e.g. pharmacy just opened at 6am, or closed at 9pm, or new calendar day)
-      this.resetAddedAndDeductedStock(`Shift transition to: ${currentShift}`);
-      localStorage.setItem(STORAGE_KEYS.SHIFT_TRACKER, currentShift);
-    }
-  }
-
-  resetAddedAndDeductedStock(reason = 'Shift reset') {
-    const rawItems = JSON.parse(localStorage.getItem(STORAGE_KEYS.ITEMS)) || [];
-    let modified = false;
-
-    const updated = rawItems.map(item => {
-      const added = Number(item.addedStock) || 0;
-      const deducted = Number(item.deductedStock) || 0;
-      const current = Number(item.currentStock) || 0;
-
-      if (added !== 0 || deducted !== 0 || item.beginningStock !== current) {
-        modified = true;
-        return {
-          ...item,
-          beginningStock: current, // The new shift begins with current stock as beginning stock
-          addedStock: 0,
-          deductedStock: 0
-        };
-      }
-      return item;
-    });
-
-    if (modified) {
-      localStorage.setItem(STORAGE_KEYS.ITEMS, JSON.stringify(updated));
-      window.dispatchEvent(new CustomEvent('pharmacy:items-updated'));
-      console.log(`[AffordaLabs Shift] Reset added & deducted stock to 0. (${reason})`);
-    }
+    return false;
   }
 
   // --- Medicine Item Methods ---
   getItems() {
-    // Proactively verify shift window upon any item query
-    this.checkAndResetShiftStock();
-
     const items = JSON.parse(localStorage.getItem(STORAGE_KEYS.ITEMS)) || [];
     return items.map(item => {
       const name = this.formatItemName(item);
@@ -297,10 +364,10 @@ class PharmacyStore {
     return this.getItems().find(i => i.id === id);
   }
 
+  /** Write the local cache only (the caller queues the matching server operation). */
   saveItems(items) {
     localStorage.setItem(STORAGE_KEYS.ITEMS, JSON.stringify(items));
     window.dispatchEvent(new CustomEvent('pharmacy:items-updated'));
-    this.pushToServer({ items });
   }
 
   // Helper to compute a standardized medicine display name (e.g. Biogesic, Lazartan)
@@ -346,8 +413,10 @@ class PharmacyStore {
       ...item,
       name: formattedName
     };
+    newItem._ord = Date.now();
     items.unshift(newItem);
     this.saveItems(items);
+    this.enqueue({ type: 'item.put', item: newItem, stockMode: 'init' });
     return newItem;
   }
 
@@ -355,10 +424,15 @@ class PharmacyStore {
     const items = this.getItems();
     const idx = items.findIndex(i => i.id === id);
     if (idx !== -1) {
-      const merged = { ...items[idx], ...updates };
+      const before = items[idx];
+      const merged = { ...before, ...updates };
       merged.name = this.formatItemName(merged);
       items[idx] = merged;
       this.saveItems(items);
+      this.enqueue({ type: 'item.put', item: merged, stockMode: 'none' });
+      if (updates.currentStock !== undefined && Number(merged.currentStock) !== Number(before.currentStock)) {
+        this.enqueue({ type: 'stock.set', id, current: Number(merged.currentStock) });
+      }
       return items[idx];
     }
     return null;
@@ -369,6 +443,7 @@ class PharmacyStore {
     const filtered = items.filter(i => i.id !== id);
     if (filtered.length !== items.length) {
       this.saveItems(filtered);
+      this.enqueue({ type: 'item.del', id });
       return true;
     }
     return false;
@@ -379,6 +454,9 @@ class PharmacyStore {
     const items = this.getItems();
     const filtered = items.filter(i => !idSet.has(i.id));
     this.saveItems(filtered);
+    if (items.length !== filtered.length) {
+      this.enqueue({ type: 'item.delMany', ids: Array.from(idSet) });
+    }
     return items.length - filtered.length;
   }
 
@@ -395,9 +473,11 @@ class PharmacyStore {
     if (!key) return false;
     const backupData = localStorage.getItem(key);
     if (!backupData) return false;
+    const restored = JSON.parse(backupData);
     localStorage.setItem(STORAGE_KEYS.ITEMS, backupData);
     window.dispatchEvent(new CustomEvent('pharmacy:items-updated'));
-    this.pushToServer({ items: JSON.parse(backupData) });
+    this.enqueue({ type: 'item.clear' });
+    restored.forEach(item => this.enqueue({ type: 'item.put', item, stockMode: 'set' }));
     return true;
   }
 
@@ -419,6 +499,9 @@ class PharmacyStore {
     let addedCount = 0;
     let updatedCount = 0;
     let skippedCount = 0;
+    const changedExisting = [];
+    const createdItems = [];
+    const ordBase = Date.now();
 
     newItemsList.forEach(rawItem => {
       const key = makeKey(rawItem.brandName, rawItem.genericName, rawItem.dosage, rawItem.dosageForm);
@@ -440,6 +523,7 @@ class PharmacyStore {
           if (rawItem.expiryDate) existing.expiryDate = rawItem.expiryDate;
           if (rawItem.batchLot) existing.batchLot = rawItem.batchLot;
           existing.name = this.formatItemName(existing);
+          changedExisting.push(existing);
           updatedCount++;
         } else {
           skippedCount++;
@@ -472,13 +556,17 @@ class PharmacyStore {
           company: rawItem.company || rawItem.supplier || 'General Distributor',
           supplier: rawItem.company || rawItem.supplier || 'General Distributor'
         };
+        newItem._ord = ordBase + createdItems.length;
         currentItems.unshift(newItem);
+        createdItems.push(newItem);
         itemMap.set(key, newItem);
         addedCount++;
       }
     });
 
     this.saveItems(currentItems);
+    changedExisting.forEach(item => this.enqueue({ type: 'item.put', item, stockMode: 'none' }));
+    createdItems.forEach(item => this.enqueue({ type: 'item.put', item, stockMode: 'init' }));
     return {
       success: true,
       addedCount,
@@ -490,6 +578,7 @@ class PharmacyStore {
 
   clearAllItems() {
     this.saveItems([]);
+    this.enqueue({ type: 'item.clear' });
   }
 
   adjustStock(id, changeAmount, reason = 'Adjustment', isReturn = false) {
@@ -509,6 +598,10 @@ class PharmacyStore {
       }
       item.currentStock = Math.max(0, (Number(item.currentStock) || 0) + amount);
       this.saveItems(items);
+      // The server applies this as an atomic +/- so two PCs adjusting the same medicine never overwrite each other.
+      if (amount !== 0 && Number.isFinite(amount)) {
+        this.enqueue({ type: 'stock.adj', id, delta: amount, isReturn: !!isReturn, reason });
+      }
       return item;
     }
     return null;
@@ -519,20 +612,26 @@ class PharmacyStore {
     return JSON.parse(localStorage.getItem(STORAGE_KEYS.TRANSACTIONS)) || [];
   }
 
+  /** Write the local cache only (the caller queues the matching server operation). */
   saveTransactions(txns) {
     localStorage.setItem(STORAGE_KEYS.TRANSACTIONS, JSON.stringify(txns));
     window.dispatchEvent(new CustomEvent('pharmacy:txns-updated'));
-    this.pushToServer({ transactions: txns });
   }
 
   addTransaction(txnData) {
     const txns = this.getTransactions();
-    const receiptNum = 2760 + txns.length;
+    // Next receipt number = highest existing IO-#### + 1 (the server guarantees uniqueness across PCs).
+    const highest = txns.reduce((max, t) => {
+      const m = /^IO-(\d+)$/.exec(t.receiptNo || '');
+      return m ? Math.max(max, Number(m[1])) : max;
+    }, 2759);
+    const receiptNum = highest + 1;
     const now = new Date();
     const uniqueSuffix = Math.random().toString(36).substring(2, 8) + '-' + Math.random().toString(36).substring(2, 6);
-    
+
     const newTxn = {
       id: 'txn-' + Date.now() + '-' + uniqueSuffix,
+      _ord: Date.now(),
       receiptNo: txnData.receiptNo || 'IO-' + receiptNum,
       customerName: txnData.customerName || 'Walk-in Customer',
       budget: Number(txnData.budget || 0),
@@ -552,6 +651,7 @@ class PharmacyStore {
 
     txns.unshift(newTxn);
     this.saveTransactions(txns);
+    this.enqueue({ type: 'txn.add', txn: newTxn, opId: newTxn.id });
 
     // Deduct stock for each supplied medicine based on actual inventory item used
     newTxn.items.forEach(item => {
@@ -601,8 +701,10 @@ class PharmacyStore {
       });
     }
 
+    // adjustStock only touches the items cache, so the transactions list above is still current
     txns[txnIndex] = updatedTxn;
     this.saveTransactions(txns);
+    this.enqueue({ type: 'txn.put', txn: updatedTxn });
     return updatedTxn;
   }
 
@@ -614,6 +716,7 @@ class PharmacyStore {
       txn.refundReason = reason;
       txn.refundDate = new Date().toISOString();
       this.saveTransactions(txns);
+      this.enqueue({ type: 'txn.put', txn });
 
       // Return actual medicines to inventory
       txn.items.forEach(item => {
@@ -645,6 +748,7 @@ class PharmacyStore {
 
     txns.splice(idx, 1);
     this.saveTransactions(txns);
+    this.enqueue({ type: 'txn.del', id: txnId });
     return true;
   }
 
@@ -758,7 +862,7 @@ class PharmacyStore {
   saveSettings(settings) {
     localStorage.setItem(STORAGE_KEYS.SETTINGS, JSON.stringify(settings));
     window.dispatchEvent(new CustomEvent('pharmacy:settings-updated'));
-    this.pushToServer({ settings });
+    this.enqueue({ type: 'settings.put', settings });
   }
 
   // --- Staff ---
@@ -790,7 +894,7 @@ class PharmacyStore {
   saveDrawer(drawer) {
     localStorage.setItem(STORAGE_KEYS.DRAWER, JSON.stringify(drawer));
     window.dispatchEvent(new CustomEvent('pharmacy:drawer-updated'));
-    this.pushToServer({ drawer });
+    this.enqueue({ type: 'drawer.put', drawer });
   }
 }
 

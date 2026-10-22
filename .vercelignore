@@ -1,0 +1,15 @@
+# Never publish local data, scripts or test artifacts as public web files.
+# (data/pharmacy_db.json contains the old plain-text user passwords and all records.)
+data
+serve.ps1
+scripts
+scratch_edge_profile
+simulation_output.json
+sim_suite.html
+sim.hta
+trace.hta
+test_runner.html
+debug.html
+err_trace.txt
+README.md
+.git

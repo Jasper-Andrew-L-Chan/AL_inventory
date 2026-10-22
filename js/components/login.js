@@ -7,7 +7,7 @@ function renderLoginPage() {
   const overlay = document.getElementById('login-overlay');
   if (!overlay) return;
 
-  const users = window.authStore ? window.authStore.getUsers() : [];
+  const users = window.authStore ? window.authStore.getLoginUsers() : [];
 
   overlay.style.display = 'flex';
   overlay.style.opacity = '1';
@@ -90,12 +90,8 @@ function renderLoginPage() {
         <!-- Quick Select Staff Accounts -->
         <div class="login-demo">
           <div class="login-demo-label">Select user account to sign in:</div>
-          <div class="login-demo-accounts">
-            ${users.map(u => `
-              <button type="button" class="login-demo-pill" onclick="fillDemo('${u.username}')" title="${u.fullName} (${u.role})" style="display: inline-flex; align-items: center; gap: 4px;">
-                <i data-lucide="user" style="width: 14px; height: 14px;"></i> <strong>${u.username}</strong>
-              </button>
-            `).join('')}
+          <div class="login-demo-accounts" id="loginPillsContainer">
+            ${renderLoginPills(users)}
           </div>
         </div>
 
@@ -115,6 +111,26 @@ function renderLoginPage() {
     const el = document.getElementById('loginUsername');
     if (el) el.focus();
   }, 100);
+
+  // Load the account names from the central database so every PC shows the same list
+  if (window.authStore) {
+    window.authStore.refreshLoginUsers().then(list => {
+      const box = document.getElementById('loginPillsContainer');
+      if (box) {
+        box.innerHTML = renderLoginPills(list);
+        if (typeof lucide !== 'undefined') lucide.createIcons();
+      }
+    });
+  }
+}
+
+function renderLoginPills(users) {
+  const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  return (users || []).map(u => `
+    <button type="button" class="login-demo-pill" onclick="fillDemo('${esc(u.username)}')" title="${esc(u.fullName)} (${esc(u.role)})" style="display: inline-flex; align-items: center; gap: 4px;">
+      <i data-lucide="user" style="width: 14px; height: 14px;"></i> <strong>${esc(u.username)}</strong>
+    </button>
+  `).join('');
 }
 
 function handleLogin(e) {
@@ -130,17 +146,29 @@ function handleLogin(e) {
   btnText.textContent = 'Signing in…';
   error.style.display = 'none';
 
-  // Smooth short delay for UX
-  setTimeout(() => {
-    const session = window.authStore.login(username, password);
+  // Verify against the central database, then load the shared data before opening the app
+  (async () => {
+    let session = null;
+    let message = 'Invalid username or password.';
+    try {
+      session = await window.authStore.login(username, password);
+    } catch (err) {
+      message = err.message || message;
+    }
+
     if (session) {
+      btnText.textContent = 'Loading shared data…';
+      try {
+        await window.pharmacyStore.startSync();
+      } catch (e) { /* the app still opens with whatever is cached; sync keeps retrying */ }
+
       // Success – animate out overlay
       btnText.textContent = `✓ Welcome, ${session.firstName}!`;
       const overlay = document.getElementById('login-overlay');
       overlay.style.opacity = '0';
       overlay.style.transform = 'scale(1.03)';
       overlay.style.transition = 'opacity 0.35s ease, transform 0.35s ease';
-      
+
       setTimeout(() => {
         overlay.style.display = 'none';
         // Boot / update the main app with current user
@@ -150,15 +178,19 @@ function handleLogin(e) {
           window.updateUserProfileUI();
           window.appRouter.renderCurrent();
         }
+        if (session.mustChange) {
+          setTimeout(() => alert('Security notice: this account is still using the default password.\n\nPlease open Settings > Account Security and change it now.'), 400);
+        }
       }, 350);
     } else {
       // Failure
       btn.disabled = false;
       btnText.textContent = 'Sign In';
+      document.getElementById('loginErrorMsg').textContent = message;
       error.style.display = 'flex';
       document.getElementById('loginPassword').value = '';
       document.getElementById('loginPassword').focus();
-      
+
       // Shake animation
       const card = document.querySelector('.login-card');
       if (card) {
@@ -166,7 +198,7 @@ function handleLogin(e) {
         setTimeout(() => card.classList.remove('login-shake'), 500);
       }
     }
-  }, 400);
+  })();
 }
 
 function handleLogout() {

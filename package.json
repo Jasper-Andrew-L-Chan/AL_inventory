@@ -1,0 +1,9 @@
+{
+  "name": "al-inventory",
+  "version": "2.0.0",
+  "private": true,
+  "description": "AffordaLabs Pharmacy POS & Inventory - static frontend + Vercel serverless API backed by a central Upstash Redis database.",
+  "engines": {
+    "node": ">=18"
+  }
+}

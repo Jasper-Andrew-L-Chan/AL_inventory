@@ -1,0 +1,8 @@
+# Local pharmacy database exports contain customer records and old plain-text passwords.
+data/
+scratch_edge_profile/
+simulation_output.json
+err_trace.txt
+node_modules/
+.vercel/
+.env*

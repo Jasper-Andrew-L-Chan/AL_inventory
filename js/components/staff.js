@@ -340,8 +340,8 @@ window.openEditStaffModal = function(id) {
   document.getElementById('staffFullName').value = user.fullName || '';
   document.getElementById('staffUsername').value = user.username || '';
   document.getElementById('staffUsername').disabled = false;
-  document.getElementById('staffPassword').value = user.password || '';
-  document.getElementById('staffPassword').placeholder = 'Enter new password or leave existing';
+  document.getElementById('staffPassword').value = '';
+  document.getElementById('staffPassword').placeholder = 'Leave blank to keep the current password';
   document.getElementById('staffPassword').required = false;
   document.getElementById('staffLevel').value = user.level || 'Staff';
   document.getElementById('staffRole').value = user.role || 'Staff Pharmacist';
@@ -405,7 +405,7 @@ window.toggleAllPermissions = function(select) {
   });
 };
 
-window.handleSaveStaffAccount = function(e) {
+window.handleSaveStaffAccount = async function(e) {
   e.preventDefault();
 
   const id = document.getElementById('staffUserId').value;
@@ -433,6 +433,9 @@ window.handleSaveStaffAccount = function(e) {
     return;
   }
 
+  const submitBtn = e.submitter || document.querySelector('#staffModal button[type="submit"]');
+  if (submitBtn) submitBtn.disabled = true;
+
   try {
     if (id) {
       const updates = {
@@ -448,9 +451,9 @@ window.handleSaveStaffAccount = function(e) {
       if (password) {
         updates.password = password;
       }
-      window.authStore.updateUser(id, updates);
+      await window.authStore.updateUser(id, updates);
     } else {
-      window.authStore.addUser({
+      await window.authStore.addUser({
         fullName,
         username,
         password,
@@ -470,13 +473,15 @@ window.handleSaveStaffAccount = function(e) {
     }
   } catch (err) {
     alert(err.message || 'Error saving staff account.');
+  } finally {
+    if (submitBtn) submitBtn.disabled = false;
   }
 };
 
-window.confirmDeleteStaff = function(id, name) {
+window.confirmDeleteStaff = async function(id, name) {
   if (confirm(`Are you sure you want to delete the staff account for "${name}"?\nThis action cannot be undone.`)) {
     try {
-      window.authStore.deleteUser(id);
+      await window.authStore.deleteUser(id);
       const mainContent = document.getElementById('main-content');
       if (mainContent) {
         renderStaffView(mainContent);
