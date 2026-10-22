@@ -83,15 +83,15 @@ function renderDashboardView(container) {
           <i data-lucide="plus-circle" style="width: 15px; height: 15px;"></i>
           <span>+ New Sale / Dispense</span>
         </button>
-        <button onclick="window.appRouter.navigate('inventory')" class="btn-outline" style="font-size: 0.82rem; padding: 6px 12px; display: inline-flex; align-items: center; gap: 6px; background: white;" title="Receive or restock medicine batches">
+        <button onclick="window.appRouter.navigate('inventory')" class="btn-outline" style="font-size: 0.82rem; padding: 6px 12px; display: inline-flex; align-items: center; gap: 6px; background: var(--bg-card); color: var(--text-main); border-color: var(--border-color);" title="Receive or restock medicine batches">
           <i data-lucide="package-plus" style="width: 15px; height: 15px; color: var(--primary);"></i>
           <span>+ Receive Stock</span>
         </button>
-        <button onclick="goToAlertsTab()" class="btn-outline" style="font-size: 0.82rem; padding: 6px 12px; display: inline-flex; align-items: center; gap: 6px; background: white; color: ${metrics.expiringSoonCount + metrics.lowStockCount > 0 ? '#b45309' : 'var(--text-main)'}; border-color: ${metrics.expiringSoonCount + metrics.lowStockCount > 0 ? '#fde68a' : 'var(--border-color)'};" title="View batch expiries & low stock alerts">
+        <button onclick="goToAlertsTab()" class="btn-outline" style="font-size: 0.82rem; padding: 6px 12px; display: inline-flex; align-items: center; gap: 6px; background: var(--bg-card); color: ${metrics.expiringSoonCount + metrics.lowStockCount > 0 ? '#f59e0b' : 'var(--text-main)'}; border-color: ${metrics.expiringSoonCount + metrics.lowStockCount > 0 ? 'rgba(245, 158, 11, 0.4)' : 'var(--border-color)'};" title="View batch expiries & low stock alerts">
           <i data-lucide="alert-triangle" style="width: 15px; height: 15px; color: #f59e0b;"></i>
           <span>Batch Alerts (${metrics.expiringSoonCount + metrics.lowStockCount})</span>
         </button>
-        <button onclick="renderDashboardView(document.getElementById('main-content'))" class="btn-outline" style="padding: 6px 10px; font-size: 0.82rem; display: inline-flex; align-items: center; gap: 4px; background: white;" title="Refresh live counter numbers">
+        <button onclick="renderDashboardView(document.getElementById('main-content'))" class="btn-outline" style="padding: 6px 10px; font-size: 0.82rem; display: inline-flex; align-items: center; gap: 4px; background: var(--bg-card); color: var(--text-main); border-color: var(--border-color);" title="Refresh live counter numbers">
           <i data-lucide="refresh-cw" style="width: 14px; height: 14px;"></i>
         </button>
       </div>
@@ -105,11 +105,11 @@ function renderDashboardView(container) {
         <div class="kpi-card-desktop" style="border-left: 4px solid #f97316;">
           <div class="kpi-head">
             <span class="kpi-title">Total Net Sales</span>
-            <div class="kpi-icon-box" style="background: #fff7ed; color: #ea580c;">
+            <div class="kpi-icon-box kpi-icon-orange">
               <i data-lucide="trending-up" style="width: 17px; height: 17px;"></i>
             </div>
           </div>
-          <div class="kpi-val" style="color: #c2410c;">₱${metrics.netSales.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+          <div class="kpi-val kpi-val-orange">₱${metrics.netSales.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
           <div class="kpi-footnote">
             <i data-lucide="check-circle-2" style="width: 13px; height: 13px; color: #16a34a;"></i>
             <span>${metrics.transactionCount} completed sales transaction${metrics.transactionCount === 1 ? '' : 's'}</span>
@@ -120,13 +120,13 @@ function renderDashboardView(container) {
         <div class="kpi-card-desktop" style="border-left: 4px solid #10b981;">
           <div class="kpi-head">
             <span class="kpi-title">Gross Profit</span>
-            <div class="kpi-icon-box" style="background: #ecfdf5; color: #059669;">
+            <div class="kpi-icon-box kpi-icon-emerald">
               <i data-lucide="banknote" style="width: 17px; height: 17px;"></i>
             </div>
           </div>
-          <div class="kpi-val" style="color: #047857;">₱${metrics.grossProfit.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+          <div class="kpi-val kpi-val-emerald">₱${metrics.grossProfit.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
           <div class="kpi-footnote">
-            <span style="font-weight: 700; color: #059669; background: #d1fae5; padding: 1px 6px; border-radius: 4px;">
+            <span class="kpi-margin-badge">
               ${metrics.netSales ? ((metrics.grossProfit / metrics.netSales) * 100).toFixed(1) : 0}% Margin
             </span>
             <span>After direct COGS</span>
@@ -137,11 +137,11 @@ function renderDashboardView(container) {
         <div class="kpi-card-desktop" style="border-left: 4px solid #6366f1;">
           <div class="kpi-head">
             <span class="kpi-title">Cost of Goods (COGS)</span>
-            <div class="kpi-icon-box" style="background: #eef2ff; color: #4f46e5;">
+            <div class="kpi-icon-box kpi-icon-indigo">
               <i data-lucide="receipt" style="width: 17px; height: 17px;"></i>
             </div>
           </div>
-          <div class="kpi-val">₱${metrics.costOfGoods.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+          <div class="kpi-val kpi-val-indigo">₱${metrics.costOfGoods.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
           <div class="kpi-footnote">
             <i data-lucide="boxes" style="width: 13px; height: 13px;"></i>
             <span>Direct inventory supplier cost</span>
@@ -152,11 +152,11 @@ function renderDashboardView(container) {
         <div class="kpi-card-desktop" style="border-left: 4px solid #06b6d4;">
           <div class="kpi-head">
             <span class="kpi-title">Discounts Applied</span>
-            <div class="kpi-icon-box" style="background: #ecfeff; color: #0891b2;">
+            <div class="kpi-icon-box kpi-icon-cyan">
               <i data-lucide="percent" style="width: 17px; height: 17px;"></i>
             </div>
           </div>
-          <div class="kpi-val">₱${metrics.discounts.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+          <div class="kpi-val kpi-val-cyan">₱${metrics.discounts.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
           <div class="kpi-footnote">
             <i data-lucide="shield-check" style="width: 13px; height: 13px; color: #0891b2;"></i>
             <span>Senior Citizen & PWD legal deduction</span>
@@ -170,11 +170,11 @@ function renderDashboardView(container) {
         <div class="kpi-card-desktop" style="border-left: 4px solid #0284c7;">
           <div class="kpi-head">
             <span class="kpi-title">Items Dispensed</span>
-            <div class="kpi-icon-box" style="background: #f0f9ff; color: #0284c7;">
+            <div class="kpi-icon-box kpi-icon-sky">
               <i data-lucide="pill" style="width: 17px; height: 17px;"></i>
             </div>
           </div>
-          <div class="kpi-val">${metrics.itemsDispensed} <span style="font-size: 0.9rem; font-weight: 600; color: var(--text-muted);">units</span></div>
+          <div class="kpi-val kpi-val-sky">${metrics.itemsDispensed} <span style="font-size: 0.9rem; font-weight: 600; color: var(--text-muted);">units</span></div>
           <div class="kpi-footnote">
             <span>Avg ₱${metrics.transactionCount ? (metrics.netSales / metrics.transactionCount).toFixed(2) : '0.00'} / transaction</span>
           </div>
@@ -184,11 +184,11 @@ function renderDashboardView(container) {
         <div class="kpi-card-desktop" style="border-left: 4px solid #0d9488;">
           <div class="kpi-head">
             <span class="kpi-title">Stock Movements</span>
-            <div class="kpi-icon-box" style="background: #f0fdfa; color: #0d9488;">
+            <div class="kpi-icon-box kpi-icon-teal">
               <i data-lucide="arrow-left-right" style="width: 17px; height: 17px;"></i>
             </div>
           </div>
-          <div class="kpi-val">${metrics.transactionCount} <span style="font-size: 0.9rem; font-weight: 600; color: var(--text-muted);">logs</span></div>
+          <div class="kpi-val kpi-val-teal">${metrics.transactionCount} <span style="font-size: 0.9rem; font-weight: 600; color: var(--text-muted);">logs</span></div>
           <div class="kpi-footnote">
             <i data-lucide="clock" style="width: 13px; height: 13px;"></i>
             <span>Across current shift window</span>
@@ -199,11 +199,11 @@ function renderDashboardView(container) {
         <div class="kpi-card-desktop" style="border-left: 4px solid #8b5cf6;">
           <div class="kpi-head">
             <span class="kpi-title">Returns / Refunds</span>
-            <div class="kpi-icon-box" style="background: #f5f3ff; color: #7c3aed;">
+            <div class="kpi-icon-box kpi-icon-purple">
               <i data-lucide="rotate-ccw" style="width: 17px; height: 17px;"></i>
             </div>
           </div>
-          <div class="kpi-val">₱${metrics.totalRefunds.toFixed(2)}</div>
+          <div class="kpi-val kpi-val-purple">₱${metrics.totalRefunds.toFixed(2)}</div>
           <div class="kpi-footnote">
             <i data-lucide="smile" style="width: 13px; height: 13px; color: #16a34a;"></i>
             <span>Zero customer return issues today</span>
@@ -214,11 +214,11 @@ function renderDashboardView(container) {
         <div class="kpi-card-desktop" onclick="goToAlertsTab()" style="border-left: 4px solid ${metrics.expiringSoonCount + metrics.lowStockCount > 0 ? '#eab308' : '#10b981'}; cursor: pointer;" title="Click to view Expiring and Low Stock Medicines">
           <div class="kpi-head">
             <span class="kpi-title">Batch & Stock Alerts</span>
-            <div class="kpi-icon-box" style="background: ${metrics.expiringSoonCount + metrics.lowStockCount > 0 ? '#fefce8' : '#ecfdf5'}; color: ${metrics.expiringSoonCount + metrics.lowStockCount > 0 ? '#ca8a04' : '#059669'};">
+            <div class="kpi-icon-box ${metrics.expiringSoonCount + metrics.lowStockCount > 0 ? 'kpi-icon-amber' : 'kpi-icon-emerald'}">
               <i data-lucide="alert-triangle" style="width: 17px; height: 17px;"></i>
             </div>
           </div>
-          <div class="kpi-val" style="color: ${metrics.expiringSoonCount + metrics.lowStockCount > 0 ? '#b45309' : '#047857'};">
+          <div class="kpi-val ${metrics.expiringSoonCount + metrics.lowStockCount > 0 ? 'kpi-val-amber' : 'kpi-val-emerald'}">
             ${metrics.expiringSoonCount + metrics.lowStockCount}
             <span style="font-size: 0.8rem; font-weight: 700; color: var(--primary); margin-left: 6px;">View →</span>
           </div>
@@ -237,12 +237,12 @@ function renderDashboardView(container) {
         <span style="font-size: 0.82rem; font-weight: 600; color: var(--text-muted);">Counter station ready at ${settings.pharmacyName} (${settings.branch})</span>
       </h3>
       <div style="display: flex; align-items: center; gap: 0.6rem;">
-        <div style="background: white; border: 1px solid var(--border-color); border-radius: var(--radius-sm); padding: 0.4rem 0.85rem; display: flex; align-items: center; gap: 0.5rem; font-size: 0.82rem; color: var(--text-muted); box-shadow: var(--shadow-sm);">
+        <div style="background: var(--bg-card); border: 1px solid var(--border-color); border-radius: var(--radius-sm); padding: 0.4rem 0.85rem; display: flex; align-items: center; gap: 0.5rem; font-size: 0.82rem; color: var(--text-muted); box-shadow: var(--shadow-sm);">
           <span>Date Filter:</span>
           <strong style="color: var(--text-main);">Today (12:00am - 11:59pm)</strong>
           <i data-lucide="calendar" style="width: 14px; height: 14px; color: var(--text-muted);"></i>
         </div>
-        <div style="background: #f8fafc; border: 1px solid var(--border-color); border-radius: var(--radius-sm); padding: 0.4rem 0.75rem; font-size: 0.78rem; color: var(--text-muted);">
+        <div style="background: var(--bg-card); border: 1px solid var(--border-color); border-radius: var(--radius-sm); padding: 0.4rem 0.75rem; font-size: 0.78rem; color: var(--text-muted);">
           Synced at <strong>${timeStr}</strong>
         </div>
       </div>
@@ -264,9 +264,9 @@ function renderDashboardView(container) {
           </div>
           <!-- Time Interval Toggles -->
           <div style="display: flex; gap: 0.4rem; font-size: 0.78rem;">
-            <button class="chart-tab ${currentChartPeriod === 'hourly' ? 'active' : ''}" onclick="switchDashboardChartPeriod('hourly')" style="padding: 4px 10px; border-radius: 4px; border: 1px solid ${currentChartPeriod === 'hourly' ? 'var(--primary)' : '#cbd5e1'}; background: ${currentChartPeriod === 'hourly' ? 'var(--primary-light)' : 'white'}; color: ${currentChartPeriod === 'hourly' ? 'var(--primary)' : 'var(--text-muted)'}; font-weight: ${currentChartPeriod === 'hourly' ? '700' : '500'}; cursor: pointer;">Hourly</button>
-            <button class="chart-tab ${currentChartPeriod === 'daily' ? 'active' : ''}" onclick="switchDashboardChartPeriod('daily')" style="padding: 4px 10px; border-radius: 4px; border: 1px solid ${currentChartPeriod === 'daily' ? 'var(--primary)' : '#cbd5e1'}; background: ${currentChartPeriod === 'daily' ? 'var(--primary-light)' : 'white'}; color: ${currentChartPeriod === 'daily' ? 'var(--primary)' : 'var(--text-muted)'}; font-weight: ${currentChartPeriod === 'daily' ? '700' : '500'}; cursor: pointer;">Daily</button>
-            <button class="chart-tab ${currentChartPeriod === 'monthly' ? 'active' : ''}" onclick="switchDashboardChartPeriod('monthly')" style="padding: 4px 10px; border-radius: 4px; border: 1px solid ${currentChartPeriod === 'monthly' ? 'var(--primary)' : '#cbd5e1'}; background: ${currentChartPeriod === 'monthly' ? 'var(--primary-light)' : 'white'}; color: ${currentChartPeriod === 'monthly' ? 'var(--primary)' : 'var(--text-muted)'}; font-weight: ${currentChartPeriod === 'monthly' ? '700' : '500'}; cursor: pointer;">Monthly</button>
+            <button class="chart-tab ${currentChartPeriod === 'hourly' ? 'active' : ''}" onclick="switchDashboardChartPeriod('hourly')" style="padding: 4px 10px; border-radius: 4px; border: 1px solid ${currentChartPeriod === 'hourly' ? 'var(--primary)' : 'var(--border-color)'}; background: ${currentChartPeriod === 'hourly' ? 'var(--primary-light)' : 'var(--bg-card)'}; color: ${currentChartPeriod === 'hourly' ? 'var(--primary)' : 'var(--text-muted)'}; font-weight: ${currentChartPeriod === 'hourly' ? '700' : '500'}; cursor: pointer;">Hourly</button>
+            <button class="chart-tab ${currentChartPeriod === 'daily' ? 'active' : ''}" onclick="switchDashboardChartPeriod('daily')" style="padding: 4px 10px; border-radius: 4px; border: 1px solid ${currentChartPeriod === 'daily' ? 'var(--primary)' : 'var(--border-color)'}; background: ${currentChartPeriod === 'daily' ? 'var(--primary-light)' : 'var(--bg-card)'}; color: ${currentChartPeriod === 'daily' ? 'var(--primary)' : 'var(--text-muted)'}; font-weight: ${currentChartPeriod === 'daily' ? '700' : '500'}; cursor: pointer;">Daily</button>
+            <button class="chart-tab ${currentChartPeriod === 'monthly' ? 'active' : ''}" onclick="switchDashboardChartPeriod('monthly')" style="padding: 4px 10px; border-radius: 4px; border: 1px solid ${currentChartPeriod === 'monthly' ? 'var(--primary)' : 'var(--border-color)'}; background: ${currentChartPeriod === 'monthly' ? 'var(--primary-light)' : 'var(--bg-card)'}; color: ${currentChartPeriod === 'monthly' ? 'var(--primary)' : 'var(--text-muted)'}; font-weight: ${currentChartPeriod === 'monthly' ? '700' : '500'}; cursor: pointer;">Monthly</button>
           </div>
         </div>
 
@@ -333,7 +333,7 @@ function renderDashboardView(container) {
                           ${data.qty} <span style="font-size: 0.7rem; font-weight: 600; color: var(--text-muted);">dispensed</span>
                         </span>
                       </div>
-                      <div style="width: 100%; height: 5px; background: #f1f5f9; border-radius: 9999px; overflow: hidden;">
+                      <div class="progress-track-bg" style="width: 100%; height: 5px; background: #f1f5f9; border-radius: 9999px; overflow: hidden;">
                         <div style="width: ${percent}%; height: 100%; background: linear-gradient(90deg, #f97316, #ea580c); border-radius: 9999px;"></div>
                       </div>
                     </div>
@@ -363,7 +363,7 @@ function renderDashboardView(container) {
             <!-- Cash -->
             <div style="display: flex; align-items: center; justify-content: space-between;">
               <div style="display: flex; align-items: center; gap: 0.65rem;">
-                <div style="width: 28px; height: 28px; border-radius: 6px; background: #dcfce7; color: #16a34a; display: flex; align-items: center; justify-content: center;">
+                <div class="payment-icon-badge badge-cash" style="width: 28px; height: 28px; border-radius: 6px; background: #dcfce7; color: #16a34a; display: flex; align-items: center; justify-content: center;">
                   <i data-lucide="banknote" style="width: 15px; height: 15px;"></i>
                 </div>
                 <div>
@@ -378,7 +378,7 @@ function renderDashboardView(container) {
             <!-- GrabMart -->
             <div style="display: flex; align-items: center; justify-content: space-between;">
               <div style="display: flex; align-items: center; gap: 0.65rem;">
-                <div style="width: 28px; height: 28px; border-radius: 6px; background: #ecfdf5; color: #059669; display: flex; align-items: center; justify-content: center;">
+                <div class="payment-icon-badge badge-grab" style="width: 28px; height: 28px; border-radius: 6px; background: #ecfdf5; color: #059669; display: flex; align-items: center; justify-content: center;">
                   <i data-lucide="bike" style="width: 15px; height: 15px;"></i>
                 </div>
                 <div>
@@ -393,7 +393,7 @@ function renderDashboardView(container) {
             <!-- Maya QR -->
             <div style="display: flex; align-items: center; justify-content: space-between;">
               <div style="display: flex; align-items: center; gap: 0.65rem;">
-                <div style="width: 28px; height: 28px; border-radius: 6px; background: #f7fee7; color: #65a30d; display: flex; align-items: center; justify-content: center;">
+                <div class="payment-icon-badge badge-maya" style="width: 28px; height: 28px; border-radius: 6px; background: #f7fee7; color: #65a30d; display: flex; align-items: center; justify-content: center;">
                   <i data-lucide="credit-card" style="width: 15px; height: 15px;"></i>
                 </div>
                 <div>
@@ -408,7 +408,7 @@ function renderDashboardView(container) {
             <!-- GCash QR -->
             <div style="display: flex; align-items: center; justify-content: space-between;">
               <div style="display: flex; align-items: center; gap: 0.65rem;">
-                <div style="width: 28px; height: 28px; border-radius: 6px; background: #e0f2fe; color: #0284c7; display: flex; align-items: center; justify-content: center;">
+                <div class="payment-icon-badge badge-gcash" style="width: 28px; height: 28px; border-radius: 6px; background: #e0f2fe; color: #0284c7; display: flex; align-items: center; justify-content: center;">
                   <i data-lucide="smartphone" style="width: 15px; height: 15px;"></i>
                 </div>
                 <div>
@@ -423,7 +423,7 @@ function renderDashboardView(container) {
             <!-- Card / FoodPanda -->
             <div style="display: flex; align-items: center; justify-content: space-between;">
               <div style="display: flex; align-items: center; gap: 0.65rem;">
-                <div style="width: 28px; height: 28px; border-radius: 6px; background: #fdf2f8; color: #db2777; display: flex; align-items: center; justify-content: center;">
+                <div class="payment-icon-badge badge-card" style="width: 28px; height: 28px; border-radius: 6px; background: #fdf2f8; color: #db2777; display: flex; align-items: center; justify-content: center;">
                   <i data-lucide="shopping-bag" style="width: 15px; height: 15px;"></i>
                 </div>
                 <div>
@@ -715,7 +715,7 @@ function renderDynamicAreaChartSvg(dataPoints) {
         ${ySteps.map((val, idx) => {
           const y = topY + (idx * (height / 4));
           return `
-            <line x1="40" y1="${y}" x2="680" y2="${y}" stroke="${idx === 4 ? '#e2e8f0' : '#f1f5f9'}" stroke-width="1" />
+            <line class="chart-grid-line" x1="40" y1="${y}" x2="680" y2="${y}" stroke="${idx === 4 ? '#e2e8f0' : '#f1f5f9'}" stroke-width="1" />
             <text x="32" y="${y + 3}" text-anchor="end" font-size="10" fill="#94a3b8" font-family="sans-serif">₱${val}</text>
           `;
         }).join('')}
@@ -728,9 +728,9 @@ function renderDynamicAreaChartSvg(dataPoints) {
 
         <!-- Data Points & Tooltip Labels -->
         ${points.map(p => `
-          <circle cx="${p.x}" cy="${p.y}" r="5" fill="#FF5A00" stroke="#ffffff" stroke-width="2.5" />
+          <circle class="chart-point" cx="${p.x}" cy="${p.y}" r="5" fill="#FF5A00" stroke="#ffffff" stroke-width="2.5" />
           ${p.val > 0 ? `
-            <text x="${p.x}" y="${p.y - 10}" text-anchor="middle" font-size="10" font-weight="700" fill="#C2410C" font-family="sans-serif">
+            <text class="chart-val-label" x="${p.x}" y="${p.y - 10}" text-anchor="middle" font-size="10" font-weight="700" fill="#C2410C" font-family="sans-serif">
               ₱${p.val.toFixed(0)}
             </text>
           ` : ''}

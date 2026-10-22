@@ -572,7 +572,7 @@ body {
 
 /* Refined Medical Desktop KPI Cards */
 .kpi-card-desktop {
-  background: #ffffff;
+  background: var(--bg-card);
   border: 1px solid var(--border-color);
   border-radius: var(--radius-md);
   padding: 1.15rem 1.25rem;
@@ -614,7 +614,18 @@ body {
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
+  transition: all 0.2s ease;
 }
+
+/* Light Mode Icon Palettes */
+.kpi-icon-orange  { background: #fff7ed; color: #ea580c; }
+.kpi-icon-emerald { background: #ecfdf5; color: #059669; }
+.kpi-icon-indigo  { background: #eef2ff; color: #4f46e5; }
+.kpi-icon-cyan    { background: #ecfeff; color: #0891b2; }
+.kpi-icon-sky     { background: #f0f9ff; color: #0284c7; }
+.kpi-icon-teal    { background: #f0fdfa; color: #0d9488; }
+.kpi-icon-purple  { background: #f5f3ff; color: #7c3aed; }
+.kpi-icon-amber   { background: #fefce8; color: #ca8a04; }
 
 .kpi-card-desktop .kpi-val {
   font-size: 1.65rem;
@@ -626,12 +637,31 @@ body {
   font-family: inherit;
 }
 
+/* Light Mode Value Accents */
+.kpi-val-orange  { color: #c2410c; }
+.kpi-val-emerald { color: #047857; }
+.kpi-val-indigo  { color: #4338ca; }
+.kpi-val-cyan    { color: #0e7490; }
+.kpi-val-sky     { color: #0369a1; }
+.kpi-val-teal    { color: #0f766e; }
+.kpi-val-purple  { color: #6d28d9; }
+.kpi-val-amber   { color: #b45309; }
+
 .kpi-card-desktop .kpi-footnote {
   font-size: 0.73rem;
   color: var(--text-muted);
   display: flex;
   align-items: center;
   gap: 5px;
+}
+
+.kpi-margin-badge {
+  font-weight: 700;
+  color: #059669;
+  background: #d1fae5;
+  padding: 1px 6px;
+  border-radius: 4px;
+  display: inline-block;
 }
 
 .kpi-header {
@@ -1741,14 +1771,169 @@ body.dark-mode #links-panel div[onclick]:hover {
   background-color: #273549 !important;
 }
 
-/* Staff & Settings Access Control Panels */
-body.dark-mode div[style*="border-left: 4px solid var(--primary)"],
-body.dark-mode div[style*="border-left: 4px solid #10b981"],
-body.dark-mode div[style*="border-left: 4px solid #ea580c"],
-body.dark-mode div[style*="border-left: 4px solid #028090"],
-body.dark-mode div[style*="border-left: 4px solid #f59e0b"] {
+/* ── Dashboard Desktop KPI Cards in Dark Mode ── */
+body.dark-mode .kpi-card-desktop {
   background-color: #1e293b !important;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3) !important;
+  border-color: #334155 !important;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.4) !important;
+}
+
+body.dark-mode .kpi-card-desktop:hover {
+  background-color: #243248 !important;
+  border-color: #475569 !important;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.5) !important;
+  transform: translateY(-2px);
+}
+
+body.dark-mode .kpi-card-desktop .kpi-title {
+  color: #94a3b8 !important;
+}
+
+body.dark-mode .kpi-card-desktop .kpi-val {
+  color: #f8fafc !important;
+}
+
+body.dark-mode .kpi-card-desktop .kpi-footnote {
+  color: #94a3b8 !important;
+}
+
+/* Vibrant, high-contrast KPI Values in Dark Mode */
+body.dark-mode .kpi-val-orange  { color: #fb923c !important; }
+body.dark-mode .kpi-val-emerald { color: #34d399 !important; }
+body.dark-mode .kpi-val-indigo  { color: #a5b4fc !important; }
+body.dark-mode .kpi-val-cyan    { color: #38bdf8 !important; }
+body.dark-mode .kpi-val-sky     { color: #38bdf8 !important; }
+body.dark-mode .kpi-val-teal    { color: #2dd4bf !important; }
+body.dark-mode .kpi-val-purple  { color: #c084fc !important; }
+body.dark-mode .kpi-val-amber   { color: #fbbf24 !important; }
+
+/* Translucent Glowing KPI Icon Badges in Dark Mode */
+body.dark-mode .kpi-icon-orange {
+  background: rgba(249, 115, 22, 0.16) !important;
+  color: #fb923c !important;
+  border: 1px solid rgba(249, 115, 22, 0.3) !important;
+}
+body.dark-mode .kpi-icon-emerald {
+  background: rgba(16, 185, 129, 0.16) !important;
+  color: #34d399 !important;
+  border: 1px solid rgba(16, 185, 129, 0.3) !important;
+}
+body.dark-mode .kpi-icon-indigo {
+  background: rgba(99, 102, 241, 0.16) !important;
+  color: #a5b4fc !important;
+  border: 1px solid rgba(99, 102, 241, 0.3) !important;
+}
+body.dark-mode .kpi-icon-cyan {
+  background: rgba(6, 182, 212, 0.16) !important;
+  color: #38bdf8 !important;
+  border: 1px solid rgba(6, 182, 212, 0.3) !important;
+}
+body.dark-mode .kpi-icon-sky {
+  background: rgba(2, 132, 199, 0.16) !important;
+  color: #38bdf8 !important;
+  border: 1px solid rgba(2, 132, 199, 0.3) !important;
+}
+body.dark-mode .kpi-icon-teal {
+  background: rgba(13, 148, 136, 0.16) !important;
+  color: #2dd4bf !important;
+  border: 1px solid rgba(13, 148, 136, 0.3) !important;
+}
+body.dark-mode .kpi-icon-purple {
+  background: rgba(139, 92, 246, 0.16) !important;
+  color: #c084fc !important;
+  border: 1px solid rgba(139, 92, 246, 0.3) !important;
+}
+body.dark-mode .kpi-icon-amber {
+  background: rgba(234, 179, 8, 0.16) !important;
+  color: #facc15 !important;
+  border: 1px solid rgba(234, 179, 8, 0.3) !important;
+}
+
+body.dark-mode .kpi-margin-badge {
+  background: rgba(16, 185, 129, 0.22) !important;
+  color: #34d399 !important;
+  border: 1px solid rgba(16, 185, 129, 0.35) !important;
+}
+
+/* Staff, Settings & Border-Left Panels in Dark Mode */
+body.dark-mode div[style*="border-left: 4px solid"] {
+  background-color: #1e293b !important;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.35) !important;
+}
+
+/* Dashboard Action Buttons & Chart Tabs in Dark Mode */
+body.dark-mode .chart-tab {
+  background: #1e293b !important;
+  border-color: #334155 !important;
+  color: #94a3b8 !important;
+}
+
+body.dark-mode .chart-tab.active {
+  background: rgba(255, 90, 0, 0.18) !important;
+  border-color: var(--primary) !important;
+  color: var(--primary) !important;
+}
+
+body.dark-mode .chart-tab:hover:not(.active) {
+  background: #273549 !important;
+  color: #f8fafc !important;
+}
+
+body.dark-mode button[style*="background: white"],
+body.dark-mode button[style*="background:white"],
+body.dark-mode button[style*="background: #ffffff"],
+body.dark-mode button[style*="background:#ffffff"] {
+  background-color: #1e293b !important;
+  border-color: #334155 !important;
+  color: #e2e8f0 !important;
+}
+
+body.dark-mode button[style*="background: white"]:hover,
+body.dark-mode button[style*="background:white"]:hover {
+  background-color: #273549 !important;
+  border-color: #475569 !important;
+}
+
+/* Payment breakdown & track styling */
+body.dark-mode .payment-icon-badge.badge-cash {
+  background: rgba(22, 163, 74, 0.2) !important;
+  color: #4ade80 !important;
+}
+body.dark-mode .payment-icon-badge.badge-grab {
+  background: rgba(5, 150, 105, 0.2) !important;
+  color: #34d399 !important;
+}
+body.dark-mode .payment-icon-badge.badge-maya {
+  background: rgba(101, 163, 13, 0.2) !important;
+  color: #a3e635 !important;
+}
+body.dark-mode .payment-icon-badge.badge-gcash {
+  background: rgba(2, 132, 199, 0.2) !important;
+  color: #38bdf8 !important;
+}
+body.dark-mode .payment-icon-badge.badge-card {
+  background: rgba(219, 39, 119, 0.2) !important;
+  color: #f472b6 !important;
+}
+
+body.dark-mode .progress-track-bg {
+  background: #334155 !important;
+}
+
+body.dark-mode .chart-grid-line {
+  stroke: #334155 !important;
+}
+
+body.dark-mode .chart-point {
+  stroke: #1e293b !important;
+}
+
+body.dark-mode text.chart-val-label {
+  fill: #fb923c !important;
+}
+
+body.dark-mode [style*="color: var(--primary-dark)"] {
+  color: #ff8533 !important;
 }
 
 /* Notice & Warning Tints in Dark Mode */
