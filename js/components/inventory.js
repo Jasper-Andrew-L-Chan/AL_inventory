@@ -317,6 +317,14 @@ function renderInventoryView(container) {
               <input type="number" id="modalSellingPrice" class="form-input" step="0.01" min="0" placeholder="0.00" required />
             </div>
             <div class="input-group">
+              <label style="font-size: 0.78rem; font-weight: 600; color: #028090; margin-bottom: 4px;">Cong's Price (₱)</label>
+              <input type="number" id="modalCongPrice" class="form-input" step="0.01" min="0" placeholder="0.00" />
+            </div>
+            <div class="input-group">
+              <label style="font-size: 0.78rem; font-weight: 600; color: var(--text-muted); margin-bottom: 4px;">Company / Distributor</label>
+              <input type="text" id="modalCompany" class="form-input" placeholder="e.g. ZUELLIG / ALLPMEDS" />
+            </div>
+            <div class="input-group">
               <label style="font-size: 0.78rem; font-weight: 600; color: var(--text-muted); margin-bottom: 4px;">Batch / Lot Number (FDA)</label>
               <input type="text" id="modalBatchLot" class="form-input" placeholder="e.g. LOT-2026-A1" required />
             </div>
@@ -385,20 +393,24 @@ function renderInventoryView(container) {
             <div>
               <div style="font-weight: 700; font-size: 0.84rem; color: #166534; display: flex; align-items: center; gap: 5px;">
                 <i data-lucide="shield-alert" style="width: 15px; height: 15px;"></i>
-                <span>Duplicate Prevention & Conflict Resolution</span>
+                <span>Inventory Entry & Duplicate Handling</span>
               </div>
               <div style="font-size: 0.75rem; color: #374151; margin-top: 2px;">
-                Duplicates are matched by: <strong>Generic Name + Brand Name + Dosage + Dosage Form</strong>.
+                Choose how identical medicine names should be handled:
               </div>
             </div>
-            <div style="display: flex; gap: 1rem; align-items: center; font-size: 0.82rem; font-weight: 600;">
-              <label style="display: flex; align-items: center; gap: 0.35rem; cursor: pointer;">
-                <input type="radio" name="duplicateAction" value="skip" checked onchange="handleDuplicateActionChange('skip')" />
-                <span>Skip Existing (Keep Current Stock)</span>
+            <div style="display: flex; gap: 1rem; align-items: center; font-size: 0.82rem; font-weight: 600; flex-wrap: wrap;">
+              <label style="display: flex; align-items: center; gap: 0.35rem; cursor: pointer; color: #15803d;" title="Recommended: Preserve all medicines, different dosages, batches, and suppliers as separate inventory items">
+                <input type="radio" name="duplicateAction" value="separate" checked onchange="handleDuplicateActionChange('separate')" />
+                <span>Import All as Separate Entries (Recommended)</span>
               </label>
-              <label style="display: flex; align-items: center; gap: 0.35rem; cursor: pointer;">
+              <label style="display: flex; align-items: center; gap: 0.35rem; cursor: pointer; color: #1e40af;" title="Update prices and details for existing matching records">
                 <input type="radio" name="duplicateAction" value="update" onchange="handleDuplicateActionChange('update')" />
-                <span>Update Prices & Specs</span>
+                <span>Update Existing Records</span>
+              </label>
+              <label style="display: flex; align-items: center; gap: 0.35rem; cursor: pointer; color: #854d0e;" title="Skip medicines that already exist in inventory">
+                <input type="radio" name="duplicateAction" value="skip" onchange="handleDuplicateActionChange('skip')" />
+                <span>Skip Existing</span>
               </label>
             </div>
           </div>
@@ -422,6 +434,7 @@ function renderInventoryView(container) {
                   <th style="text-align: right;">Unit Price</th>
                   <th style="text-align: right;">Net Price</th>
                   <th style="text-align: right;">Selling Price</th>
+                  <th style="text-align: right; color: #028090;">Cong's Price</th>
                   <th style="text-align: center;">Qty/Box</th>
                   <th>Expiry Date</th>
                   <th>Company</th>
@@ -735,6 +748,7 @@ function renderInventoryTableRows(displayedItems) {
           </div>
           <div style="font-size: 0.8rem; color: #475569; font-weight: 500; margin-top: 1px;">
             ${escapeHtml(item.brandName || 'Generic / Unbranded')} <span style="font-size: 0.74rem; color: var(--text-muted); font-weight: normal;">• ${escapeHtml(item.dosage || '')} [${escapeHtml(item.dosageForm || item.unit || 'pcs')}]</span>
+            ${(item.company || item.supplier) ? `<span style="font-size: 0.72rem; background: #f1f5f9; color: #475569; padding: 1px 5px; border-radius: 4px; margin-left: 4px; font-weight: 600;" title="Company / Supplier">${escapeHtml(item.company || item.supplier)}</span>` : ''}
           </div>
         </td>
         <td>
@@ -928,8 +942,12 @@ window.openEditMedicineModal = function(id) {
   document.getElementById('modalCategory').value = item.category || 'General Medicine';
   document.getElementById('modalIsRx').value = item.isRx ? 'true' : 'false';
   document.getElementById('modalUnit').value = item.unit;
-  document.getElementById('modalCostPrice').value = item.costPrice;
-  document.getElementById('modalSellingPrice').value = item.sellingPrice;
+  document.getElementById('modalCostPrice').value = item.costPrice || item.unitPrice || 0;
+  document.getElementById('modalSellingPrice').value = item.sellingPrice || 0;
+  const congInput = document.getElementById('modalCongPrice');
+  if (congInput) congInput.value = item.congPrice || 0;
+  const companyInput = document.getElementById('modalCompany');
+  if (companyInput) companyInput.value = item.company || item.supplier || '';
   document.getElementById('modalBatchLot').value = item.batchLot;
   document.getElementById('modalExpiryDate').value = item.expiryDate;
   document.getElementById('modalQty').value = item.currentStock;
@@ -945,6 +963,8 @@ window.closeMedicineModal = function() {
 window.handleSaveDetailedMedicine = function(e) {
   e.preventDefault();
   const id = document.getElementById('modalMedId').value;
+  const congInput = document.getElementById('modalCongPrice');
+  const companyInput = document.getElementById('modalCompany');
   const data = {
     brandName: document.getElementById('modalBrandName').value.trim(),
     genericName: document.getElementById('modalGenericName').value.trim(),
@@ -953,7 +973,11 @@ window.handleSaveDetailedMedicine = function(e) {
     isRx: document.getElementById('modalIsRx').value === 'true',
     unit: document.getElementById('modalUnit').value.trim(),
     costPrice: Number(document.getElementById('modalCostPrice').value),
+    unitPrice: Number(document.getElementById('modalCostPrice').value),
     sellingPrice: Number(document.getElementById('modalSellingPrice').value),
+    congPrice: congInput ? Number(congInput.value) || 0 : 0,
+    company: companyInput ? companyInput.value.trim() : '',
+    supplier: companyInput ? companyInput.value.trim() : '',
     batchLot: document.getElementById('modalBatchLot').value.trim(),
     expiryDate: document.getElementById('modalExpiryDate').value,
     currentStock: Number(document.getElementById('modalQty').value),
@@ -1004,7 +1028,7 @@ window.exportInventoryToCSV = function() {
 // ── Excel (.xlsx, .xls) and CSV Import Logic with Preview & Validation ─────
 
 let parsedImportData = [];
-let importDuplicateAction = 'skip'; // 'skip' or 'update'
+let importDuplicateAction = 'separate'; // 'separate' (default), 'update', 'skip'
 
 window.closeImportPreviewModal = function() {
   const modal = document.getElementById('importPreviewModal');
@@ -1020,6 +1044,7 @@ window.closeImportPreviewModal = function() {
 window.handleDuplicateActionChange = function(action) {
   importDuplicateAction = action;
   updateImportSummaryStats();
+  renderImportPreviewTable();
 };
 
 window.handleInventoryFileSelect = function(event) {
@@ -1050,15 +1075,16 @@ window.handleInventoryFileSelect = function(event) {
         let rawJson = [];
         for (const sheetName of workbook.SheetNames) {
           const grid = XLSX.utils.sheet_to_json(workbook.Sheets[sheetName], { header: 1, defval: '', raw: false });
-          const hIdx = grid.findIndex(r => r.some(c => /generic/i.test(String(c))));
+          // Locate header row by looking for generic name, brand name, medicine name, or product
+          const hIdx = grid.findIndex(r => Array.isArray(r) && r.some(c => /generic|brand|medicine|dosage|drug/i.test(String(c || ''))));
           if (hIdx === -1) continue;
-          const headers = grid[hIdx].map(h => String(h).trim());
+          const headers = grid[hIdx].map(h => String(h || '').trim());
           rawJson = grid.slice(hIdx + 1).map(r => {
             const o = {};
             headers.forEach((h, i) => { if (h) o[h] = r[i] !== undefined ? r[i] : ''; });
             return o;
           });
-          break;
+          if (rawJson.length > 0) break;
         }
         if (rawJson.length === 0) {
           const ws = workbook.Sheets[workbook.SheetNames[0]];
@@ -1215,6 +1241,9 @@ function processImportRows(rawRows, fileName) {
       sellingPrice = parseFloat((unitPrice * 1.20).toFixed(2));
     }
 
+    const rawCongPrice = findVal(['cong price', "cong's price", 'congs price', 'cong', 'special price']);
+    const congPrice = cleanNum(rawCongPrice, 0);
+
     const company = findVal(['company', 'manufacturer', 'supplier', 'distributor', 'mfg']) || 'General Distributor';
 
     // Parse and normalize expiry date
@@ -1258,6 +1287,7 @@ function processImportRows(rawRows, fileName) {
         netPrice: netPrice,
         qtyPerBox: qtyPerBox > 0 ? qtyPerBox : 1,
         sellingPrice: sellingPrice,
+        congPrice: congPrice,
         company: company,
         expiryDate: expiryDate || '2028-12-31'
       }
@@ -1354,10 +1384,15 @@ function updateImportSummaryStats() {
 
   const btnConfirm = document.getElementById('btnConfirmImport');
   const btnConfirmText = document.getElementById('btnConfirmImportText');
-  const validExecutableCount = newCount + (importDuplicateAction === 'update' ? duplicateCount : 0);
+
+  const validTotal = newCount + duplicateCount;
 
   if (btnConfirm) {
-    if (validExecutableCount === 0 && newCount === 0 && duplicateCount === 0) {
+    if (importDuplicateAction === 'skip' && newCount === 0) {
+      btnConfirm.disabled = true;
+      btnConfirm.style.opacity = '0.5';
+      btnConfirm.style.cursor = 'not-allowed';
+    } else if (validTotal === 0) {
       btnConfirm.disabled = true;
       btnConfirm.style.opacity = '0.5';
       btnConfirm.style.cursor = 'not-allowed';
@@ -1369,10 +1404,12 @@ function updateImportSummaryStats() {
   }
 
   if (btnConfirmText) {
-    if (importDuplicateAction === 'skip') {
-      btnConfirmText.textContent = `Import ${newCount} New Medicine${newCount === 1 ? '' : 's'} (Skip ${duplicateCount} Duplicates)`;
-    } else {
+    if (importDuplicateAction === 'separate') {
+      btnConfirmText.textContent = `Import All ${validTotal} Medicine Record${validTotal === 1 ? '' : 's'} as Separate Entries`;
+    } else if (importDuplicateAction === 'update') {
       btnConfirmText.textContent = `Import ${newCount} New + Update ${duplicateCount} Existing`;
+    } else {
+      btnConfirmText.textContent = `Import ${newCount} New Medicine${newCount === 1 ? '' : 's'} (Skip ${duplicateCount} Duplicates)`;
     }
   }
 }
@@ -1382,7 +1419,7 @@ function renderImportPreviewTable() {
   if (!tbody) return;
 
   if (parsedImportData.length === 0) {
-    tbody.innerHTML = `<tr><td colspan="11" style="text-align: center; padding: 2rem; color: var(--text-muted);">No records detected</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="12" style="text-align: center; padding: 2rem; color: var(--text-muted);">No records detected</td></tr>`;
     return;
   }
 
@@ -1394,11 +1431,16 @@ function renderImportPreviewTable() {
     if (item.status === 'valid_new') {
       badgeHtml = `<span style="background: #dcfce7; color: #15803d; font-weight: 700; padding: 2px 6px; border-radius: 4px; font-size: 0.72rem; display: inline-block;">NEW</span>`;
     } else if (item.status === 'duplicate') {
-      const actionText = importDuplicateAction === 'update' ? 'UPDATE' : 'SKIP';
-      const actionColor = importDuplicateAction === 'update' ? '#2563eb' : '#b45309';
-      const actionBg = importDuplicateAction === 'update' ? '#dbeafe' : '#fef3c7';
-      badgeHtml = `<span style="background: ${actionBg}; color: ${actionColor}; font-weight: 700; padding: 2px 6px; border-radius: 4px; font-size: 0.72rem; display: inline-block;" title="Matches existing medicine (${item.existingItem ? item.existingItem.brandName : ''})">DUPLICATE (${actionText})</span>`;
-      rowBg = 'background: #fffbeb;';
+      if (importDuplicateAction === 'separate') {
+        badgeHtml = `<span style="background: #dcfce7; color: #166534; font-weight: 700; padding: 2px 6px; border-radius: 4px; font-size: 0.72rem; display: inline-block;" title="Will be imported as a separate inventory entry">SEPARATE ENTRY</span>`;
+        rowBg = 'background: #f0fdf4;';
+      } else if (importDuplicateAction === 'update') {
+        badgeHtml = `<span style="background: #dbeafe; color: #2563eb; font-weight: 700; padding: 2px 6px; border-radius: 4px; font-size: 0.72rem; display: inline-block;" title="Matches existing medicine (${item.existingItem ? item.existingItem.brandName : ''})">UPDATE</span>`;
+        rowBg = 'background: #eff6ff;';
+      } else {
+        badgeHtml = `<span style="background: #fef3c7; color: #b45309; font-weight: 700; padding: 2px 6px; border-radius: 4px; font-size: 0.72rem; display: inline-block;" title="Matches existing medicine (${item.existingItem ? item.existingItem.brandName : ''})">SKIP</span>`;
+        rowBg = 'background: #fffbeb;';
+      }
     } else {
       badgeHtml = `<span style="background: #fee2e2; color: #b91c1c; font-weight: 700; padding: 2px 6px; border-radius: 4px; font-size: 0.72rem; display: inline-block;" title="${item.errors.join(', ')}">INVALID</span>`;
       rowBg = 'background: #fef2f2;';
@@ -1424,6 +1466,7 @@ function renderImportPreviewTable() {
         <td style="text-align: right;">₱${d.unitPrice.toFixed(2)}</td>
         <td style="text-align: right;">₱${d.netPrice.toFixed(2)}</td>
         <td style="text-align: right; font-weight: 700; color: var(--primary);">₱${d.sellingPrice.toFixed(2)}</td>
+        <td style="text-align: right; font-weight: 700; color: #028090;">₱${d.congPrice.toFixed(2)}</td>
         <td style="text-align: center;">${d.qtyPerBox}</td>
         <td>${escapeHtml(d.expiryDate)}</td>
         <td style="max-width: 140px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${escapeHtml(d.company)}">
@@ -1448,10 +1491,9 @@ window.executeInventoryImport = function() {
   }
 
   const itemsToProcess = validRows.map(r => r.data);
-  const updateExisting = importDuplicateAction === 'update';
 
-  // Execute bulk import with automatic backup in store
-  const result = window.pharmacyStore.bulkImportItems(itemsToProcess, updateExisting);
+  // Execute bulk import with duplicate mode: 'separate' | 'update' | 'skip'
+  const result = window.pharmacyStore.bulkImportItems(itemsToProcess, importDuplicateAction);
 
   // Capture invalid count before the preview data is cleared
   const invalidCount = parsedImportData.filter(i => i.status === 'invalid').length;

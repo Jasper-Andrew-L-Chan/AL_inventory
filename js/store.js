@@ -503,23 +503,29 @@ class PharmacyStore {
     const createdItems = [];
     const ordBase = Date.now();
 
+    // duplicateMode can be: 'separate' (import all as separate entries), 'update' (update existing), 'skip' (skip existing)
+    const duplicateMode = typeof updateExisting === 'string' 
+      ? updateExisting 
+      : (updateExisting === true ? 'update' : 'skip');
+
     newItemsList.forEach(rawItem => {
       const key = makeKey(rawItem.brandName, rawItem.genericName, rawItem.dosage, rawItem.dosageForm);
       const existing = itemMap.get(key);
 
-      if (existing) {
-        if (updateExisting) {
+      if (existing && duplicateMode !== 'separate') {
+        if (duplicateMode === 'update') {
           // Update prices, expiry, supplier, batch without wiping out currentStock unless specified
-          existing.costPrice = Number(rawItem.costPrice !== undefined ? rawItem.costPrice : existing.costPrice);
-          existing.unitPrice = Number(rawItem.unitPrice !== undefined ? rawItem.unitPrice : existing.unitPrice || existing.costPrice);
-          existing.netPrice = Number(rawItem.netPrice !== undefined ? rawItem.netPrice : existing.netPrice);
+          existing.costPrice = Number(rawItem.costPrice !== undefined ? rawItem.costPrice : (rawItem.unitPrice !== undefined ? rawItem.unitPrice : existing.costPrice));
+          existing.unitPrice = Number(rawItem.unitPrice !== undefined ? rawItem.unitPrice : (rawItem.costPrice !== undefined ? rawItem.costPrice : (existing.unitPrice || existing.costPrice)));
+          existing.netPrice = Number(rawItem.netPrice !== undefined ? rawItem.netPrice : (existing.netPrice || 0));
           existing.sellingPrice = Number(rawItem.sellingPrice !== undefined ? rawItem.sellingPrice : existing.sellingPrice);
-          existing.qtyPerBox = Number(rawItem.qtyPerBox !== undefined ? rawItem.qtyPerBox : existing.qtyPerBox || 1);
+          existing.congPrice = Number(rawItem.congPrice !== undefined ? rawItem.congPrice : (existing.congPrice || 0));
+          existing.qtyPerBox = Number(rawItem.qtyPerBox !== undefined ? rawItem.qtyPerBox : (existing.qtyPerBox || 1));
           if (rawItem.company || rawItem.supplier) {
-            existing.company = rawItem.company || rawItem.supplier;
-            existing.supplier = rawItem.company || rawItem.supplier;
+            existing.company = (rawItem.company || rawItem.supplier).trim();
+            existing.supplier = (rawItem.company || rawItem.supplier).trim();
           }
-          if (rawItem.dosageForm) existing.dosageForm = rawItem.dosageForm;
+          if (rawItem.dosageForm) existing.dosageForm = rawItem.dosageForm.trim();
           if (rawItem.expiryDate) existing.expiryDate = rawItem.expiryDate;
           if (rawItem.batchLot) existing.batchLot = rawItem.batchLot;
           existing.name = this.formatItemName(existing);
@@ -552,14 +558,17 @@ class PharmacyStore {
           unitPrice: Number(rawItem.unitPrice || rawItem.costPrice || 0),
           netPrice: Number(rawItem.netPrice || 0),
           sellingPrice: Number(rawItem.sellingPrice || 0),
+          congPrice: Number(rawItem.congPrice || 0),
           qtyPerBox: Number(rawItem.qtyPerBox || 1),
-          company: rawItem.company || rawItem.supplier || 'General Distributor',
-          supplier: rawItem.company || rawItem.supplier || 'General Distributor'
+          company: (rawItem.company || rawItem.supplier || 'General Distributor').trim(),
+          supplier: (rawItem.company || rawItem.supplier || 'General Distributor').trim()
         };
         newItem._ord = ordBase + createdItems.length;
         currentItems.unshift(newItem);
         createdItems.push(newItem);
-        itemMap.set(key, newItem);
+        if (duplicateMode !== 'separate') {
+          itemMap.set(key, newItem);
+        }
         addedCount++;
       }
     });
