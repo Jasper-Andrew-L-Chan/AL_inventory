@@ -409,6 +409,7 @@ function renderDetailsTabHtml(editingTxnId, currentTxnForm, allTxns, inventoryIt
 
 function renderLogsTabHtml(filteredTxns, totalTxnCount, totalTxnPages, startTxnIdx, pageTxns, nowStr) {
   return `
+    <div id="inOutLogsTabContainer">
     <!-- 2. Date Range & Download Toolbar -->
     <div style="display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 1.25rem; flex-wrap: wrap; gap: 1rem;">
       <div>
@@ -445,7 +446,7 @@ function renderLogsTabHtml(filteredTxns, totalTxnCount, totalTxnPages, startTxnI
 
     <!-- Data Table of In - Out Transactions -->
     <div style="background: #ffffff; border: 1px solid var(--border-color); border-radius: var(--radius-md); box-shadow: var(--shadow-sm); overflow: hidden; margin-bottom: 1.5rem;">
-      <div style="max-height: 520px; overflow-y: auto; overflow-x: auto;">
+      <div id="inOutTableScrollBox" style="max-height: 520px; overflow-y: auto; overflow-x: auto;">
         <table class="data-table" style="margin: 0;">
           <thead style="position: sticky; top: 0; z-index: 2; box-shadow: 0 1px 2px rgba(0,0,0,0.05);">
             <tr style="background: #f8fafc; color: var(--text-main); border-bottom: 2px solid var(--border-color);">
@@ -701,6 +702,7 @@ function renderLogsTabHtml(filteredTxns, totalTxnCount, totalTxnPages, startTxnI
           </div>
         </div>
       ` : ''}
+    </div>
     </div>
   `;
 }

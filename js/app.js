@@ -53,13 +53,43 @@ class AppRouter {
 
   safeRender() {
     const active = document.activeElement;
-    const typing = active && /^(INPUT|TEXTAREA|SELECT)$/.test(active.tagName);
-    const dialogOpen = document.querySelector('.modal-overlay.active');
-    if (typing || dialogOpen) {
+    const isTyping = active && /^(INPUT|TEXTAREA|SELECT)$/.test(active.tagName);
+    const dialogOpen = document.querySelector('.modal-overlay.active, .custom-modal-backdrop, #customNoticeModal, #importResultOverlay, #securityNoticeOverlay');
+
+    // If a modal dialog is open, defer re-render until it's closed
+    if (dialogOpen) {
       clearTimeout(this._safeRenderTimer);
-      this._safeRenderTimer = setTimeout(() => this.safeRender(), 2500);
+      this._safeRenderTimer = setTimeout(() => this.safeRender(), 2000);
       return;
     }
+
+    // If on transactions view and user is on 'IN - OUT LOGS' tab, update the log table smoothly
+    if (this.currentView === 'transactions') {
+      const logsContainer = document.getElementById('inOutLogsTabContainer');
+      if (logsContainer && !isTyping) {
+        // User is viewing the In-Out Logs tab and not typing into a search input: refresh the view cleanly
+        const scrollBox = document.getElementById('inOutTableScrollBox');
+        const scrollPos = scrollBox ? scrollBox.scrollTop : 0;
+        this.renderCurrent();
+        const newScrollBox = document.getElementById('inOutTableScrollBox');
+        if (newScrollBox && scrollPos) newScrollBox.scrollTop = scrollPos;
+        return;
+      }
+      if (isTyping) {
+        // User is typing in the customer order form or search filter: defer re-render
+        clearTimeout(this._safeRenderTimer);
+        this._safeRenderTimer = setTimeout(() => this.safeRender(), 2000);
+        return;
+      }
+    }
+
+    // For other views (inventory, home, dashboard, reports): if typing in an input, defer
+    if (isTyping) {
+      clearTimeout(this._safeRenderTimer);
+      this._safeRenderTimer = setTimeout(() => this.safeRender(), 2000);
+      return;
+    }
+
     if (window.authStore && window.authStore.hasPermission(this.currentView)) {
       this.renderCurrent();
     }

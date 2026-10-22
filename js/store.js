@@ -67,7 +67,7 @@ class PharmacyStore {
     this.localSeq = 0;          // bumps on every local change (guards against stale poll responses)
     this.pollTimer = null;
     this.flushTimer = null;
-    this.POLL_MS = 10000;       // other PCs' changes appear within ~10 seconds
+    this.POLL_MS = 2500;        // other PCs' changes appear within ~2.5 seconds (near real-time)
     this.status = { state: 'idle', message: '', at: null };
     this.init();
     this.outbox = this.loadOutbox();
