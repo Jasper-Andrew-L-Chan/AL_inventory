@@ -179,7 +179,7 @@ function handleLogin(e) {
           window.appRouter.renderCurrent();
         }
         if (session.mustChange) {
-          setTimeout(() => alert('Security notice: this account is still using the default password.\n\nPlease open Settings > Account Security and change it now.'), 400);
+          setTimeout(() => showDefaultPasswordModal(), 400);
         }
       }, 350);
     } else {
@@ -236,3 +236,99 @@ function fillDemo(username) {
     p.focus();
   }
 }
+
+function showDefaultPasswordModal() {
+  const existing = document.getElementById('securityNoticeOverlay');
+  if (existing) existing.remove();
+
+  const overlay = document.createElement('div');
+  overlay.id = 'securityNoticeOverlay';
+  overlay.style.cssText = 'position: fixed; inset: 0; background: rgba(15, 23, 42, 0.6); backdrop-filter: blur(6px); display: flex; align-items: center; justify-content: center; z-index: 25000; opacity: 0; transition: opacity 0.25s ease; padding: 1rem;';
+  
+  overlay.innerHTML = `
+    <div style="background: var(--bg-card, #ffffff); width: 100%; max-width: 440px; border-radius: 22px; padding: 2rem 1.8rem 1.6rem; text-align: center; box-shadow: 0 25px 60px -15px rgba(15, 23, 42, 0.4); border: 1px solid var(--border-color, rgba(226, 232, 240, 0.8)); transform: translateY(16px) scale(0.96); transition: transform 0.28s cubic-bezier(0.2, 0.9, 0.3, 1.2);">
+      
+      <div style="width: 64px; height: 64px; border-radius: 50%; margin: 0 auto 1.25rem; background: linear-gradient(135deg, #f59e0b, #d97706); display: flex; align-items: center; justify-content: center; box-shadow: 0 10px 24px rgba(245, 158, 11, 0.35);">
+        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#ffffff" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+          <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+        </svg>
+      </div>
+
+      <div style="display: inline-flex; align-items: center; gap: 6px; padding: 0.3rem 0.75rem; background: #fef3c7; border-radius: 9999px; margin-bottom: 0.85rem;">
+        <span style="width: 7px; height: 7px; border-radius: 50%; background: #d97706;"></span>
+        <span style="font-size: 0.72rem; font-weight: 700; color: #92400e; text-transform: uppercase; letter-spacing: 0.05em;">Security Notice</span>
+      </div>
+
+      <h3 style="margin: 0 0 0.5rem; font-size: 1.3rem; font-weight: 800; color: var(--brand-charcoal, #1e293b); letter-spacing: -0.02em;">
+        Default Password In Use
+      </h3>
+      
+      <p style="margin: 0 0 1.4rem; font-size: 0.88rem; line-height: 1.5; color: var(--text-muted, #64748b);">
+        This account is still using its default password. For the security of your pharmacy records and cash register, please update it now.
+      </p>
+
+      <div style="background: #f8fafc; border-radius: 12px; padding: 0.85rem 1rem; margin-bottom: 1.5rem; text-align: left; border: 1px solid #e2e8f0; display: flex; gap: 10px; align-items: flex-start;">
+        <span style="font-size: 1rem;">💡</span>
+        <div style="font-size: 0.78rem; color: #475569; line-height: 1.45;">
+          You can change it anytime in <strong style="color: #0f172a;">Settings &gt; Account Security</strong>.
+        </div>
+      </div>
+
+      <div style="display: flex; gap: 0.75rem;">
+        <button id="secNoticeLaterBtn" type="button" style="flex: 1; padding: 0.75rem 1rem; border: 1px solid #cbd5e1; background: transparent; color: var(--text-muted, #64748b); font-weight: 600; border-radius: 12px; font-size: 0.88rem; cursor: pointer; transition: all 0.15s ease;">
+          Remind Later
+        </button>
+        <button id="secNoticeChangeBtn" type="button" style="flex: 1.3; padding: 0.75rem 1rem; border: none; background: linear-gradient(135deg, #ff6b35, #e8590c); color: #ffffff; font-weight: 700; border-radius: 12px; font-size: 0.88rem; cursor: pointer; box-shadow: 0 4px 14px rgba(255, 107, 53, 0.35); transition: all 0.15s ease; display: flex; align-items: center; justify-content: center; gap: 6px;">
+          <span>Change Now</span>
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="9 18 15 12 9 6"></polyline>
+          </svg>
+        </button>
+      </div>
+
+    </div>`;
+
+  document.body.appendChild(overlay);
+
+  const close = () => {
+    overlay.style.opacity = '0';
+    const card = overlay.firstElementChild;
+    if (card) card.style.transform = 'translateY(16px) scale(0.96)';
+    setTimeout(() => overlay.remove(), 250);
+  };
+
+  overlay.addEventListener('click', e => { if (e.target === overlay) close(); });
+  
+  const laterBtn = overlay.querySelector('#secNoticeLaterBtn');
+  if (laterBtn) {
+    laterBtn.addEventListener('click', close);
+    laterBtn.addEventListener('mouseenter', () => laterBtn.style.background = '#f1f5f9');
+    laterBtn.addEventListener('mouseleave', () => laterBtn.style.background = 'transparent');
+  }
+
+  const changeBtn = overlay.querySelector('#secNoticeChangeBtn');
+  if (changeBtn) {
+    changeBtn.addEventListener('click', () => {
+      close();
+      if (window.appRouter) {
+        window.appRouter.navigate('settings');
+        setTimeout(() => {
+          const passCard = document.querySelector('.card:has(#settingsCurrentPassword)');
+          if (passCard) {
+            passCard.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            const currInput = document.getElementById('settingsCurrentPassword');
+            if (currInput) currInput.focus();
+          }
+        }, 300);
+      }
+    });
+  }
+
+  requestAnimationFrame(() => {
+    overlay.style.opacity = '1';
+    const card = overlay.firstElementChild;
+    if (card) card.style.transform = 'translateY(0) scale(1)';
+  });
+}
+
