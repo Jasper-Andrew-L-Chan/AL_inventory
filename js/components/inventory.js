@@ -249,7 +249,9 @@ function renderInventoryView(container) {
             <th style="text-align: right;" title="Stock received / added during this shift (resets at 6am / 9pm)">Added (Shift)</th>
             <th style="text-align: right;" title="Stock dispensed / deducted during this shift (resets at 6am / 9pm)">Deducted (Shift)</th>
             <th style="text-align: right; color: var(--primary); font-weight: 700;">Current Stock</th>
-            <th style="text-align: right;">Unit Price</th>
+            <th style="text-align: right; color: #028090; font-weight: 800; background: #f0fdfa;" title="Cong's Price (Primary Reference Price)">Cong's Price ★</th>
+            <th style="text-align: right;" title="Original Unit Cost / Purchase Price">Unit Cost</th>
+            <th style="text-align: right;" title="Selling Retail Price">Selling Price</th>
             <th style="text-align: center; width: 140px;">Fast Adjust</th>
             <th style="text-align: center; width: 160px;">Actions</th>
           </tr>
@@ -369,7 +371,7 @@ function renderInventoryView(container) {
 
         <div class="modal-body" style="padding: 1.25rem 1.5rem; overflow-y: auto; flex: 1;">
           <!-- Validation Metrics Bar -->
-          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 0.75rem; margin-bottom: 1.25rem;">
+          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 0.75rem; margin-bottom: 1.25rem;">
             <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: var(--radius-sm); padding: 0.75rem 1rem;">
               <div style="font-size: 0.7rem; font-weight: 700; color: #64748b; text-transform: uppercase;">Total Detected Rows</div>
               <div style="font-size: 1.4rem; font-weight: 900; color: #1e293b;" id="importStatTotal">0</div>
@@ -385,6 +387,10 @@ function renderInventoryView(container) {
             <div style="background: #fff5f5; border: 1px solid #fed7d7; border-radius: var(--radius-sm); padding: 0.75rem 1rem;">
               <div style="font-size: 0.7rem; font-weight: 700; color: #9b2c2c; text-transform: uppercase;">Invalid / Missing Data</div>
               <div style="font-size: 1.4rem; font-weight: 900; color: #e53e3e;" id="importStatInvalid">0</div>
+            </div>
+            <div style="background: #fff7ed; border: 1px solid #ffedd5; border-radius: var(--radius-sm); padding: 0.75rem 1rem;" title="Rows where Cong's Price (Primary Reference Price) is missing or 0">
+              <div style="font-size: 0.7rem; font-weight: 700; color: #c2410c; text-transform: uppercase;">Missing Cong's Price</div>
+              <div style="font-size: 1.4rem; font-weight: 900; color: #ea580c;" id="importStatCongWarn">0</div>
             </div>
           </div>
 
@@ -418,7 +424,7 @@ function renderInventoryView(container) {
           <!-- Safety Backup Callout -->
           <div style="font-size: 0.75rem; color: #4b5563; background: #f9fafb; border: 1px dashed #cbd5e1; border-radius: 6px; padding: 0.5rem 0.75rem; margin-bottom: 1rem; display: flex; align-items: center; gap: 6px;">
             <i data-lucide="shield-check" style="width: 14px; height: 14px; color: #028090;"></i>
-            <span>Safety Backup: The system will automatically create an instant snapshot of your current inventory before applying changes.</span>
+            <span>Safety Backup: The system will automatically create an instant snapshot of your current inventory before applying changes. Cong's Price is preserved as the primary reference price.</span>
           </div>
 
           <!-- Preview Table -->
@@ -427,14 +433,14 @@ function renderInventoryView(container) {
               <thead style="position: sticky; top: 0; background: #f8fafc; z-index: 2;">
                 <tr>
                   <th style="width: 45px; text-align: center;">#</th>
-                  <th style="width: 95px; text-align: center;">Status</th>
+                  <th style="width: 105px; text-align: center;">Status</th>
                   <th>Generic & Brand Name</th>
                   <th>Dosage & Form</th>
                   <th style="text-align: right;">Initial Qty</th>
-                  <th style="text-align: right;">Unit Price</th>
+                  <th style="text-align: right;">Unit Price (Cost)</th>
                   <th style="text-align: right;">Net Price</th>
                   <th style="text-align: right;">Selling Price</th>
-                  <th style="text-align: right; color: #028090;">Cong's Price</th>
+                  <th style="text-align: right; color: #028090; font-weight: 800; background: #f0fdfa;">Cong's Price ★</th>
                   <th style="text-align: center;">Qty/Box</th>
                   <th>Expiry Date</th>
                   <th>Company</th>
@@ -717,7 +723,7 @@ function renderInventoryTableRows(displayedItems) {
   if (!displayedItems || displayedItems.length === 0) {
     return `
       <tr>
-        <td colspan="11" style="text-align: center; padding: 3rem 1rem; color: var(--text-muted);">
+        <td colspan="13" style="text-align: center; padding: 3rem 1rem; color: var(--text-muted);">
           <div style="margin-bottom: 0.5rem; display: flex; justify-content: center;"><i data-lucide="${inventoryCurrentTab === 'expiry-alerts' ? 'check-circle' : 'package'}" style="width: 36px; height: 36px; opacity: 0.5; color: ${inventoryCurrentTab === 'expiry-alerts' ? '#10b981' : 'inherit'};"></i></div>
           <div style="font-weight: 700; font-size: 1.05rem; color: var(--text-main); margin-bottom: 0.25rem;">
             ${inventoryCurrentTab === 'expiry-alerts' ? 'No Low Stock or Expiring Batches Found' : (inventorySearchQuery ? `No medicines matching "${escapeHtml(inventorySearchQuery)}"` : 'No medicines in inventory')}
@@ -740,6 +746,9 @@ function renderInventoryTableRows(displayedItems) {
     const daysToExpiry = Math.ceil((expDate - now) / (1000 * 60 * 60 * 24));
     const isExpiringSoon = daysToExpiry <= 90;
     const isSelected = selectedInventoryItemIds.has(item.id);
+    const congVal = Number(item.congPrice || 0);
+    const costVal = Number(item.costPrice !== undefined ? item.costPrice : (item.unitPrice || 0));
+    const sellVal = Number(item.sellingPrice || 0);
 
     return `
       <tr 
@@ -811,7 +820,11 @@ function renderInventoryTableRows(displayedItems) {
             ` : '')}
           </div>
         </td>
-        <td style="text-align: right; font-weight: 600;">₱${Number(item.sellingPrice).toFixed(2)}</td>
+        <td style="text-align: right; font-weight: 800; color: #028090; background: #f0fdfa;">
+          ${congVal > 0 ? `₱${congVal.toFixed(2)}` : '<span style="color: #ea580c; font-size: 0.72rem; font-weight: 700;" title="Cong\'s Price missing or unset">Unset</span>'}
+        </td>
+        <td style="text-align: right; font-size: 0.85rem; color: var(--text-muted);">₱${costVal.toFixed(2)}</td>
+        <td style="text-align: right; font-weight: 700; color: var(--primary);">₱${sellVal.toFixed(2)}</td>
         <td style="text-align: center;" onclick="event.stopPropagation()">
           <div style="display: flex; align-items: center; justify-content: center; gap: 4px;">
             <input 
@@ -1014,7 +1027,7 @@ window.handleSaveDetailedMedicine = function(e) {
 
 window.exportInventoryToCSV = function() {
   const items = window.pharmacyStore.getItems();
-  const headers = ['ID,Brand Name,Generic Name,Dosage,Category,Rx,Unit,Cost Price,Selling Price,Stock,Batch Lot,Expiry Date'];
+  const headers = ['ID,Brand Name,Generic Name,Dosage,Category,Rx,Unit,Cong\'s Price (Reference),Unit Cost Price,Selling Price,Stock,Batch Lot,Expiry Date,Company'];
   const rows = items.map(i => [
     i.id,
     `"${i.brandName}"`,
@@ -1023,11 +1036,13 @@ window.exportInventoryToCSV = function() {
     `"${i.category}"`,
     i.isRx ? 'Yes' : 'No',
     i.unit,
-    i.costPrice,
-    i.sellingPrice,
+    (Number(i.congPrice) || 0).toFixed(2),
+    (Number(i.costPrice !== undefined ? i.costPrice : i.unitPrice) || 0).toFixed(2),
+    (Number(i.sellingPrice) || 0).toFixed(2),
     i.currentStock,
     i.batchLot,
-    i.expiryDate
+    i.expiryDate,
+    `"${i.company || i.supplier || ''}"`
   ].join(','));
 
   const csvContent = 'data:text/csv;charset=utf-8,' + [headers, ...rows].join('\n');
@@ -1265,13 +1280,23 @@ function processImportRows(rawRows, fileName) {
     const rawExpiry = findVal(['expiry date', 'expiry', 'exp date', 'expiration', 'exp']);
     let expiryDate = normalizeDateString(rawExpiry);
 
-    // 2. Validate row
+    // 2. Validate row & Cong's Price as primary reference price
     const errors = [];
+    const warnings = [];
+
     if (initialQty < 0) {
       errors.push('Initial Quantity cannot be negative');
     }
     if (sellingPrice < 0) {
       errors.push('Selling Price cannot be negative');
+    }
+    if (unitPrice < 0) {
+      errors.push('Unit Price cannot be negative');
+    }
+
+    // Cong's price is the primary reference price: flag if missing or invalid (0 or unprovided)
+    if (!congPrice || congPrice <= 0) {
+      warnings.push("Cong's Price is missing or ₱0.00 (Primary reference price unset)");
     }
 
     const key = makeKey(brandName, genericName, dosage, dosageForm);
@@ -1290,6 +1315,7 @@ function processImportRows(rawRows, fileName) {
       rowIndex: displayRowIndex,
       status, // 'valid_new', 'duplicate', 'invalid'
       errors,
+      warnings,
       key,
       existingItem,
       data: {
@@ -1386,16 +1412,19 @@ function updateImportSummaryStats() {
   const newCount = parsedImportData.filter(i => i.status === 'valid_new').length;
   const duplicateCount = parsedImportData.filter(i => i.status === 'duplicate').length;
   const invalidCount = parsedImportData.filter(i => i.status === 'invalid').length;
+  const congWarnCount = parsedImportData.filter(i => i.warnings && i.warnings.length > 0).length;
 
   const statTotal = document.getElementById('importStatTotal');
   const statNew = document.getElementById('importStatNew');
   const statDuplicate = document.getElementById('importStatDuplicate');
   const statInvalid = document.getElementById('importStatInvalid');
+  const statCongWarn = document.getElementById('importStatCongWarn');
 
   if (statTotal) statTotal.textContent = total;
   if (statNew) statNew.textContent = newCount;
   if (statDuplicate) statDuplicate.textContent = duplicateCount;
   if (statInvalid) statInvalid.textContent = invalidCount;
+  if (statCongWarn) statCongWarn.textContent = congWarnCount;
 
   const btnConfirm = document.getElementById('btnConfirmImport');
   const btnConfirmText = document.getElementById('btnConfirmImportText');
@@ -1461,6 +1490,16 @@ function renderImportPreviewTable() {
       rowBg = 'background: #fef2f2;';
     }
 
+    const hasCongWarning = item.warnings && item.warnings.length > 0;
+    const congPriceCell = hasCongWarning
+      ? `<td style="text-align: right; background: #fff7ed; border-left: 2px solid #ea580c; border-right: 2px solid #ea580c;" title="${item.warnings.join('; ')}">
+           <span style="font-weight: 800; color: #c2410c;">₱${d.congPrice.toFixed(2)}</span>
+           <div style="font-size: 0.68rem; color: #ea580c; font-weight: 700; display: flex; align-items: center; justify-content: flex-end; gap: 2px;">
+             <i data-lucide="alert-triangle" style="width: 10px; height: 10px;"></i> Missing / 0
+           </div>
+         </td>`
+      : `<td style="text-align: right; font-weight: 800; color: #028090; background: #f0fdfa;">₱${d.congPrice.toFixed(2)}</td>`;
+
     return `
       <tr style="${rowBg} border-bottom: 1px solid #f1f5f9;">
         <td style="text-align: center; color: var(--text-muted); font-size: 0.75rem;">${item.rowIndex}</td>
@@ -1481,7 +1520,7 @@ function renderImportPreviewTable() {
         <td style="text-align: right;">₱${d.unitPrice.toFixed(2)}</td>
         <td style="text-align: right;">₱${d.netPrice.toFixed(2)}</td>
         <td style="text-align: right; font-weight: 700; color: var(--primary);">₱${d.sellingPrice.toFixed(2)}</td>
-        <td style="text-align: right; font-weight: 700; color: #028090;">₱${d.congPrice.toFixed(2)}</td>
+        ${congPriceCell}
         <td style="text-align: center;">${d.qtyPerBox}</td>
         <td>${escapeHtml(d.expiryDate)}</td>
         <td style="max-width: 140px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${escapeHtml(d.company)}">

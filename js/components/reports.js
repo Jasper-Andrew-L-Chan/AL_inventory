@@ -280,7 +280,10 @@ function renderReportsView(container) {
                 </td>
                 <td style="font-weight: 700;">${entry.item.qty}</td>
                 <td>${entry.txn.doctorRx || 'Dr. M. Santos, MD (PRC #009124)'}</td>
-                <td>${entry.txn.cashier}</td>
+                <td>
+                  <div style="font-weight: 700;">${entry.txn.encoderName || entry.txn.cashier}</div>
+                  ${(entry.txn.encoderLicense || entry.txn.cashierLicense) ? `<div style="font-size: 0.72rem; color: #888888;">PRC Lic: ${entry.txn.encoderLicense || entry.txn.cashierLicense}</div>` : ''}
+                </td>
               </tr>
             `).join('')}
           </tbody>

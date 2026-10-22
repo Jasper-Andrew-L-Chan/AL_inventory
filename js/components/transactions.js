@@ -33,11 +33,12 @@ let txnSearchFilters = {
   date: '',
   time: '',
   receipt: '',
-  cashier: '',
+  encoder: '',
   items: '',
   total: ''
 };
 let txnCurrentTab = 'DETAILS';
+let txnGroupByBarangay = false; // Toggle to group In-Out transactions by Barangay
 let txnDateRange = {
   from: '',
   to: ''
@@ -133,7 +134,12 @@ function renderTransactionsView(container) {
     }
     if (txnSearchFilters.time && !t.time.toLowerCase().includes(txnSearchFilters.time.toLowerCase())) return false;
     if (txnSearchFilters.receipt && !t.receiptNo.toLowerCase().includes(txnSearchFilters.receipt.toLowerCase())) return false;
-    if (txnSearchFilters.cashier && !t.cashier.toLowerCase().includes(txnSearchFilters.cashier.toLowerCase())) return false;
+    if (txnSearchFilters.encoder) {
+      const qEnc = txnSearchFilters.encoder.toLowerCase();
+      const encName = (t.encoderName || t.cashier || '').toLowerCase();
+      const encLic = (t.encoderLicense || '').toLowerCase();
+      if (!encName.includes(qEnc) && !encLic.includes(qEnc)) return false;
+    }
     if (txnSearchFilters.total && !t.netTotal.toString().includes(txnSearchFilters.total)) return false;
     if (txnSearchFilters.items) {
       const itemsStr = t.items.map(i => `${i.name} ${i.actualSuppliedName || ''}`).join(' ').toLowerCase();
@@ -429,10 +435,10 @@ function renderDetailsTabHtml(editingTxnId, currentTxnForm, allTxns, inventoryIt
 function renderLogsTabHtml(filteredTxns, totalTxnCount, totalTxnPages, startTxnIdx, pageTxns, nowStr) {
   return `
     <div id="inOutLogsTabContainer">
-    <!-- 2. Date Range & Download Toolbar -->
+    <!-- 2. Date Range, Grouping & Download Toolbar -->
     <div style="display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 1.25rem; flex-wrap: wrap; gap: 1rem;">
       <div>
-        <div style="display: flex; align-items: center; gap: 0.75rem; margin-bottom: 0.35rem;">
+        <div style="display: flex; align-items: center; gap: 0.75rem; margin-bottom: 0.35rem; flex-wrap: wrap;">
           <div style="display: flex; flex-direction: column;">
             <label style="font-size: 0.75rem; color: var(--text-muted); font-weight: 600;">From</label>
             <input type="date" id="txnFromDate" value="${txnDateRange.from}" class="form-input" style="padding: 0.4rem 0.6rem; font-size: 0.82rem;" />
@@ -449,9 +455,21 @@ function renderLogsTabHtml(filteredTxns, totalTxnCount, totalTxnPages, startTxnI
               Clear Date
             </button>
           ` : ''}
+
+          <!-- Group by Barangay Toggle Button -->
+          <button 
+            type="button" 
+            onclick="toggleTxnGroupByBarangay()" 
+            class="${txnGroupByBarangay ? 'btn-primary' : 'btn-outline'}" 
+            style="margin-top: 1.2rem; font-size: 0.8rem; padding: 0.42rem 0.85rem; font-weight: 700; display: inline-flex; align-items: center; gap: 0.4rem; ${txnGroupByBarangay ? 'background: #028090; color: #ffffff; border-color: #028090;' : ''}"
+            title="Group customer logs by Barangay"
+          >
+            <i data-lucide="${txnGroupByBarangay ? 'check-square' : 'layout-grid'}" style="width: 14px; height: 14px;"></i>
+            <span>${txnGroupByBarangay ? 'Grouped by Barangay' : 'Group by Barangay'}</span>
+          </button>
         </div>
         <div style="font-size: 0.72rem; color: var(--text-muted);">
-          In - Out logs can be viewed for all completed customer stock out transactions. Showing <strong>${filteredTxns.length}</strong> record${filteredTxns.length === 1 ? '' : 's'}.
+          In - Out logs can be viewed for all completed customer stock out transactions. Showing <strong>${filteredTxns.length}</strong> record${filteredTxns.length === 1 ? '' : 's'}${txnGroupByBarangay ? ' (Grouped by Barangay)' : ''}.
         </div>
       </div>
 
@@ -473,7 +491,7 @@ function renderLogsTabHtml(filteredTxns, totalTxnCount, totalTxnPages, startTxnI
               <th style="background: #f8fafc; color: var(--brand-charcoal); font-weight: 700;">Date & Ref</th>
               <th style="background: #f8fafc; color: var(--brand-charcoal); font-weight: 700;">Customer / Barangay</th>
               <th style="background: #f8fafc; color: var(--brand-charcoal); font-weight: 700;">Receipt No.</th>
-              <th style="background: #f8fafc; color: var(--brand-charcoal); font-weight: 700;">Cashier</th>
+              <th style="background: #f8fafc; color: var(--brand-charcoal); font-weight: 700;">Encoder</th>
               <th style="background: #f8fafc; color: var(--brand-charcoal); font-weight: 700;">Medicines Supplied</th>
               <th style="background: #f8fafc; color: var(--brand-charcoal); font-weight: 700; text-align: right;">Total Amount</th>
               <th style="background: #f8fafc; color: var(--brand-charcoal); font-weight: 700; text-align: center;">Action</th>
@@ -482,9 +500,9 @@ function renderLogsTabHtml(filteredTxns, totalTxnCount, totalTxnPages, startTxnI
             <tr style="background: #ffffff;">
               <td></td>
               <td><input type="text" placeholder="Search date..." value="${txnSearchFilters.date}" oninput="updateTxnFilter('date', this.value)" class="table-search-input" style="width: 100px;" /></td>
-              <td><input type="text" placeholder="Search customer..." value="${txnSearchFilters.cashier}" oninput="updateTxnFilter('cashier', this.value)" class="table-search-input" style="width: 120px;" /></td>
+              <td><input type="text" placeholder="Search customer..." value="" oninput="updateTxnFilter('items', this.value)" class="table-search-input" style="width: 120px;" /></td>
               <td><input type="text" placeholder="Search ref..." value="${txnSearchFilters.receipt}" oninput="updateTxnFilter('receipt', this.value)" class="table-search-input" style="width: 100px;" /></td>
-              <td><input type="text" placeholder="Search staff..." value="" oninput="updateTxnFilter('time', this.value)" class="table-search-input" style="width: 80px;" /></td>
+              <td><input type="text" placeholder="Search encoder..." value="${txnSearchFilters.encoder}" oninput="updateTxnFilter('encoder', this.value)" class="table-search-input" style="width: 110px;" /></td>
               <td><input type="text" placeholder="Search medicines..." value="${txnSearchFilters.items}" oninput="updateTxnFilter('items', this.value)" class="table-search-input" style="width: 180px;" /></td>
               <td><input type="text" placeholder="Search ₱..." value="${txnSearchFilters.total}" oninput="updateTxnFilter('total', this.value)" class="table-search-input" style="width: 80px; text-align: right;" /></td>
               <td></td>
@@ -505,168 +523,233 @@ function renderLogsTabHtml(filteredTxns, totalTxnCount, totalTxnPages, startTxnI
                   </div>
                 </td>
               </tr>
-            ` : pageTxns.map(t => {
-            const isExpanded = expandedTxnId === t.id;
-            const isRefunded = t.status === 'Refunded';
+            ` : (() => {
+              // Helper to render an individual transaction row + expanded row
+              const renderSingleTxnRow = (t) => {
+                const isExpanded = expandedTxnId === t.id;
+                const isRefunded = t.status === 'Refunded';
+                const encName = t.encoderName || t.cashier || 'Encoder';
+                const encLicense = t.encoderLicense !== undefined ? t.encoderLicense : (t.cashierLicense || '');
 
-            return `
-                <tr style="${isRefunded ? 'opacity: 0.6; background: #fff1f2;' : ''}">
-                  <td style="text-align: center; cursor: pointer;" onclick="toggleExpandTxn('${t.id}')">
-                    <span style="display: inline-flex; align-items: center; justify-content: center; color: var(--primary);">
-                      <i data-lucide="${isExpanded ? 'chevron-down' : 'chevron-right'}" style="width: 16px; height: 16px;"></i>
-                    </span>
-                  </td>
-                  <td>
-                    <div style="font-weight: 600; color: var(--text-main); font-size: 0.85rem;">
-                      ${formatDateMMDDYY(t.date)}
-                    </div>
-                    <div style="font-size: 0.72rem; color: var(--text-muted); font-family: monospace;">
-                      ${t.time || ''}
-                    </div>
-                  </td>
-                  <td>
-                    <div style="font-weight: 700; color: var(--brand-charcoal); font-size: 0.86rem;">
-                      ${escapeHtml(t.customerName || 'Walk-in')}
-                    </div>
-                    ${t.barangay ? `
-                      <div style="font-size: 0.73rem; color: #64748b; display: inline-flex; align-items: center; gap: 0.25rem; margin-top: 2px;">
-                        <i data-lucide="map-pin" style="width: 12px; height: 12px; color: #94a3b8;"></i>
-                        <span>Brgy: ${escapeHtml(t.barangay)}</span>
+                return `
+                  <tr style="${isRefunded ? 'opacity: 0.6; background: #fff1f2;' : ''}">
+                    <td style="text-align: center; cursor: pointer;" onclick="toggleExpandTxn('${t.id}')">
+                      <span style="display: inline-flex; align-items: center; justify-content: center; color: var(--primary);">
+                        <i data-lucide="${isExpanded ? 'chevron-down' : 'chevron-right'}" style="width: 16px; height: 16px;"></i>
+                      </span>
+                    </td>
+                    <td>
+                      <div style="font-weight: 600; color: var(--text-main); font-size: 0.85rem;">
+                        ${formatDateMMDDYY(t.date)}
                       </div>
-                    ` : ''}
-                    ${t.budget > 0 ? `
-                      <div style="font-size: 0.7rem; color: var(--primary); font-weight: 600;">
-                        GL: ₱${Number(t.budget).toFixed(2)}
+                      <div style="font-size: 0.72rem; color: var(--text-muted); font-family: monospace;">
+                        ${t.time || ''}
                       </div>
-                    ` : ''}
-                  </td>
-                  <td style="font-family: monospace; font-weight: 700; color: var(--brand-charcoal);">
-                    ${t.receiptNo}
-                  </td>
-                  <td style="font-size: 0.82rem;">${t.cashier}</td>
-                  <td style="font-size: 0.82rem; padding: 0.6rem 0.75rem;">
-                    <div style="display: flex; flex-direction: column; gap: 4px; font-weight: 500; color: var(--text-main);">
-                      ${t.items.map(i => {
-              const wasSubstituted = i.isSubstitute || (i.actualSuppliedName && i.actualSuppliedName !== i.name);
-              const medText = `${escapeHtml(i.actualSuppliedName || i.name)} (x${i.qty})`;
-              if (wasSubstituted) {
-                return `<div style="display: flex; align-items: flex-start; gap: 6px; line-height: 1.35;">
-                          <span style="color: var(--primary); font-weight: 700; user-select: none;">•</span>
-                          <div>
-                            <strong>${escapeHtml(i.actualSuppliedName || i.name)}</strong> (x${i.qty})
-                            <span style="font-size: 0.7rem; color: #d97706; background: #fef3c7; padding: 1px 5px; border-radius: 3px; margin-left: 4px;">Substituted for ${escapeHtml(i.requestedName || i.name)}</span>
-                          </div>
-                        </div>`;
-              }
-              return `<div style="display: flex; align-items: flex-start; gap: 6px; line-height: 1.35;">
-                        <span style="color: var(--primary); font-weight: 700; user-select: none;">•</span>
-                        <span>${escapeHtml(i.name)} (x${i.qty})</span>
-                      </div>`;
-            }).join('')}
-                    </div>
-                  </td>
-                  <td style="text-align: right; font-weight: 800; font-size: 0.95rem; color: var(--text-main);">
-                    ₱${Number(t.netTotal).toFixed(2)}
-                    ${isRefunded ? '<div style="font-size: 0.68rem; color: #ef4444;">VOIDED / RESTOCKED</div>' : ''}
-                  </td>
-                  <td style="text-align: center;">
-                    <div style="display: flex; gap: 0.35rem; justify-content: center; align-items: center; flex-wrap: wrap;">
-                      ${!isRefunded ? `
+                    </td>
+                    <td>
+                      <div style="font-weight: 700; color: var(--brand-charcoal); font-size: 0.86rem;">
+                        ${escapeHtml(t.customerName || 'Walk-in')}
+                      </div>
+                      ${t.barangay ? `
+                        <div style="font-size: 0.73rem; color: #64748b; display: inline-flex; align-items: center; gap: 0.25rem; margin-top: 2px;">
+                          <i data-lucide="map-pin" style="width: 12px; height: 12px; color: #94a3b8;"></i>
+                          <span>Brgy: ${escapeHtml(t.barangay)}</span>
+                        </div>
+                      ` : ''}
+                      ${t.budget > 0 ? `
+                        <div style="font-size: 0.7rem; color: var(--primary); font-weight: 600;">
+                          GL: ₱${Number(t.budget).toFixed(2)}
+                        </div>
+                      ` : ''}
+                    </td>
+                    <td style="font-family: monospace; font-weight: 700; color: var(--brand-charcoal);">
+                      ${t.receiptNo}
+                    </td>
+                    <td style="font-size: 0.82rem; vertical-align: top; padding-top: 0.75rem;">
+                      <div style="font-weight: 700; color: #1e293b; font-size: 0.84rem;">
+                        ${escapeHtml(encName)}
+                      </div>
+                      <div style="font-size: 0.72rem; color: #888888; margin-top: 2px; font-weight: 500;">
+                        ${encLicense ? `PRC License No. ${escapeHtml(encLicense)}` : ''}
+                      </div>
+                    </td>
+                    <td style="font-size: 0.82rem; padding: 0.6rem 0.75rem;">
+                      <div style="display: flex; flex-direction: column; gap: 4px; font-weight: 500; color: var(--text-main);">
+                        ${t.items.map(i => {
+                          const wasSubstituted = i.isSubstitute || (i.actualSuppliedName && i.actualSuppliedName !== i.name);
+                          if (wasSubstituted) {
+                            return `<div style="display: flex; align-items: flex-start; gap: 6px; line-height: 1.35;">
+                                      <span style="color: var(--primary); font-weight: 700; user-select: none;">•</span>
+                                      <div>
+                                        <strong>${escapeHtml(i.actualSuppliedName || i.name)}</strong> (x${i.qty})
+                                        <span style="font-size: 0.7rem; color: #d97706; background: #fef3c7; padding: 1px 5px; border-radius: 3px; margin-left: 4px;">Substituted for ${escapeHtml(i.requestedName || i.name)}</span>
+                                      </div>
+                                    </div>`;
+                          }
+                          return `<div style="display: flex; align-items: flex-start; gap: 6px; line-height: 1.35;">
+                                    <span style="color: var(--primary); font-weight: 700; user-select: none;">•</span>
+                                    <span>${escapeHtml(i.name)} (x${i.qty})</span>
+                                  </div>`;
+                        }).join('')}
+                      </div>
+                    </td>
+                    <td style="text-align: right; font-weight: 800; font-size: 0.95rem; color: var(--text-main);">
+                      ₱${Number(t.netTotal).toFixed(2)}
+                      ${isRefunded ? '<div style="font-size: 0.68rem; color: #ef4444;">VOIDED / RESTOCKED</div>' : ''}
+                    </td>
+                    <td style="text-align: center;">
+                      <div style="display: flex; gap: 0.35rem; justify-content: center; align-items: center; flex-wrap: wrap;">
+                        ${!isRefunded ? `
+                          <button 
+                            onclick="handleStartEditTxn('${t.id}')" 
+                            style="background: var(--primary-light); border: 1.5px solid var(--primary); color: var(--primary-dark); border-radius: var(--radius-sm); padding: 4px 10px; font-size: 0.76rem; font-weight: 700; cursor: pointer; transition: all 0.15s ease; display: inline-flex; align-items: center; gap: 0.35rem;"
+                            onmouseover="this.style.background='var(--primary)'; this.style.color='#ffffff';"
+                            onmouseout="this.style.background='var(--primary-light)'; this.style.color='var(--primary-dark)';"
+                            title="Edit this transaction and substitute or restock medicines"
+                          >
+                            <i data-lucide="edit-3" style="width: 12px; height: 12px;"></i>
+                            <span>Edit / Restock</span>
+                          </button>
+                        ` : `
+                          <span style="font-size: 0.75rem; color: #94a3b8; font-weight: 600;">Restocked</span>
+                        `}
                         <button 
-                          onclick="handleStartEditTxn('${t.id}')" 
-                          style="background: var(--primary-light); border: 1.5px solid var(--primary); color: var(--primary-dark); border-radius: var(--radius-sm); padding: 4px 10px; font-size: 0.76rem; font-weight: 700; cursor: pointer; transition: all 0.15s ease; display: inline-flex; align-items: center; gap: 0.35rem;"
-                          onmouseover="this.style.background='var(--primary)'; this.style.color='#ffffff';"
-                          onmouseout="this.style.background='var(--primary-light)'; this.style.color='var(--primary-dark)';"
-                          title="Edit this transaction and substitute or restock medicines"
+                          onclick="handleDeleteTxn('${t.id}')" 
+                          style="background: #fee2e2; border: 1.5px solid #f87171; color: #b91c1c; border-radius: var(--radius-sm); padding: 5px 8px; font-size: 0.76rem; font-weight: 700; cursor: pointer; transition: all 0.15s ease; display: inline-flex; align-items: center;"
+                          onmouseover="this.style.background='#ef4444'; this.style.color='#ffffff';"
+                          onmouseout="this.style.background='#fee2e2'; this.style.color='#b91c1c';"
+                          title="Remove transaction from history"
                         >
-                          <i data-lucide="edit-3" style="width: 12px; height: 12px;"></i>
-                          <span>Edit / Restock</span>
+                          <i data-lucide="trash-2" style="width: 13px; height: 13px;"></i>
                         </button>
-                      ` : `
-                        <span style="font-size: 0.75rem; color: #94a3b8; font-weight: 600;">Restocked</span>
-                      `}
-                      <button 
-                        onclick="handleDeleteTxn('${t.id}')" 
-                        style="background: #fee2e2; border: 1.5px solid #f87171; color: #b91c1c; border-radius: var(--radius-sm); padding: 5px 8px; font-size: 0.76rem; font-weight: 700; cursor: pointer; transition: all 0.15s ease; display: inline-flex; align-items: center;"
-                        onmouseover="this.style.background='#ef4444'; this.style.color='#ffffff';"
-                        onmouseout="this.style.background='#fee2e2'; this.style.color='#b91c1c';"
-                        title="Remove transaction from history"
-                      >
-                        <i data-lucide="trash-2" style="width: 13px; height: 13px;"></i>
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-
-                <!-- Expanded Details Row -->
-                ${isExpanded ? `
-                  <tr style="background: #f8fafc;">
-                    <td colspan="8" style="padding: 1rem 1.5rem;">
-                      <div style="border-left: 3px solid var(--primary); padding-left: 1rem;">
-                        <h4 style="font-size: 0.88rem; font-weight: 700; margin-bottom: 0.4rem; color: var(--text-main);">
-                          Transaction Breakdown: ${t.receiptNo} (${formatDateMMDDYY(t.date)} ${t.time})
-                        </h4>
-                        <div style="font-size: 0.78rem; color: var(--text-muted); margin-bottom: 0.6rem;">
-                          <strong>Customer:</strong> ${escapeHtml(t.customerName)} | 
-                          <strong>Barangay:</strong> ${escapeHtml(t.barangay || 'N/A')} | 
-                          <strong>GL:</strong> ${t.budget ? '₱' + Number(t.budget).toFixed(2) : 'N/A'} |
-                          <strong>Staff:</strong> ${escapeHtml(t.cashier)}
-                        </div>
-
-                        <table style="width: 100%; max-width: 720px; font-size: 0.78rem; border-collapse: collapse; margin-bottom: 0.75rem;">
-                          <thead>
-                            <tr style="border-bottom: 1px solid #cbd5e1; text-align: left; background: #f1f5f9;">
-                              <th style="padding: 6px 8px;">Medicine Requested</th>
-                              <th style="padding: 6px 8px;">Actual Medicine Supplied (Deducted)</th>
-                              <th style="padding: 6px 8px; text-align: center;">Qty</th>
-                              <th style="padding: 6px 8px; text-align: right;">Unit Price</th>
-                              <th style="padding: 6px 8px; text-align: right;">Cong Price</th>
-                              <th style="padding: 6px 8px; text-align: right;">Selling Price</th>
-                              <th style="padding: 6px 8px; text-align: right;">Subtotal</th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            ${t.items.map(item => `
-                              <tr style="border-bottom: 1px solid #f1f5f9;">
-                                <td style="padding: 6px 8px;">${escapeHtml(item.requestedName || item.name)}</td>
-                                <td style="padding: 6px 8px; font-weight: 600; color: var(--primary-dark);">
-                                  ${escapeHtml(item.actualSuppliedName || item.name)}
-                                  ${item.isSubstitute ? '<span style="color: #b45309; font-size: 0.7rem;"> (Substitute)</span>' : ''}
-                                </td>
-                                <td style="padding: 6px 8px; text-align: center; font-weight: 700;">${item.qty}</td>
-                                <td style="padding: 6px 8px; text-align: right;">₱${Number(item.unitPrice || 0).toFixed(2)}</td>
-                                <td style="padding: 6px 8px; text-align: right;">₱${Number(item.congPrice || 0).toFixed(2)}</td>
-                                <td style="padding: 6px 8px; text-align: right;">₱${Number(item.sellingPrice || item.price || 0).toFixed(2)}</td>
-                                <td style="padding: 6px 8px; text-align: right; font-weight: 700;">₱${((item.sellingPrice || item.price || 0) * item.qty).toFixed(2)}</td>
-                              </tr>
-                            `).join('')}
-                          </tbody>
-                          <tfoot>
-                            <tr>
-                              <td colspan="6" style="text-align: right; font-weight: 700; padding: 6px 8px;">Total:</td>
-                              <td style="text-align: right; font-weight: 800; font-size: 0.88rem; color: var(--primary); padding: 6px 8px;">
-                                ₱${Number(t.netTotal).toFixed(2)}
-                              </td>
-                            </tr>
-                          </tfoot>
-                        </table>
-
-                        <div style="display: flex; gap: 0.75rem; align-items: center;">
-                          <button onclick="window.renderOfficialReceipt(window.pharmacyStore.getTransactions().find(x => x.id === '${t.id}'))" class="btn-outline" style="font-size: 0.75rem; padding: 4px 10px; display: inline-flex; align-items: center; gap: 0.35rem;">
-                            <i data-lucide="receipt" style="width: 13px; height: 13px;"></i>
-                            <span>View Full Official Receipt</span>
-                          </button>
-                          <button onclick="handleDeleteTxn('${t.id}')" class="btn-outline" style="font-size: 0.75rem; padding: 4px 10px; color: #b91c1c; border-color: #fca5a5; display: inline-flex; align-items: center; gap: 0.35rem;">
-                            <i data-lucide="trash-2" style="width: 13px; height: 13px;"></i>
-                            <span>Delete Log Entry</span>
-                          </button>
-                        </div>
                       </div>
                     </td>
                   </tr>
-                ` : ''}
-              `;
-          }).join('')}
+
+                  <!-- Expanded Details Row -->
+                  ${isExpanded ? `
+                    <tr style="background: #f8fafc;">
+                      <td colspan="8" style="padding: 1rem 1.5rem;">
+                        <div style="border-left: 3px solid var(--primary); padding-left: 1rem;">
+                          <h4 style="font-size: 0.88rem; font-weight: 700; margin-bottom: 0.4rem; color: var(--text-main);">
+                            Transaction Breakdown: ${t.receiptNo} (${formatDateMMDDYY(t.date)} ${t.time})
+                          </h4>
+                          <div style="font-size: 0.78rem; color: var(--text-muted); margin-bottom: 0.6rem;">
+                            <strong>Customer:</strong> ${escapeHtml(t.customerName)} | 
+                            <strong>Barangay:</strong> ${escapeHtml(t.barangay || 'N/A')} | 
+                            <strong>GL:</strong> ${t.budget ? '₱' + Number(t.budget).toFixed(2) : 'N/A'} |
+                            <strong>Encoder:</strong> ${escapeHtml(encName)} ${encLicense ? `<span style="color: #888888;">(PRC: ${escapeHtml(encLicense)})</span>` : ''}
+                          </div>
+
+                          <table style="width: 100%; max-width: 720px; font-size: 0.78rem; border-collapse: collapse; margin-bottom: 0.75rem;">
+                            <thead>
+                              <tr style="border-bottom: 1px solid #cbd5e1; text-align: left; background: #f1f5f9;">
+                                <th style="padding: 6px 8px;">Medicine Requested</th>
+                                <th style="padding: 6px 8px;">Actual Medicine Supplied (Deducted)</th>
+                                <th style="padding: 6px 8px; text-align: center;">Qty</th>
+                                <th style="padding: 6px 8px; text-align: right;">Unit Cost</th>
+                                <th style="padding: 6px 8px; text-align: right;">Cong's Price</th>
+                                <th style="padding: 6px 8px; text-align: right;">Selling Price</th>
+                                <th style="padding: 6px 8px; text-align: right;">Subtotal</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              ${t.items.map(item => `
+                                <tr style="border-bottom: 1px solid #f1f5f9;">
+                                  <td style="padding: 6px 8px;">${escapeHtml(item.requestedName || item.name)}</td>
+                                  <td style="padding: 6px 8px; font-weight: 600; color: var(--primary-dark);">
+                                    ${escapeHtml(item.actualSuppliedName || item.name)}
+                                    ${item.isSubstitute ? '<span style="color: #b45309; font-size: 0.7rem;"> (Substitute)</span>' : ''}
+                                  </td>
+                                  <td style="padding: 6px 8px; text-align: center; font-weight: 700;">${item.qty}</td>
+                                  <td style="padding: 6px 8px; text-align: right;">₱${Number(item.unitPrice || 0).toFixed(2)}</td>
+                                  <td style="padding: 6px 8px; text-align: right; color: #0284c7; font-weight: 600;">₱${Number(item.congPrice || 0).toFixed(2)}</td>
+                                  <td style="padding: 6px 8px; text-align: right;">₱${Number(item.sellingPrice || item.price || 0).toFixed(2)}</td>
+                                  <td style="padding: 6px 8px; text-align: right; font-weight: 700;">₱${((item.sellingPrice || item.price || 0) * item.qty).toFixed(2)}</td>
+                                </tr>
+                              `).join('')}
+                            </tbody>
+                            <tfoot>
+                              <tr>
+                                <td colspan="6" style="text-align: right; font-weight: 700; padding: 6px 8px;">Total:</td>
+                                <td style="text-align: right; font-weight: 800; font-size: 0.88rem; color: var(--primary); padding: 6px 8px;">
+                                  ₱${Number(t.netTotal).toFixed(2)}
+                                </td>
+                              </tr>
+                            </tfoot>
+                          </table>
+
+                          <div style="display: flex; gap: 0.75rem; align-items: center;">
+                            <button onclick="window.renderOfficialReceipt(window.pharmacyStore.getTransactions().find(x => x.id === '${t.id}'))" class="btn-outline" style="font-size: 0.75rem; padding: 4px 10px; display: inline-flex; align-items: center; gap: 0.35rem;">
+                              <i data-lucide="receipt" style="width: 13px; height: 13px;"></i>
+                              <span>View Full Official Receipt</span>
+                            </button>
+                            <button onclick="handleDeleteTxn('${t.id}')" class="btn-outline" style="font-size: 0.75rem; padding: 4px 10px; color: #b91c1c; border-color: #fca5a5; display: inline-flex; align-items: center; gap: 0.35rem;">
+                              <i data-lucide="trash-2" style="width: 13px; height: 13px;"></i>
+                              <span>Delete Log Entry</span>
+                            </button>
+                          </div>
+                        </div>
+                      </td>
+                    </tr>
+                  ` : ''}
+                `;
+              };
+
+              // If Barangay grouping is active, group the page items (or all filtered items)
+              if (txnGroupByBarangay) {
+                // Group transactions by normalized barangay name
+                const brgyGroups = new Map();
+                pageTxns.forEach(t => {
+                  const brgyKey = normalizeBarangayName(t.barangay);
+                  if (!brgyGroups.has(brgyKey)) {
+                    brgyGroups.set(brgyKey, []);
+                  }
+                  brgyGroups.get(brgyKey).push(t);
+                });
+
+                // Render group headers and rows
+                let groupedHtml = '';
+                brgyGroups.forEach((groupTxns, brgyTitle) => {
+                  const groupTotalAmount = groupTxns.reduce((sum, item) => sum + (Number(item.netTotal) || 0), 0);
+                  const isUnspecified = brgyTitle === 'Barangay Not Specified';
+
+                  groupedHtml += `
+                    <!-- Barangay Group Heading Banner -->
+                    <tr style="background: ${isUnspecified ? '#f8fafc' : '#f0fdf4'}; border-top: 2px solid ${isUnspecified ? '#cbd5e1' : '#86efac'}; border-bottom: 1.5px solid ${isUnspecified ? '#e2e8f0' : '#bbf7d0'};">
+                      <td colspan="8" style="padding: 0.65rem 1rem;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.5rem;">
+                          <div style="display: flex; align-items: center; gap: 0.5rem;">
+                            <span style="display: inline-flex; align-items: center; justify-content: center; width: 24px; height: 24px; border-radius: 50%; background: ${isUnspecified ? '#e2e8f0' : '#dcfce7'}; color: ${isUnspecified ? '#64748b' : '#15803d'}; font-size: 0.75rem;">
+                              <i data-lucide="map-pin" style="width: 13px; height: 13px;"></i>
+                            </span>
+                            <span style="font-weight: 800; font-size: 0.92rem; color: ${isUnspecified ? '#475569' : '#166534'};">
+                              ${escapeHtml(brgyTitle)}
+                            </span>
+                            <span style="font-size: 0.74rem; font-weight: 700; background: #ffffff; border: 1px solid ${isUnspecified ? '#cbd5e1' : '#bbf7d0'}; color: ${isUnspecified ? '#64748b' : '#15803d'}; padding: 2px 7px; border-radius: 12px;">
+                              ${groupTxns.length} customer transaction${groupTxns.length === 1 ? '' : 's'}
+                            </span>
+                          </div>
+                          <div style="font-size: 0.82rem; font-weight: 700; color: ${isUnspecified ? '#475569' : '#166534'};">
+                            Group Total: ₱${groupTotalAmount.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                          </div>
+                        </div>
+                      </td>
+                    </tr>
+                  `;
+
+                  // Render each transaction belonging to this Barangay
+                  groupTxns.forEach(t => {
+                    groupedHtml += renderSingleTxnRow(t);
+                  });
+                });
+
+                return groupedHtml;
+              } else {
+                // Default chronological table listing
+                return pageTxns.map(t => renderSingleTxnRow(t)).join('');
+              }
+            })()}
           </tbody>
         </table>
       </div>
@@ -848,6 +931,7 @@ function renderMedRowHtml(row, idx, inventoryItems) {
                 <span><strong>Unit:</strong> ${escapeHtml(selectedItem.unit || 'unit')}</span>
                 <span><strong>Batch:</strong> ${escapeHtml(selectedItem.batchLot || 'N/A')}</span>
                 <span><strong>Cost:</strong> ₱${Number(selectedItem.costPrice || 0).toFixed(2)}</span>
+                <span><strong>Cong's Price:</strong> <strong style="color: #0369a1;">₱${Number(selectedItem.congPrice || 0).toFixed(2)}</strong></span>
                 <span><strong>Selling:</strong> ₱${Number(selectedItem.sellingPrice || 0).toFixed(2)}</span>
               </div>
             </div>
@@ -1474,12 +1558,19 @@ window.saveCustomerTransaction = function () {
   const grandTotal = transactionItems.reduce((sum, i) => sum + i.subtotal, 0);
 
   // 3. Construct transaction payload
+  const currentSession = window.authStore && window.authStore.getSession ? window.authStore.getSession() : null;
+  const currentEncoderName = currentSession ? (currentSession.fullName || currentSession.username) : 'Staff Pharmacist';
+  const currentEncoderLicense = currentSession ? (currentSession.prcLicense || '') : '';
+
   const txnPayload = {
     receiptNo: currentTxnForm.receiptNo && currentTxnForm.receiptNo.trim() ? currentTxnForm.receiptNo.trim() : undefined,
     customerName: currentTxnForm.customerName.trim(),
     budget: Number(currentTxnForm.budget) || 0,
     barangay: (currentTxnForm.barangay || '').trim(),
     date: currentTxnForm.date || new Date().toISOString().split('T')[0],
+    cashier: currentEncoderName,
+    encoderName: currentEncoderName,
+    encoderLicense: currentEncoderLicense,
     items: transactionItems,
     subtotal: grandTotal,
     discountAmount: 0,
@@ -1664,6 +1755,33 @@ window.switchTxnTab = function (tab) {
   txnCurrentTab = tab;
   renderTransactionsView(document.getElementById('main-content'));
 };
+
+window.toggleTxnGroupByBarangay = function () {
+  txnGroupByBarangay = !txnGroupByBarangay;
+  txnHistoryPage = 1;
+  renderTransactionsView(document.getElementById('main-content'));
+};
+
+// Normalize barangay name handling casing and whitespace differences
+function normalizeBarangayName(raw) {
+  if (!raw || !String(raw).trim()) {
+    return 'Barangay Not Specified';
+  }
+  // Remove redundant whitespace
+  const cleaned = String(raw).trim().replace(/\s+/g, ' ');
+  // Check if it already has "Barangay" or "Brgy" prefix (case-insensitive)
+  const prefixRegex = /^(barangay|brgy\.?)\s+/i;
+  const core = cleaned.replace(prefixRegex, '').trim();
+  if (!core) return 'Barangay Not Specified';
+
+  // Capitalize words nicely
+  const titleCased = core.split(' ').map(w => {
+    if (!w) return '';
+    return w.charAt(0).toUpperCase() + w.slice(1).toLowerCase();
+  }).join(' ');
+
+  return `Barangay ${titleCased}`;
+}
 
 window.updateTxnFilter = function (key, val) {
   txnSearchFilters[key] = val;

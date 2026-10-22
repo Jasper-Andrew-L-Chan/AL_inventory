@@ -451,7 +451,8 @@ window.renderOfficialReceipt = function(txn) {
         <span>${txn.date} ${txn.time}</span>
       </div>
       <div style="font-size: 0.75rem; margin-bottom: 4px;">
-        Cashier: ${txn.cashier}
+        Encoder: <strong>${txn.encoderName || txn.cashier}</strong>
+        ${(txn.encoderLicense || txn.cashierLicense) ? `<div style="font-size: 0.7rem; color: #888888;">PRC License No. ${txn.encoderLicense || txn.cashierLicense}</div>` : ''}
       </div>
 
       ${txn.customerId ? `
