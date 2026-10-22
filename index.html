@@ -102,11 +102,11 @@
           <span class="icon"><i data-lucide="log-out"></i></span>
           <span class="nav-label">Logout</span>
         </div>
-        <div class="sidebar-version-badge" style="padding: 0.65rem 0.5rem 0.2rem; display: flex; align-items: center; justify-content: space-between; font-size: 0.68rem; color: var(--text-muted, #94a3b8); border-top: 1px dashed rgba(203, 213, 225, 0.45); margin-top: 0.4rem; font-family: monospace;">
-          <span style="font-weight: 600; letter-spacing: 0.03em;">v2.0.0</span>
-          <span style="display: inline-flex; align-items: center; gap: 4px; font-weight: 500; font-size: 0.64rem; color: #10b981; background: rgba(16, 185, 129, 0.1); padding: 1px 6px; border-radius: 9999px;">
-            <span style="width: 5px; height: 5px; border-radius: 50%; background: #10b981;"></span>
-            Cloud
+        <div class="sidebar-version-badge" id="sidebarVersionBadge" onclick="showSystemVersionInfo()" style="padding: 0.65rem 0.5rem 0.2rem; display: flex; align-items: center; justify-content: space-between; font-size: 0.68rem; color: var(--text-muted, #94a3b8); border-top: 1px dashed rgba(203, 213, 225, 0.45); margin-top: 0.4rem; font-family: monospace; cursor: pointer; user-select: none;" title="Click to inspect system version & build telemetry">
+          <span id="appVersionText" style="font-weight: 700; letter-spacing: 0.03em; color: var(--text-main, #334155);">v2.1.0</span>
+          <span id="appSyncStatusPill" style="display: inline-flex; align-items: center; gap: 4px; font-weight: 600; font-size: 0.64rem; color: #10b981; background: rgba(16, 185, 129, 0.1); padding: 1px 6px; border-radius: 9999px;">
+            <span id="appSyncStatusDot" style="width: 5px; height: 5px; border-radius: 50%; background: #10b981;"></span>
+            <span id="appSyncStatusLabel">Live</span>
           </span>
         </div>
       </div>

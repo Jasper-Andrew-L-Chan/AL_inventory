@@ -557,3 +557,139 @@ window.applyThemeMode = function (isDark) {
   }
 };
 
+// ── System Version & Build Telemetry ─────────────────────────────────────────
+window.APP_CONFIG = {
+  version: '2.1.0',
+  build: 'rev.18',
+  commit: 'd349b5b',
+  buildDate: '2026-10-22',
+  environment: window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' ? 'Local Development' : 'Production Cloud'
+};
+
+window.updateAppVersionDisplay = function () {
+  const verEl = document.getElementById('appVersionText');
+  if (verEl) {
+    const store = window.pharmacyStore;
+    const serverVer = store && store.serverVersion > 0 ? `.${store.serverVersion}` : '';
+    verEl.textContent = `v${window.APP_CONFIG.version}${serverVer}`;
+    verEl.title = `AffordaLabs POS v${window.APP_CONFIG.version} (Build ${window.APP_CONFIG.build} - ${window.APP_CONFIG.commit})`;
+  }
+
+  const pillEl = document.getElementById('appSyncStatusPill');
+  const dotEl = document.getElementById('appSyncStatusDot');
+  const labelEl = document.getElementById('appSyncStatusLabel');
+  if (pillEl && dotEl && labelEl && window.pharmacyStore) {
+    const st = window.pharmacyStore.status || {};
+    if (st.state === 'offline' || st.state === 'error') {
+      dotEl.style.background = '#ef4444';
+      pillEl.style.color = '#dc2626';
+      pillEl.style.background = 'rgba(239, 68, 68, 0.1)';
+      labelEl.textContent = 'Offline';
+    } else if (st.state === 'syncing' || (window.pharmacyStore.outbox && window.pharmacyStore.outbox.length)) {
+      dotEl.style.background = '#3b82f6';
+      pillEl.style.color = '#2563eb';
+      pillEl.style.background = 'rgba(59, 130, 246, 0.1)';
+      labelEl.textContent = 'Syncing';
+    } else {
+      dotEl.style.background = '#10b981';
+      pillEl.style.color = '#059669';
+      pillEl.style.background = 'rgba(16, 185, 129, 0.1)';
+      labelEl.textContent = 'Live';
+    }
+  }
+};
+
+window.showSystemVersionInfo = function () {
+  const existing = document.getElementById('systemVersionModal');
+  if (existing) existing.remove();
+
+  const store = window.pharmacyStore;
+  const itemsCount = store ? store.getItems().length : 0;
+  const txnsCount = store ? store.getTransactions().length : 0;
+  const dbVer = store && store.serverVersion !== undefined ? store.serverVersion : 'Local';
+  const outboxPending = store && store.outbox ? store.outbox.length : 0;
+  const user = window.authStore && window.authStore.getCurrentUser ? window.authStore.getCurrentUser() : null;
+
+  const modal = document.createElement('div');
+  modal.id = 'systemVersionModal';
+  modal.style.cssText = 'position:fixed;inset:0;background:rgba(15,23,42,0.6);backdrop-filter:blur(4px);display:flex;align-items:center;justify-content:center;z-index:99999;animation:fadeIn 0.2s ease;';
+  modal.innerHTML = `
+    <div style="background:#ffffff;border-radius:18px;width:90%;max-width:440px;box-shadow:0 25px 50px -12px rgba(0,0,0,0.3);overflow:hidden;border:1px solid rgba(226,232,240,0.8);">
+      <div style="padding:1.25rem 1.5rem;background:linear-gradient(135deg, #028090 0%, #00a896 100%);color:white;display:flex;align-items:center;justify-content:space-between;">
+        <div style="display:flex;align-items:center;gap:0.65rem;">
+          <div style="width:36px;height:36px;border-radius:8px;background:rgba(255,255,255,0.2);display:flex;align-items:center;justify-content:center;">
+            <i data-lucide="layers" style="width:20px;height:20px;color:white;"></i>
+          </div>
+          <div>
+            <h3 style="margin:0;font-size:1.05rem;font-weight:700;">System Version & Diagnostics</h3>
+            <p style="margin:0;font-size:0.75rem;opacity:0.9;">AffordaLabs Pharmacy Management</p>
+          </div>
+        </div>
+        <button onclick="document.getElementById('systemVersionModal').remove()" style="background:none;border:none;color:white;cursor:pointer;padding:4px;display:flex;align-items:center;">
+          <i data-lucide="x" style="width:20px;height:20px;"></i>
+        </button>
+      </div>
+
+      <div style="padding:1.25rem 1.5rem;">
+        <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;padding:0.9rem 1rem;margin-bottom:1rem;display:flex;justify-content:space-between;align-items:center;">
+          <div>
+            <div style="font-size:0.7rem;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:0.04em;">Release Version</div>
+            <div style="font-size:1.4rem;font-weight:900;color:#0f172a;font-family:monospace;margin-top:2px;">
+              v${window.APP_CONFIG.version}
+            </div>
+          </div>
+          <span style="font-size:0.75rem;font-weight:700;padding:4px 10px;border-radius:9999px;background:#ecfdf5;color:#047857;border:1px solid #bbf7d0;">
+            ${window.APP_CONFIG.environment}
+          </span>
+        </div>
+
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.65rem;margin-bottom:1rem;font-size:0.78rem;">
+          <div style="background:#f1f5f9;padding:0.65rem 0.85rem;border-radius:8px;">
+            <div style="color:#64748b;font-size:0.68rem;font-weight:600;">BUILD ITERATION</div>
+            <div style="font-weight:700;color:#1e293b;font-family:monospace;">${window.APP_CONFIG.build} (${window.APP_CONFIG.commit})</div>
+          </div>
+          <div style="background:#f1f5f9;padding:0.65rem 0.85rem;border-radius:8px;">
+            <div style="color:#64748b;font-size:0.68rem;font-weight:600;">CENTRAL DB STATE</div>
+            <div style="font-weight:700;color:#1e293b;font-family:monospace;">Revision #${dbVer}</div>
+          </div>
+          <div style="background:#f1f5f9;padding:0.65rem 0.85rem;border-radius:8px;">
+            <div style="color:#64748b;font-size:0.68rem;font-weight:600;">ACTIVE INVENTORY</div>
+            <div style="font-weight:700;color:#1e293b;">${itemsCount.toLocaleString()} medicines</div>
+          </div>
+          <div style="background:#f1f5f9;padding:0.65rem 0.85rem;border-radius:8px;">
+            <div style="color:#64748b;font-size:0.68rem;font-weight:600;">SYNC OUTBOX</div>
+            <div style="font-weight:700;color:${outboxPending ? '#ea580c' : '#16a34a'};">${outboxPending ? outboxPending + ' pending ops' : 'All synced ✓'}</div>
+          </div>
+        </div>
+
+        <div style="font-size:0.75rem;color:#64748b;border-top:1px solid #e2e8f0;padding-top:0.75rem;display:flex;justify-content:space-between;align-items:center;">
+          <span>Active user: <strong>${user ? user.name : 'Guest'}</strong></span>
+          <span>Role: <strong>${user ? user.role : 'N/A'}</strong></span>
+        </div>
+      </div>
+
+      <div style="padding:0.85rem 1.5rem;background:#f8fafc;border-top:1px solid #e2e8f0;display:flex;justify-content:flex-end;">
+        <button onclick="document.getElementById('systemVersionModal').remove()" class="btn-primary" style="padding:0.45rem 1.25rem;font-size:0.82rem;">
+          Close Diagnostics
+        </button>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(modal);
+  if (typeof lucide !== 'undefined') lucide.createIcons();
+};
+
+// Initial version display update
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', () => window.updateAppVersionDisplay());
+} else {
+  window.updateAppVersionDisplay();
+}
+
+window.addEventListener('pharmacy:remote-sync', () => {
+  if (typeof window.updateAppVersionDisplay === 'function') {
+    window.updateAppVersionDisplay();
+  }
+});
+
+
