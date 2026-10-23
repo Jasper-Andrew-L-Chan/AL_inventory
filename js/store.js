@@ -356,7 +356,27 @@ class PharmacyStore {
     const items = JSON.parse(localStorage.getItem(STORAGE_KEYS.ITEMS)) || [];
     return items.map(item => {
       const name = this.formatItemName(item);
-      return { ...item, name };
+      const cost = Number(item.costPrice !== undefined ? item.costPrice : (item.unitPrice || 0));
+      let sellingPrice = Number(item.sellingPrice || 0);
+      let congPrice = Number(item.congPrice || 0);
+
+      // If sellingPrice was unset or erroneously set to cost price, heal with 1.2x multiplier
+      if (cost > 0 && (sellingPrice === 0 || Math.abs(sellingPrice - cost) < 0.001)) {
+        sellingPrice = parseFloat((cost * 1.20).toFixed(4));
+      }
+      // If congPrice was unset or erroneously set to cost price, heal with 2.4x multiplier
+      if (cost > 0 && (congPrice === 0 || Math.abs(congPrice - cost) < 0.001)) {
+        congPrice = parseFloat((cost * 2.40).toFixed(4));
+      }
+
+      return {
+        ...item,
+        name,
+        costPrice: cost,
+        unitPrice: cost,
+        sellingPrice,
+        congPrice
+      };
     });
   }
 

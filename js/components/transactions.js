@@ -940,8 +940,8 @@ function renderMedRowHtml(row, idx, inventoryItems) {
                 <span><strong>Unit:</strong> ${escapeHtml(selectedItem.unit || 'unit')}</span>
                 <span><strong>Batch:</strong> ${escapeHtml(selectedItem.batchLot || 'N/A')}</span>
                 <span><strong>Cost:</strong> ₱${Number(selectedItem.costPrice || 0).toFixed(2)}</span>
-                <span><strong>Cong's Price:</strong> <strong style="color: #0369a1; font-weight: 800;">₱${Number(selectedItem.congPrice || 0).toFixed(2)}</strong></span>
                 <span><strong>Selling:</strong> ₱${Number(selectedItem.sellingPrice || 0).toFixed(2)}</span>
+                <span><strong>Cong's Price:</strong> <strong style="color: #0369a1; font-weight: 800;">₱${Number(selectedItem.congPrice || 0).toFixed(2)}</strong></span>
                 ${(!selectedItem.congPrice || Number(selectedItem.congPrice) <= 0) ? `
                   <span style="color: #ea580c; font-weight: 700;">⚠ Missing Cong's Price</span>
                 ` : ''}
@@ -1242,8 +1242,18 @@ window.onSelectPrimaryMedicine = function (rowId, selectedId) {
     row.customMedName = '';
     const stock = Number(found.currentStock || 0);
     const unitCost = Number(found.costPrice || found.unitPrice || 0);
-    const congP = Number(found.congPrice !== undefined && found.congPrice !== null && Number(found.congPrice) > 0 ? found.congPrice : (unitCost > 0 ? parseFloat((unitCost * 2.4).toFixed(4)) : 0));
-    const sellP = Number(found.sellingPrice !== undefined && found.sellingPrice !== null && Number(found.sellingPrice) > 0 ? found.sellingPrice : (unitCost > 0 ? parseFloat((unitCost * 1.2).toFixed(4)) : 0));
+    
+    // Selling price: if item has a valid selling price different from unit cost, use it; otherwise unitCost * 1.2
+    let sellP = Number(found.sellingPrice || 0);
+    if (unitCost > 0 && (sellP === 0 || Math.abs(sellP - unitCost) < 0.001)) {
+      sellP = parseFloat((unitCost * 1.2).toFixed(4));
+    }
+
+    // Cong's price: if item has a valid cong price different from unit cost, use it; otherwise unitCost * 2.4
+    let congP = Number(found.congPrice || 0);
+    if (unitCost > 0 && (congP === 0 || Math.abs(congP - unitCost) < 0.001)) {
+      congP = parseFloat((unitCost * 2.4).toFixed(4));
+    }
 
     // If stock is 0, prompt substitute automatically
     if (stock <= 0) {
@@ -1290,8 +1300,14 @@ window.toggleSubstituteMode = function (rowId) {
     const orig = items.find(i => i.id === row.selectedMedId);
     if (orig) {
       const unitCost = Number(orig.costPrice || orig.unitPrice || 0);
-      const congP = Number(orig.congPrice !== undefined && orig.congPrice !== null && Number(orig.congPrice) > 0 ? orig.congPrice : (unitCost > 0 ? parseFloat((unitCost * 2.4).toFixed(4)) : 0));
-      const sellP = Number(orig.sellingPrice !== undefined && orig.sellingPrice !== null && Number(orig.sellingPrice) > 0 ? orig.sellingPrice : (unitCost > 0 ? parseFloat((unitCost * 1.2).toFixed(4)) : 0));
+      let sellP = Number(orig.sellingPrice || 0);
+      if (unitCost > 0 && (sellP === 0 || Math.abs(sellP - unitCost) < 0.001)) {
+        sellP = parseFloat((unitCost * 1.2).toFixed(4));
+      }
+      let congP = Number(orig.congPrice || 0);
+      if (unitCost > 0 && (congP === 0 || Math.abs(congP - unitCost) < 0.001)) {
+        congP = parseFloat((unitCost * 2.4).toFixed(4));
+      }
 
       row.actualInventoryId = orig.id;
       row.unitPrice = unitCost;
@@ -1314,8 +1330,14 @@ window.onSelectActualSubstitute = function (rowId, actualInvId) {
 
   if (subItem) {
     const unitCost = Number(subItem.costPrice || subItem.unitPrice || 0);
-    const congP = Number(subItem.congPrice !== undefined && subItem.congPrice !== null && Number(subItem.congPrice) > 0 ? subItem.congPrice : (unitCost > 0 ? parseFloat((unitCost * 2.4).toFixed(4)) : 0));
-    const sellP = Number(subItem.sellingPrice !== undefined && subItem.sellingPrice !== null && Number(subItem.sellingPrice) > 0 ? subItem.sellingPrice : (unitCost > 0 ? parseFloat((unitCost * 1.2).toFixed(4)) : 0));
+    let sellP = Number(subItem.sellingPrice || 0);
+    if (unitCost > 0 && (sellP === 0 || Math.abs(sellP - unitCost) < 0.001)) {
+      sellP = parseFloat((unitCost * 1.2).toFixed(4));
+    }
+    let congP = Number(subItem.congPrice || 0);
+    if (unitCost > 0 && (congP === 0 || Math.abs(congP - unitCost) < 0.001)) {
+      congP = parseFloat((unitCost * 2.4).toFixed(4));
+    }
 
     row.unitPrice = unitCost;
     row.congPrice = congP;
