@@ -37,16 +37,8 @@ function renderInventoryView(container) {
     return !isNaN(exp.getTime()) && exp <= in90Days;
   });
 
-  // Filter based on active subtab
-  let displayedItems = filteredItems;
-  if (inventoryCurrentTab === 'expiry-alerts') {
-    displayedItems = filteredItems.filter(item => {
-      const isLow = (Number(item.currentStock) || 0) <= (Number(item.reorderLevel) || 10);
-      const expDate = new Date(item.expiryDate);
-      const isExpiring = !isNaN(expDate.getTime()) && expDate <= in90Days;
-      return isLow || isExpiring;
-    });
-  }
+  // Get filtered and sorted items (in-stock alphabetical A-Z first, out-of-stock alphabetical A-Z at bottom)
+  const displayedItems = getFilteredInventoryItems();
 
   const totalStockCount = items.reduce((acc, curr) => acc + (Number(curr.currentStock) || 0), 0);
   const selectedCount = selectedInventoryItemIds.size;
@@ -249,9 +241,9 @@ function renderInventoryView(container) {
             <th style="text-align: right;" title="Stock received / added during this shift (resets at 6am / 9pm)">Added (Shift)</th>
             <th style="text-align: right;" title="Stock dispensed / deducted during this shift (resets at 6am / 9pm)">Deducted (Shift)</th>
             <th style="text-align: right; color: var(--primary); font-weight: 700;">Current Stock</th>
-            <th style="text-align: right; color: #028090; font-weight: 800; background: #f0fdfa;" title="Cong's Price (Primary Reference Price)">Cong's Price ★</th>
             <th style="text-align: right;" title="Original Unit Cost / Purchase Price">Unit Cost</th>
             <th style="text-align: right;" title="Selling Retail Price">Selling Price</th>
+            <th style="text-align: right; color: #028090; font-weight: 800; background: #f0fdfa;" title="Cong's Price (Primary Reference Price)">Cong's Price ★</th>
             <th style="text-align: center; width: 140px;">Fast Adjust</th>
             <th style="text-align: center; width: 160px;">Actions</th>
           </tr>
@@ -699,23 +691,36 @@ function getFilteredInventoryItems() {
       const isExpiring = !isNaN(expDate.getTime()) && expDate <= in90Days;
       return isLow || isExpiring;
     });
+  let targetList = filtered;
+  if (inventoryCurrentTab === 'expiry-alerts') {
+    targetList = filtered.filter(item => {
+      const isLow = (Number(item.currentStock) || 0) <= (Number(item.reorderLevel) || 10);
+      const expDate = new Date(item.expiryDate);
+      const isExpiring = !isNaN(expDate.getTime()) && expDate <= in90Days;
+      return isLow || isExpiring;
+    });
   }
 
-  // Sort medicines alphabetically A-Z with out-of-stock items placed at the bottom
-  return filtered.sort((a, b) => {
+  // Sort medicines: in-stock first (A-Z), out-of-stock at the very bottom (A-Z)
+  return targetList.sort((a, b) => {
     const stockA = Number(a.currentStock) || 0;
     const stockB = Number(b.currentStock) || 0;
     const aOutOfStock = stockA <= 0;
     const bOutOfStock = stockB <= 0;
 
-    // In-stock items appear first; out-of-stock items go to the bottom
+    // In-stock items appear first; out-of-stock items go down to the bottom of the list
     if (!aOutOfStock && bOutOfStock) return -1;
     if (aOutOfStock && !bOutOfStock) return 1;
 
-    // Both are in-stock or both are out-of-stock: sort alphabetically by generic name, then brand name
-    const nameA = ((a.genericName || a.brandName || a.name || '')).trim().toLowerCase();
-    const nameB = ((b.genericName || b.brandName || b.name || '')).trim().toLowerCase();
-    return nameA.localeCompare(nameB, undefined, { numeric: true, sensitivity: 'base' });
+    // Both are in-stock or both are out-of-stock: sort in strict alphabetical order A-Z
+    const nameA = (a.genericName || a.brandName || a.name || '').trim().toLowerCase();
+    const nameB = (b.genericName || b.brandName || b.name || '').trim().toLowerCase();
+    const cmp = nameA.localeCompare(nameB, undefined, { numeric: true, sensitivity: 'base' });
+    if (cmp !== 0) return cmp;
+
+    const brandA = (a.brandName || '').trim().toLowerCase();
+    const brandB = (b.brandName || '').trim().toLowerCase();
+    return brandA.localeCompare(brandB, undefined, { numeric: true, sensitivity: 'base' });
   });
 }
 
@@ -820,11 +825,11 @@ function renderInventoryTableRows(displayedItems) {
             ` : '')}
           </div>
         </td>
+        <td style="text-align: right; font-size: 0.85rem; color: var(--text-muted);">₱${costVal.toFixed(2)}</td>
+        <td style="text-align: right; font-weight: 700; color: var(--primary);">₱${sellVal.toFixed(2)}</td>
         <td style="text-align: right; font-weight: 800; color: #028090; background: #f0fdfa;">
           ${congVal > 0 ? `₱${congVal.toFixed(2)}` : '<span style="color: #ea580c; font-size: 0.72rem; font-weight: 700;" title="Cong\'s Price missing or unset">Unset</span>'}
         </td>
-        <td style="text-align: right; font-size: 0.85rem; color: var(--text-muted);">₱${costVal.toFixed(2)}</td>
-        <td style="text-align: right; font-weight: 700; color: var(--primary);">₱${sellVal.toFixed(2)}</td>
         <td style="text-align: center;" onclick="event.stopPropagation()">
           <div style="display: flex; align-items: center; justify-content: center; gap: 4px;">
             <input 
