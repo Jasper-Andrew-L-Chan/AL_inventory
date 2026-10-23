@@ -38,7 +38,7 @@ let txnSearchFilters = {
   total: ''
 };
 let txnCurrentTab = 'DETAILS';
-let txnGroupByBarangay = false; // Toggle to group In-Out transactions by Barangay
+let txnGroupByBarangay = true; // Toggle to group In-Out transactions by Barangay
 let txnDateRange = {
   from: '',
   to: ''
@@ -154,6 +154,9 @@ function renderTransactionsView(container) {
     if (txnDateRange.to && t.date && t.date > txnDateRange.to) return false;
     return true;
   });
+
+  // Keep customers of the same Barangay together (stable sort preserves order within a barangay)
+  if (txnGroupByBarangay) sortTxnsByBarangay(filteredTxns);
 
   const totalTxnCount = filteredTxns.length;
   const totalTxnPages = Math.ceil(totalTxnCount / TXN_PAGE_SIZE) || 1;
@@ -1827,6 +1830,19 @@ window.toggleTxnGroupByBarangay = function () {
   renderTransactionsView(document.getElementById('main-content'));
 };
 
+// Sort transactions in place so the same Barangay is contiguous; unspecified goes last
+function sortTxnsByBarangay(list) {
+  const UNSPEC = 'Barangay Not Specified';
+  return list.sort((a, b) => {
+    const ka = normalizeBarangayName(a.barangay);
+    const kb = normalizeBarangayName(b.barangay);
+    if (ka === kb) return 0;
+    if (ka === UNSPEC) return 1;
+    if (kb === UNSPEC) return -1;
+    return ka.localeCompare(kb, undefined, { numeric: true, sensitivity: 'base' });
+  });
+}
+
 // Normalize barangay name handling casing and whitespace differences
 function normalizeBarangayName(raw) {
   if (!raw || !String(raw).trim()) {
@@ -1867,10 +1883,20 @@ window.handleRefundTxn = function (id) {
 };
 
 window.exportTransactionsCSV = function () {
-  const txns = window.pharmacyStore.getTransactions();
+  const allTxns = window.pharmacyStore.getTransactions();
+  // Filter according to currently active date range filters if set
+  const txns = allTxns.filter(t => {
+    if (txnDateRange.from && t.date && t.date < txnDateRange.from) return false;
+    if (txnDateRange.to && t.date && t.date > txnDateRange.to) return false;
+    return true;
+  });
+
+  // Sort by Barangay strictly so that customers belonging to the same Barangay are clustered together
+  sortTxnsByBarangay(txns);
+
   const headers = [
-    'NAME',
     'BARANGAY',
+    'NAME',
     'GL',
     'DESCRIPTION',
     'QTY',
@@ -1888,51 +1914,61 @@ window.exportTransactionsCSV = function () {
 
   const rows = [];
 
+  // Group by normalized barangay
+  const brgyMap = new Map();
   txns.forEach(t => {
-    const customer = (t.customerName || 'Walk-in').trim();
-    const barangay = (t.barangay || '').trim();
-    const gl = t.budget > 0 ? Number(t.budget).toFixed(2) : '';
-    const receiveDate = t.date ? formatDateMMDDYY(t.date) : '';
-    const deliveryDate = t.deliveryDate || '';
-    const items = t.items && t.items.length > 0 ? t.items : [
-      {
-        name: 'No items recorded',
-        qty: 0,
-        congPrice: 0,
-        sellingPrice: 0,
-        unitPrice: 0
-      }
-    ];
+    const bKey = (t.barangay || '').trim().toUpperCase() || 'UNSPECIFIED';
+    if (!brgyMap.has(bKey)) {
+      brgyMap.set(bKey, []);
+    }
+    brgyMap.get(bKey).push(t);
+  });
 
-    const grandTotal = Number(t.netTotal || 0).toFixed(2);
+  brgyMap.forEach((groupTxns, brgyName) => {
+    groupTxns.forEach(t => {
+      const customer = (t.customerName || 'Walk-in').trim();
+      const barangay = (t.barangay || '').trim().toUpperCase();
+      const gl = t.budget > 0 ? Number(t.budget).toFixed(2) : '';
+      const receiveDate = t.date ? formatDateMMDDYY(t.date) : '';
+      const deliveryDate = t.deliveryDate || '';
+      const items = t.items && t.items.length > 0 ? t.items : [
+        {
+          name: 'No items recorded',
+          qty: 0,
+          congPrice: 0,
+          sellingPrice: 0,
+          unitPrice: 0
+        }
+      ];
 
-    items.forEach((item, index) => {
-      const isFirst = index === 0;
-      const desc = item.actualSuppliedName || item.name || '';
-      const qty = Number(item.qty || 0);
-      const cong = Number(item.congPrice || 0);
-      const selling = Number(item.sellingPrice || item.price || 0);
-      const unit = Number(item.unitPrice || 0);
-      const unitTotal = (qty * unit).toFixed(2);
-      const sellingTotal = (qty * selling).toFixed(2);
+      const grandTotal = Number(t.netTotal || 0).toFixed(2);
 
-      // On first row of transaction: include Customer Name, Barangay, GL, grand TOTAL, and dates
-      // On subsequent item rows: leave them blank just like in the CONG Excel sheet
-      rows.push([
-        escapeCsv(isFirst ? customer : ''),
-        escapeCsv(isFirst ? barangay : ''),
-        escapeCsv(isFirst ? gl : ''),
-        escapeCsv(desc),
-        qty,
-        cong.toFixed(2),
-        selling.toFixed(2),
-        unit.toFixed(2),
-        unitTotal,
-        sellingTotal,
-        isFirst ? grandTotal : '',
-        escapeCsv(isFirst ? receiveDate : ''),
-        escapeCsv(isFirst ? deliveryDate : '')
-      ].join(','));
+      items.forEach((item, index) => {
+        const isFirst = index === 0;
+        const desc = item.actualSuppliedName || item.name || '';
+        const qty = Number(item.qty || 0);
+        const cong = Number(item.congPrice || 0);
+        const selling = Number(item.sellingPrice || item.price || 0);
+        const unit = Number(item.unitPrice || 0);
+        const unitTotal = (qty * unit).toFixed(2);
+        const sellingTotal = (qty * selling).toFixed(2);
+
+        rows.push([
+          escapeCsv(isFirst ? barangay : ''),
+          escapeCsv(isFirst ? customer : ''),
+          escapeCsv(isFirst ? gl : ''),
+          escapeCsv(desc),
+          qty,
+          cong.toFixed(2),
+          selling.toFixed(2),
+          unit.toFixed(2),
+          unitTotal,
+          sellingTotal,
+          isFirst ? grandTotal : '',
+          escapeCsv(isFirst ? receiveDate : ''),
+          escapeCsv(isFirst ? deliveryDate : '')
+        ].join(','));
+      });
     });
   });
 

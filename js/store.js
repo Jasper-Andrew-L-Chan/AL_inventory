@@ -638,7 +638,22 @@ class PharmacyStore {
 
   // --- Transactions ---
   getTransactions() {
-    return JSON.parse(localStorage.getItem(STORAGE_KEYS.TRANSACTIONS)) || [];
+    const txns = JSON.parse(localStorage.getItem(STORAGE_KEYS.TRANSACTIONS)) || [];
+    // Always keep customers who belong to the same Barangay grouped together
+    const UNSPEC = 'BARANGAY NOT SPECIFIED';
+    return txns.sort((a, b) => {
+      const cleanBrgy = raw => {
+        if (!raw || !String(raw).trim()) return UNSPEC;
+        const c = String(raw).trim().replace(/\s+/g, ' ');
+        return c.replace(/^(barangay|brgy\.?)\s+/i, '').trim().toUpperCase() || UNSPEC;
+      };
+      const ka = cleanBrgy(a.barangay);
+      const kb = cleanBrgy(b.barangay);
+      if (ka === kb) return 0;
+      if (ka === UNSPEC) return 1;
+      if (kb === UNSPEC) return -1;
+      return ka.localeCompare(kb, undefined, { numeric: true, sensitivity: 'base' });
+    });
   }
 
   /** Write the local cache only (the caller queues the matching server operation). */
