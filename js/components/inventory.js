@@ -684,13 +684,6 @@ function getFilteredInventoryItems() {
   const now = new Date();
   const in90Days = new Date(now.getTime() + 90 * 24 * 60 * 60 * 1000);
 
-  if (inventoryCurrentTab === 'expiry-alerts') {
-    return filtered.filter(item => {
-      const isLow = (Number(item.currentStock) || 0) <= (Number(item.reorderLevel) || 10);
-      const expDate = new Date(item.expiryDate);
-      const isExpiring = !isNaN(expDate.getTime()) && expDate <= in90Days;
-      return isLow || isExpiring;
-    });
   let targetList = filtered;
   if (inventoryCurrentTab === 'expiry-alerts') {
     targetList = filtered.filter(item => {
