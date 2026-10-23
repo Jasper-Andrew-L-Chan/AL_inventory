@@ -1265,14 +1265,18 @@ function processImportRows(rawRows, fileName) {
     const qtyPerBox = cleanNum(rawQtyPerBox, 1);
 
     const rawSellingPrice = findVal(['selling price', 'retail price', 'srp', 'price']);
-    // If selling price is 0 or #DIV/0! but unitPrice is available, provide standard 20% pharmacy markup fallback if 0
+    // If selling price is 0 or missing but unitPrice is available, fallback: Unit Price × 1.2
     let sellingPrice = cleanNum(rawSellingPrice, 0);
     if (sellingPrice === 0 && unitPrice > 0) {
-      sellingPrice = parseFloat((unitPrice * 1.20).toFixed(2));
+      sellingPrice = parseFloat((unitPrice * 1.20).toFixed(4));
     }
 
     const rawCongPrice = findVal(['cong price', "cong's price", 'congs price', 'cong', 'special price']);
-    const congPrice = cleanNum(rawCongPrice, 0);
+    // If Cong's price is 0 or missing but unitPrice is available, fallback: Unit Price × 2.4
+    let congPrice = cleanNum(rawCongPrice, 0);
+    if (congPrice === 0 && unitPrice > 0) {
+      congPrice = parseFloat((unitPrice * 2.40).toFixed(4));
+    }
 
     const company = findVal(['company', 'manufacturer', 'supplier', 'distributor', 'mfg']) || 'General Distributor';
 

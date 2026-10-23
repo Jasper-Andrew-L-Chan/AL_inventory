@@ -68,11 +68,11 @@ function createEmptyMedRow() {
     actualInventoryId: '',   // actual inventory item supplied (could be substitute)
     isSubstitute: false,
     qty: 1,
-    unitPrice: 0,            // cost/unit price
-    congPrice: 0,            // cong price
-    sellingPrice: 0,         // selling price per unit
+    unitPrice: 0,            // cost/unit price (reference)
+    congPrice: 0,            // cong price (main price used for total amount)
+    sellingPrice: 0,         // selling price per unit (reference only)
     totalUnit: 1,            // total unit
-    totalSellingPrice: 0     // qty * sellingPrice
+    totalSellingPrice: 0     // qty * congPrice (main calculation)
   };
 }
 
@@ -108,18 +108,20 @@ function renderTransactionsView(container) {
         row.actualInventoryId = '';
         row.unitPrice = 0;
         row.sellingPrice = 0;
+        row.congPrice = 0;
         row.totalSellingPrice = 0;
       } else {
-        // Item exists in inventory: keep unit and selling price aligned unless custom edited
+        // Item exists in inventory: keep unit, selling, and cong price aligned unless custom edited
         const curItem = inventoryItems.find(i => i.id === row.selectedMedId);
         if (curItem && !row.isSubstitute) {
-          const curCong = Number(curItem.congPrice || 0);
-          const curSell = Number(curItem.sellingPrice || 0);
-          const curRef = curCong > 0 ? curCong : curSell;
-          if (!row.unitPrice) row.unitPrice = Number(curItem.costPrice || 0);
-          if (row.congPrice === undefined || row.congPrice === null) row.congPrice = curCong;
-          if (!row.sellingPrice) row.sellingPrice = curRef;
-          row.totalSellingPrice = (Number(row.qty) || 1) * (Number(row.sellingPrice) || 0);
+          const curUnit = Number(curItem.costPrice || curItem.unitPrice || 0);
+          const curCong = Number(curItem.congPrice !== undefined && curItem.congPrice !== null ? curItem.congPrice : (curUnit > 0 ? curUnit * 2.4 : 0));
+          const curSell = Number(curItem.sellingPrice !== undefined && curItem.sellingPrice !== null ? curItem.sellingPrice : (curUnit > 0 ? curUnit * 1.2 : 0));
+          if (!row.unitPrice) row.unitPrice = curUnit;
+          if (row.congPrice === undefined || row.congPrice === null || row.congPrice === 0) row.congPrice = curCong;
+          if (!row.sellingPrice) row.sellingPrice = curSell;
+          const mainPrice = Number(row.congPrice) || 0;
+          row.totalSellingPrice = (Number(row.qty) || 1) * mainPrice;
         }
       }
     }
@@ -342,8 +344,8 @@ function renderDetailsTabHtml(editingTxnId, currentTxnForm, allTxns, inventoryIt
                   <th style="min-width: 240px;">Medicine Selection</th>
                   <th style="width: 100px; text-align: center;">Quantity (QTY)</th>
                   <th style="width: 120px; text-align: right;">Unit Price (Cost)</th>
-                  <th style="width: 130px; text-align: right; background: #e0f2fe; color: #0369a1; font-weight: 800;">★ Cong Price (Main)</th>
                   <th style="width: 120px; text-align: right;">Selling Price</th>
+                  <th style="width: 130px; text-align: right; background: #e0f2fe; color: #0369a1; font-weight: 800;">★ Cong Price (Main)</th>
                   <th style="width: 90px; text-align: center;">Total Unit</th>
                   <th style="width: 130px; text-align: right;">Total Amount</th>
                   <th style="width: 50px; text-align: center;"></th>
@@ -651,8 +653,8 @@ function renderLogsTabHtml(filteredTxns, totalTxnCount, totalTxnPages, startTxnI
                                 <th style="padding: 6px 8px;">Actual Medicine Supplied (Deducted)</th>
                                 <th style="padding: 6px 8px; text-align: center;">Qty</th>
                                 <th style="padding: 6px 8px; text-align: right;">Unit Cost</th>
-                                <th style="padding: 6px 8px; text-align: right;">Cong's Price</th>
                                 <th style="padding: 6px 8px; text-align: right;">Selling Price</th>
+                                <th style="padding: 6px 8px; text-align: right; background: #e0f2fe; color: #0369a1; font-weight: 800;">★ Cong's Price (Main)</th>
                                 <th style="padding: 6px 8px; text-align: right;">Subtotal</th>
                               </tr>
                             </thead>
@@ -666,9 +668,9 @@ function renderLogsTabHtml(filteredTxns, totalTxnCount, totalTxnPages, startTxnI
                                   </td>
                                   <td style="padding: 6px 8px; text-align: center; font-weight: 700;">${item.qty}</td>
                                   <td style="padding: 6px 8px; text-align: right;">₱${Number(item.unitPrice || 0).toFixed(2)}</td>
-                                  <td style="padding: 6px 8px; text-align: right; color: #0284c7; font-weight: 600;">₱${Number(item.congPrice || 0).toFixed(2)}</td>
                                   <td style="padding: 6px 8px; text-align: right;">₱${Number(item.sellingPrice || item.price || 0).toFixed(2)}</td>
-                                  <td style="padding: 6px 8px; text-align: right; font-weight: 700;">₱${((item.sellingPrice || item.price || 0) * item.qty).toFixed(2)}</td>
+                                  <td style="padding: 6px 8px; text-align: right; color: #0284c7; font-weight: 600; background: rgba(224, 242, 254, 0.25);">₱${Number(item.congPrice || 0).toFixed(2)}</td>
+                                  <td style="padding: 6px 8px; text-align: right; font-weight: 700;">₱${((item.congPrice !== undefined && Number(item.congPrice) > 0 ? Number(item.congPrice) : (item.sellingPrice || item.price || 0)) * item.qty).toFixed(2)}</td>
                                 </tr>
                               `).join('')}
                             </tbody>
@@ -1038,24 +1040,6 @@ function renderMedRowHtml(row, idx, inventoryItems) {
         </div>
       </td>
 
-      <!-- Cong Price (Main Reference Price) -->
-      <td style="text-align: right; vertical-align: top; padding-top: 0.9rem; background: rgba(224, 242, 254, 0.25);">
-        <div style="display: flex; align-items: center; justify-content: flex-end; gap: 2px;">
-          <span style="font-size: 0.75rem; color: #0369a1; font-weight: 700;">₱</span>
-          <input 
-            type="number" 
-            id="row-congPrice-${row.id}"
-            min="0" 
-            step="0.01" 
-            value="${row.congPrice || 0}" 
-            class="form-input" 
-            style="width: 90px; text-align: right; font-size: 0.82rem; font-weight: 700; color: #0369a1; border-color: #7dd3fc; background: #f0f9ff;" 
-            oninput="updateMedRowField('${row.id}', 'congPrice', this.value)"
-            onkeydown="if(event.key==='Enter'){event.preventDefault(); this.blur();}"
-          />
-        </div>
-      </td>
-
       <!-- Selling Price -->
       <td style="text-align: right; vertical-align: top; padding-top: 0.9rem;">
         <div style="display: flex; align-items: center; justify-content: flex-end; gap: 2px;">
@@ -1064,11 +1048,29 @@ function renderMedRowHtml(row, idx, inventoryItems) {
             type="number" 
             id="row-sellingPrice-${row.id}"
             min="0" 
-            step="0.01" 
+            step="0.0001" 
             value="${row.sellingPrice}" 
             class="form-input" 
             style="width: 90px; text-align: right; font-size: 0.82rem; font-weight: 600;" 
             oninput="updateMedRowField('${row.id}', 'sellingPrice', this.value)"
+            onkeydown="if(event.key==='Enter'){event.preventDefault(); this.blur();}"
+          />
+        </div>
+      </td>
+
+      <!-- Cong Price (Main Reference Price) -->
+      <td style="text-align: right; vertical-align: top; padding-top: 0.9rem; background: rgba(224, 242, 254, 0.25);">
+        <div style="display: flex; align-items: center; justify-content: flex-end; gap: 2px;">
+          <span style="font-size: 0.75rem; color: #0369a1; font-weight: 700;">₱</span>
+          <input 
+            type="number" 
+            id="row-congPrice-${row.id}"
+            min="0" 
+            step="0.0001" 
+            value="${row.congPrice || 0}" 
+            class="form-input" 
+            style="width: 90px; text-align: right; font-size: 0.82rem; font-weight: 700; color: #0369a1; border-color: #7dd3fc; background: #f0f9ff;" 
+            oninput="updateMedRowField('${row.id}', 'congPrice', this.value)"
             onkeydown="if(event.key==='Enter'){event.preventDefault(); this.blur();}"
           />
         </div>
@@ -1239,24 +1241,23 @@ window.onSelectPrimaryMedicine = function (rowId, selectedId) {
   if (found) {
     row.customMedName = '';
     const stock = Number(found.currentStock || 0);
-    const congP = Number(found.congPrice || 0);
-    const origSell = Number(found.sellingPrice || 0);
-    // Primary reference price: Cong's price takes precedence as the main price
-    const primaryRefPrice = congP > 0 ? congP : origSell;
+    const unitCost = Number(found.costPrice || found.unitPrice || 0);
+    const congP = Number(found.congPrice !== undefined && found.congPrice !== null && Number(found.congPrice) > 0 ? found.congPrice : (unitCost > 0 ? parseFloat((unitCost * 2.4).toFixed(4)) : 0));
+    const sellP = Number(found.sellingPrice !== undefined && found.sellingPrice !== null && Number(found.sellingPrice) > 0 ? found.sellingPrice : (unitCost > 0 ? parseFloat((unitCost * 1.2).toFixed(4)) : 0));
 
     // If stock is 0, prompt substitute automatically
     if (stock <= 0) {
       row.isSubstitute = true;
       row.actualInventoryId = '';
-      row.unitPrice = Number(found.costPrice || 0);
+      row.unitPrice = unitCost;
       row.congPrice = congP;
-      row.sellingPrice = primaryRefPrice;
+      row.sellingPrice = sellP;
     } else {
       row.isSubstitute = false;
       row.actualInventoryId = found.id;
-      row.unitPrice = Number(found.costPrice || 0);
+      row.unitPrice = unitCost;
       row.congPrice = congP;
-      row.sellingPrice = primaryRefPrice;
+      row.sellingPrice = sellP;
     }
   } else if (selectedId === '__CUSTOM__') {
     row.isSubstitute = true;
@@ -1272,9 +1273,10 @@ window.onSelectPrimaryMedicine = function (rowId, selectedId) {
     row.sellingPrice = 0;
   }
 
-  // Recalculate totals
+  // Recalculate totals based on Cong's Price (Main Price)
   row.totalUnit = Number(row.qty) || 1;
-  row.totalSellingPrice = row.totalUnit * (Number(row.sellingPrice) || 0);
+  const mainPrice = Number(row.congPrice) || 0;
+  row.totalSellingPrice = row.totalUnit * mainPrice;
 
   renderTransactionsView(document.getElementById('main-content'));
 };
@@ -1287,15 +1289,16 @@ window.toggleSubstituteMode = function (rowId) {
     const items = window.pharmacyStore.getItems();
     const orig = items.find(i => i.id === row.selectedMedId);
     if (orig) {
-      const congP = Number(orig.congPrice || 0);
-      const origSell = Number(orig.sellingPrice || 0);
-      const primaryRefPrice = congP > 0 ? congP : origSell;
+      const unitCost = Number(orig.costPrice || orig.unitPrice || 0);
+      const congP = Number(orig.congPrice !== undefined && orig.congPrice !== null && Number(orig.congPrice) > 0 ? orig.congPrice : (unitCost > 0 ? parseFloat((unitCost * 2.4).toFixed(4)) : 0));
+      const sellP = Number(orig.sellingPrice !== undefined && orig.sellingPrice !== null && Number(orig.sellingPrice) > 0 ? orig.sellingPrice : (unitCost > 0 ? parseFloat((unitCost * 1.2).toFixed(4)) : 0));
 
       row.actualInventoryId = orig.id;
-      row.unitPrice = Number(orig.costPrice || 0);
+      row.unitPrice = unitCost;
       row.congPrice = congP;
-      row.sellingPrice = primaryRefPrice;
-      row.totalSellingPrice = row.totalUnit * row.sellingPrice;
+      row.sellingPrice = sellP;
+      const mainPrice = Number(row.congPrice) || 0;
+      row.totalSellingPrice = row.totalUnit * mainPrice;
     }
   }
   renderTransactionsView(document.getElementById('main-content'));
@@ -1310,17 +1313,18 @@ window.onSelectActualSubstitute = function (rowId, actualInvId) {
   const subItem = items.find(i => i.id === actualInvId);
 
   if (subItem) {
-    const congP = Number(subItem.congPrice || 0);
-    const origSell = Number(subItem.sellingPrice || 0);
-    const primaryRefPrice = congP > 0 ? congP : origSell;
+    const unitCost = Number(subItem.costPrice || subItem.unitPrice || 0);
+    const congP = Number(subItem.congPrice !== undefined && subItem.congPrice !== null && Number(subItem.congPrice) > 0 ? subItem.congPrice : (unitCost > 0 ? parseFloat((unitCost * 2.4).toFixed(4)) : 0));
+    const sellP = Number(subItem.sellingPrice !== undefined && subItem.sellingPrice !== null && Number(subItem.sellingPrice) > 0 ? subItem.sellingPrice : (unitCost > 0 ? parseFloat((unitCost * 1.2).toFixed(4)) : 0));
 
-    row.unitPrice = Number(subItem.costPrice || 0);
+    row.unitPrice = unitCost;
     row.congPrice = congP;
-    row.sellingPrice = primaryRefPrice;
+    row.sellingPrice = sellP;
   }
 
   row.totalUnit = Number(row.qty) || 1;
-  row.totalSellingPrice = row.totalUnit * (Number(row.sellingPrice) || 0);
+  const mainPrice = Number(row.congPrice) || 0;
+  row.totalSellingPrice = row.totalUnit * mainPrice;
 
   renderTransactionsView(document.getElementById('main-content'));
 };
@@ -1335,7 +1339,17 @@ window.updateMedRowField = function (rowId, field, val) {
     row.qty = qty;
     row.totalUnit = qty;
   } else if (field === 'unitPrice') {
-    row.unitPrice = Number(val) || 0;
+    const newUnit = Number(val) || 0;
+    row.unitPrice = newUnit;
+    // When Unit Price changes, update Selling Price (x1.2) and Cong's Price (x2.4)
+    if (newUnit > 0) {
+      row.sellingPrice = parseFloat((newUnit * 1.2).toFixed(4));
+      row.congPrice = parseFloat((newUnit * 2.4).toFixed(4));
+      const sellInput = document.getElementById(`row-sellingPrice-${row.id}`);
+      if (sellInput) sellInput.value = row.sellingPrice;
+      const congInput = document.getElementById(`row-congPrice-${row.id}`);
+      if (congInput) congInput.value = row.congPrice;
+    }
   } else if (field === 'congPrice') {
     row.congPrice = Number(val) || 0;
   } else if (field === 'sellingPrice') {
@@ -1344,8 +1358,9 @@ window.updateMedRowField = function (rowId, field, val) {
     row[field] = val;
   }
 
-  // Recalculate row totals
-  row.totalSellingPrice = (Number(row.qty) || 1) * (Number(row.sellingPrice) || 0);
+  // Recalculate row totals: Main calculations are strictly based on CONG'S PRICE
+  const mainPrice = Number(row.congPrice) || 0;
+  row.totalSellingPrice = (Number(row.qty) || 1) * mainPrice;
 
   // Directly update row DOM elements to avoid losing input focus while typing
   const totalUnitEl = document.getElementById(`row-totalUnit-${row.id}`);
@@ -1446,7 +1461,7 @@ window.handleStartEditTxn = function (txnId) {
         congPrice: rowCongPrice,
         sellingPrice: rowSellingPrice,
         totalUnit: rowQty,
-        totalSellingPrice: rowQty * rowSellingPrice
+        totalSellingPrice: rowQty * rowCongPrice
       };
     }) : [createEmptyMedRow()]
   };
@@ -1563,6 +1578,8 @@ window.saveCustomerTransaction = function () {
     }
 
     const isSub = Boolean(row.isSubstitute || row.actualInventoryId !== row.selectedMedId);
+    const rowCong = Number(row.congPrice !== undefined && row.congPrice !== null ? row.congPrice : (actualItem.congPrice || 0));
+    const rowSelling = Number(row.sellingPrice !== undefined && row.sellingPrice !== null ? row.sellingPrice : (actualItem.sellingPrice || 0));
 
     transactionItems.push({
       id: actualItem.id,                      // ID for receipt / display
@@ -1573,11 +1590,11 @@ window.saveCustomerTransaction = function () {
       isSubstitute: isSub,
       qty: qty,
       unitPrice: Number(row.unitPrice || 0),
-      congPrice: Number(row.congPrice || 0),
-      sellingPrice: Number(row.sellingPrice || actualItem.sellingPrice || 0),
-      price: Number(row.sellingPrice || actualItem.sellingPrice || 0), // compatibility with receipt
+      congPrice: rowCong,
+      sellingPrice: rowSelling,
+      price: rowCong,                         // Primary transaction calculation price (Cong's Price)
       totalUnit: qty,
-      subtotal: qty * (Number(row.sellingPrice) || 0)
+      subtotal: qty * rowCong                 // Total amount based on Cong's Price
     });
   }
 
