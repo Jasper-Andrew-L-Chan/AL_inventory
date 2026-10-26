@@ -557,6 +557,50 @@ window.applyThemeMode = function (isDark) {
   }
 };
 
+// ── Hardware Performance Mode (Auto-detection & Low-Spec PC Optimization) ──
+const PERF_MODE_KEY = 'al_perf_mode';
+
+window.detectHardwarePerformance = function () {
+  const saved = localStorage.getItem(PERF_MODE_KEY);
+  if (saved !== null) {
+    return saved === 'low';
+  }
+
+  // Automatic hardware heuristics for lower-spec machines
+  const cores = navigator.hardwareConcurrency || 4;
+  const memory = navigator.deviceMemory || 8; // in GB if supported
+
+  // If machine has <= 2 CPU cores or <= 4GB RAM, default to low-spec mode for speed
+  const isLowSpec = cores <= 2 || memory <= 4;
+  return isLowSpec;
+};
+
+window.initPerformanceMode = function () {
+  const isLowSpec = window.detectHardwarePerformance();
+  window.applyPerformanceMode(isLowSpec, false);
+};
+
+window.applyPerformanceMode = function (isLow, save = true) {
+  if (save) {
+    localStorage.setItem(PERF_MODE_KEY, isLow ? 'low' : 'high');
+  }
+  if (isLow) {
+    document.body.classList.add('low-spec-mode');
+  } else {
+    document.body.classList.remove('low-spec-mode');
+  }
+  const toggle = document.getElementById('perfModeCheckbox');
+  if (toggle) toggle.checked = isLow;
+};
+
+window.togglePerformanceMode = function (enabled) {
+  window.applyPerformanceMode(enabled, true);
+};
+
+// Initialize theme & performance mode
+window.initThemeMode();
+window.initPerformanceMode();
+
 // ── System Version & Build Telemetry ─────────────────────────────────────────
 window.APP_CONFIG = {
   version: '2.2.1',

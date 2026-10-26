@@ -193,6 +193,28 @@ function renderSettingsView(container) {
           </div>
         ` : ''}
 
+        <!-- Device Performance & Low-Spec PC Optimization Card -->
+        <div class="card" style="padding: 1.5rem; margin-bottom: 0; border: 1px solid var(--border-color); box-shadow: var(--shadow-sm);">
+          <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.75rem; flex-wrap: wrap; gap: 0.5rem;">
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <div style="width: 32px; height: 32px; border-radius: 8px; background: #f0fdf4; color: #16a34a; display: flex; align-items: center; justify-content: center;">
+                <i data-lucide="zap" style="width: 17px; height: 17px;"></i>
+              </div>
+              <div>
+                <h3 style="font-size: 1.05rem; font-weight: 700; color: var(--text-main); margin: 0;">Device Performance & Low-Spec PC Mode</h3>
+                <div style="font-size: 0.74rem; color: var(--text-muted);">Optimize animations, memory usage, and GPU rendering for slower computers</div>
+              </div>
+            </div>
+            <label style="display: inline-flex; align-items: center; gap: 8px; cursor: pointer; font-weight: 700; font-size: 0.82rem; color: var(--text-main);">
+              <input type="checkbox" id="perfModeCheckbox" ${document.body.classList.contains('low-spec-mode') ? 'checked' : ''} onchange="window.togglePerformanceMode(this.checked)" style="width: 17px; height: 17px; accent-color: var(--primary); cursor: pointer;" />
+              <span>Enable Low-Spec PC Mode</span>
+            </label>
+          </div>
+          <div style="font-size: 0.78rem; color: var(--text-muted); line-height: 1.5;">
+            When enabled, the system disables GPU-heavy background blurs, animated orbs, and reduces DOM memory footprint. The inventory table also automatically paginates into lightweight batches so typing and scrolling remain lightning fast even on older Intel Celeron, Pentium, or 4GB RAM PCs.
+          </div>
+        </div>
+
         <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem; padding-top: 0.5rem;">
           ${isOwnerOrAdmin ? `
             <button type="button" onclick="handleResetData()" style="color: #dc2626; background: #fff1f2; border: 1px solid #fecaca; padding: 0.6rem 1rem; border-radius: var(--radius-sm); font-size: 0.8rem; font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; gap: 6px;">

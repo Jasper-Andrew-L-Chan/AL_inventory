@@ -13,6 +13,9 @@ let inventorySearchQuery = '';
 let inventoryCurrentTab = 'inventory';
 let selectedInventoryItemIds = new Set();
 let lastClickedItemId = null;
+let inventoryCurrentPage = 1;
+let inventoryPageSize = 50; // High performance chunking for smooth rendering on any PC
+let searchDebounceTimer = null;
 
 function renderInventoryView(container) {
   const items = window.pharmacyStore.getItems();
@@ -252,6 +255,9 @@ function renderInventoryView(container) {
           ${renderInventoryTableRows(displayedItems)}
         </tbody>
       </table>
+      <div id="inventoryPaginationContainer">
+        ${renderInventoryPaginationBar(displayedItems)}
+      </div>
     </div>
 
     <!-- Add/Edit Medicine Modal -->
@@ -470,8 +476,9 @@ function updateSelectionUI() {
   const selectedCount = selectedInventoryItemIds.size;
   const allFilteredSelected = displayed.length > 0 && displayed.every(i => selectedInventoryItemIds.has(i.id));
 
-  // Update table rows and checkboxes directly for maximum responsiveness
-  displayed.forEach(item => {
+  // Update table rows and checkboxes directly for maximum responsiveness on current page
+  const visibleItems = getPaginatedInventoryItems(displayed);
+  visibleItems.forEach(item => {
     const isSelected = selectedInventoryItemIds.has(item.id);
     const row = document.getElementById(`inv-row-${item.id}`);
     if (row) {
@@ -717,6 +724,86 @@ function getFilteredInventoryItems() {
   });
 }
 
+function getPaginatedInventoryItems(items) {
+  if (!items || items.length === 0) return [];
+  if (inventoryPageSize <= 0 || inventoryPageSize >= 99999) return items;
+  const start = (inventoryCurrentPage - 1) * inventoryPageSize;
+  return items.slice(start, start + inventoryPageSize);
+}
+
+function renderInventoryPaginationBar(totalItems) {
+  const total = (totalItems || []).length;
+  if (total === 0) return '';
+
+  const totalPages = inventoryPageSize > 0 ? Math.ceil(total / inventoryPageSize) : 1;
+  const start = inventoryPageSize > 0 ? (inventoryCurrentPage - 1) * inventoryPageSize + 1 : 1;
+  const end = inventoryPageSize > 0 ? Math.min(inventoryCurrentPage * inventoryPageSize, total) : total;
+
+  return `
+    <div class="inventory-pagination-bar">
+      <div style="display: flex; align-items: center; gap: 8px;">
+        <span>Showing <strong>${start}–${end}</strong> of <strong>${total}</strong> medicines</span>
+        <span style="color: var(--border-color);">|</span>
+        <label style="display: flex; align-items: center; gap: 4px; font-size: 0.78rem;">
+          <span>Per Page:</span>
+          <select 
+            id="invPageSizeSelect" 
+            onchange="changeInventoryPageSize(this.value)" 
+            style="padding: 2px 6px; border: 1px solid var(--border-color); border-radius: 4px; font-size: 0.78rem; background: var(--bg-card); color: var(--text-main);"
+          >
+            <option value="50" ${inventoryPageSize === 50 ? 'selected' : ''}>50 (Fastest)</option>
+            <option value="100" ${inventoryPageSize === 100 ? 'selected' : ''}>100 (Balanced)</option>
+            <option value="250" ${inventoryPageSize === 250 ? 'selected' : ''}>250</option>
+            <option value="99999" ${inventoryPageSize >= 99999 ? 'selected' : ''}>Show All (${total})</option>
+          </select>
+        </label>
+      </div>
+
+      <div style="display: flex; align-items: center; gap: 6px;">
+        <button 
+          type="button" 
+          class="pagination-btn" 
+          onclick="changeInventoryPage(1)" 
+          ${inventoryCurrentPage <= 1 ? 'disabled' : ''} 
+          title="First Page"
+        >
+          &laquo;
+        </button>
+        <button 
+          type="button" 
+          class="pagination-btn" 
+          onclick="changeInventoryPage(${inventoryCurrentPage - 1})" 
+          ${inventoryCurrentPage <= 1 ? 'disabled' : ''} 
+          title="Previous Page"
+        >
+          &lsaquo; Prev
+        </button>
+        <span style="padding: 0 6px; font-weight: 700; color: var(--text-main);">
+          Page ${inventoryCurrentPage} of ${totalPages}
+        </span>
+        <button 
+          type="button" 
+          class="pagination-btn" 
+          onclick="changeInventoryPage(${inventoryCurrentPage + 1})" 
+          ${inventoryCurrentPage >= totalPages ? 'disabled' : ''} 
+          title="Next Page"
+        >
+          Next &rsaquo;
+        </button>
+        <button 
+          type="button" 
+          class="pagination-btn" 
+          onclick="changeInventoryPage(${totalPages})" 
+          ${inventoryCurrentPage >= totalPages ? 'disabled' : ''} 
+          title="Last Page"
+        >
+          &raquo;
+        </button>
+      </div>
+    </div>
+  `;
+}
+
 function renderInventoryTableRows(displayedItems) {
   if (!displayedItems || displayedItems.length === 0) {
     return `
@@ -737,7 +824,10 @@ function renderInventoryTableRows(displayedItems) {
     `;
   }
 
-  return displayedItems.map(item => {
+  // Slice for high-performance rendering (e.g. 50 items at a time instead of 1,593 simultaneous DOM elements)
+  const paginatedItems = getPaginatedInventoryItems(displayedItems);
+
+  return paginatedItems.map(item => {
     const isLow = item.currentStock <= item.reorderLevel;
     const expDate = new Date(item.expiryDate);
     const now = new Date();
@@ -872,32 +962,78 @@ function renderInventoryTableRows(displayedItems) {
   }).join('');
 }
 
-// ── Search & Subtabs ─────────────────────────────────────────────────────────
+// ── Search & Subtabs (with Smart Debouncing & Low-Spec PC Optimization) ──────
 
-window.handleInventorySearch = function(query) {
-  inventorySearchQuery = query;
-
+function refreshInventoryTableDOM() {
   const tbody = document.getElementById('inventoryTableBody');
   const countBadge = document.getElementById('inventoryCountText');
+  const paginationContainer = document.getElementById('inventoryPaginationContainer');
 
   if (tbody) {
     const displayedItems = getFilteredInventoryItems();
+    
+    // Ensure currentPage is within bounds
+    const totalPages = inventoryPageSize > 0 ? Math.ceil(displayedItems.length / inventoryPageSize) : 1;
+    if (inventoryCurrentPage > totalPages) {
+      inventoryCurrentPage = Math.max(1, totalPages);
+    }
+
     tbody.innerHTML = renderInventoryTableRows(displayedItems);
+    
+    if (paginationContainer) {
+      paginationContainer.innerHTML = renderInventoryPaginationBar(displayedItems);
+    }
+
     if (countBadge) {
       const inStockCount = displayedItems.filter(i => (Number(i.currentStock) || 0) > 0).length;
       const totalUnits = displayedItems.reduce((acc, c) => acc + (Number(c.currentStock) || 0), 0);
       countBadge.textContent = `${displayedItems.length} displayed • ${inStockCount} in stock (${totalUnits.toLocaleString()} units)`;
     }
+
+    // Target icon initialization only within the inventory table for maximum speed
     if (typeof lucide !== 'undefined') {
-      lucide.createIcons();
+      lucide.createIcons({
+        root: tbody
+      });
     }
   } else {
     renderInventoryView(document.getElementById('main-content'));
   }
+}
+
+window.handleInventorySearch = function(query) {
+  inventorySearchQuery = query;
+  inventoryCurrentPage = 1; // Reset to page 1 on search
+
+  if (searchDebounceTimer) {
+    clearTimeout(searchDebounceTimer);
+  }
+
+  // 120ms debounce prevents CPU stutter while typing on lower-spec machines
+  searchDebounceTimer = setTimeout(() => {
+    refreshInventoryTableDOM();
+  }, 120);
+};
+
+window.changeInventoryPage = function(newPage) {
+  inventoryCurrentPage = Math.max(1, newPage);
+  refreshInventoryTableDOM();
+  // Smooth scroll back to top of table
+  const table = document.getElementById('inventoryTable');
+  if (table) {
+    table.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  }
+};
+
+window.changeInventoryPageSize = function(newSize) {
+  inventoryPageSize = Number(newSize) || 50;
+  inventoryCurrentPage = 1;
+  refreshInventoryTableDOM();
 };
 
 window.switchInventoryTab = function(tab) {
   inventoryCurrentTab = tab;
+  inventoryCurrentPage = 1;
   renderInventoryView(document.getElementById('main-content'));
 };
 
@@ -908,7 +1044,7 @@ window.fastAdjustStock = function(itemId, multiplier) {
   const val = Number(input.value) || 1;
   const change = val * multiplier;
   window.pharmacyStore.adjustStock(itemId, change, 'Quick adjustment on inventory table');
-  renderInventoryView(document.getElementById('main-content'));
+  refreshInventoryTableDOM();
 };
 
 // ── Quick Add Form Handler ──────────────────────────────────────────────────
