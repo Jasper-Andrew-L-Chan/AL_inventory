@@ -15,117 +15,117 @@ $dbFile = Join-Path $dataDir "pharmacy_db.json"
 # Initialize central shared DB file if not exists
 if (-not (Test-Path $dbFile)) {
     $initialDb = @{
-        version = 1
-        lastUpdated = (Get-Date).ToString("o")
-        items = @()
+        version      = 1
+        lastUpdated  = (Get-Date).ToString("o")
+        items        = @()
         transactions = @()
-        settings = @{
-            pharmacyName = "AffordaLabs Pharmacy"
-            tagline = "Your Trusted Community Drugstore"
-            branch = "Main Branch - Pasig City"
-            address = "128 Mabini St, Kapasigan, Pasig City, Metro Manila"
-            tin = "302-841-925-000"
+        settings     = @{
+            pharmacyName       = "AffordaLabs Pharmacy"
+            tagline            = "Your Trusted Community Drugstore"
+            branch             = "Main Branch - Pasig City"
+            address            = "128 Mabini St, Kapasigan, Pasig City, Metro Manila"
+            tin                = "302-841-925-000"
             pharmacistInCharge = "Jasper Andrew Chan, RPh"
-            prcLicense = "PRC-0089142"
-            birAccreditation = "BIR-RR7-2024-00981"
-            phone = "(02) 8642-9912 / 0917-123-4567"
-            currency = "PHP"
-            currencySymbol = "PHP"
+            prcLicense         = "PRC-0089142"
+            birAccreditation   = "BIR-RR7-2024-00981"
+            phone              = "(02) 8642-9912 / 0917-123-4567"
+            currency           = "PHP"
+            currencySymbol     = "PHP"
             seniorDiscountRate = 20
-            vatRate = 12
-            vatExemptSenior = $true
+            vatRate            = 12
+            vatExemptSenior    = $true
         }
-        staff = @(
+        staff        = @(
             @{ id = 'stf-1'; name = 'Jasper Andrew Chan'; role = 'Pharmacist-in-Charge / Owner'; license = 'PRC-0089142'; phone = '0917-123-4567'; status = 'Active' },
             @{ id = 'stf-2'; name = 'Lionel Santos'; role = 'Staff Pharmacist'; license = 'PRC-0092144'; phone = '0918-234-5678'; status = 'Active' },
             @{ id = 'stf-3'; name = 'Sarah Dela Cruz'; role = 'Pharmacy Assistant'; license = 'TESDA NC-III'; phone = '0922-345-6789'; status = 'Active' },
             @{ id = 'stf-4'; name = 'Mark Ramos'; role = 'Inventory Specialist'; license = '-'; phone = '0919-456-7890'; status = 'Active' }
         )
-        drawer = @{
-            shiftDate = (Get-Date).ToString("yyyy-MM-dd")
-            openedAt = "08:00 AM"
-            openedBy = "Lionel Santos"
-            openingFloat = 2000.00
+        drawer       = @{
+            shiftDate           = (Get-Date).ToString("yyyy-MM-dd")
+            openedAt            = "08:00 AM"
+            openedBy            = "Lionel Santos"
+            openingFloat        = 2000.00
             currentCashInDrawer = 2000.00
-            expectedCash = 2000.00
-            discrepancy = 0.00
-            status = "Open"
+            expectedCash        = 2000.00
+            discrepancy         = 0.00
+            status              = "Open"
         }
-        users = @(
+        users        = @(
             @{
-                id = 'usr-001'
-                username = 'andrew'
-                password = 'andrew123'
-                fullName = 'Jasper Andrew Chan, RPh'
-                firstName = 'Andrew'
-                initials = 'AC'
-                role = 'Pharmacist-in-Charge / Owner'
-                level = 'Owner'
+                id          = 'usr-001'
+                username    = 'andrew'
+                password    = 'andrew123'
+                fullName    = 'Jasper Andrew Chan, RPh'
+                firstName   = 'Andrew'
+                initials    = 'AC'
+                role        = 'Pharmacist-in-Charge / Owner'
+                level       = 'Owner'
                 permissions = @('home', 'dashboard', 'transactions', 'reports', 'inventory', 'staff', 'cashdrawer', 'settings')
-                prcLicense = 'PRC-0089142'
-                phone = '0917-123-4567'
-                status = 'Active'
-                avatar = $null
+                prcLicense  = 'PRC-0089142'
+                phone       = '0917-123-4567'
+                status      = 'Active'
+                avatar      = $null
             },
             @{
-                id = 'usr-005'
-                username = 'admin'
-                password = 'admin123'
-                fullName = 'System Administrator'
-                firstName = 'Admin'
-                initials = 'SA'
-                role = 'Owner / Administrator'
-                level = 'Admin'
+                id          = 'usr-005'
+                username    = 'admin'
+                password    = 'admin123'
+                fullName    = 'System Administrator'
+                firstName   = 'Admin'
+                initials    = 'SA'
+                role        = 'Owner / Administrator'
+                level       = 'Admin'
                 permissions = @('home', 'dashboard', 'transactions', 'reports', 'inventory', 'staff', 'cashdrawer', 'settings')
-                prcLicense = 'N/A'
-                phone = '0900-000-0000'
-                status = 'Active'
-                avatar = $null
+                prcLicense  = 'N/A'
+                phone       = '0900-000-0000'
+                status      = 'Active'
+                avatar      = $null
             },
             @{
-                id = 'usr-002'
-                username = 'lionel'
-                password = 'lionel123'
-                fullName = 'Lionel Santos, RPh'
-                firstName = 'Lionel'
-                initials = 'LS'
-                role = 'Staff Pharmacist'
-                level = 'Staff'
+                id          = 'usr-002'
+                username    = 'lionel'
+                password    = 'lionel123'
+                fullName    = 'Lionel Santos, RPh'
+                firstName   = 'Lionel'
+                initials    = 'LS'
+                role        = 'Staff Pharmacist'
+                level       = 'Staff'
                 permissions = @('home', 'dashboard', 'transactions', 'reports', 'inventory', 'cashdrawer')
-                prcLicense = 'PRC-0092144'
-                phone = '0918-234-5678'
-                status = 'Active'
-                avatar = $null
+                prcLicense  = 'PRC-0092144'
+                phone       = '0918-234-5678'
+                status      = 'Active'
+                avatar      = $null
             },
             @{
-                id = 'usr-003'
-                username = 'sarah'
-                password = 'sarah123'
-                fullName = 'Sarah Dela Cruz'
-                firstName = 'Sarah'
-                initials = 'SD'
-                role = 'Pharmacy Assistant'
-                level = 'Staff'
+                id          = 'usr-003'
+                username    = 'sarah'
+                password    = 'sarah123'
+                fullName    = 'Sarah Dela Cruz'
+                firstName   = 'Sarah'
+                initials    = 'SD'
+                role        = 'Pharmacy Assistant'
+                level       = 'Staff'
                 permissions = @('home', 'transactions', 'inventory', 'cashdrawer')
-                prcLicense = 'TESDA NC-III'
-                phone = '0922-345-6789'
-                status = 'Active'
-                avatar = $null
+                prcLicense  = 'TESDA NC-III'
+                phone       = '0922-345-6789'
+                status      = 'Active'
+                avatar      = $null
             },
             @{
-                id = 'usr-004'
-                username = 'mark'
-                password = 'mark123'
-                fullName = 'Mark Ramos'
-                firstName = 'Mark'
-                initials = 'MR'
-                role = 'Inventory Specialist'
-                level = 'Staff'
+                id          = 'usr-004'
+                username    = 'mark'
+                password    = 'mark123'
+                fullName    = 'Mark Ramos'
+                firstName   = 'Mark'
+                initials    = 'MR'
+                role        = 'Inventory Specialist'
+                level       = 'Staff'
                 permissions = @('home', 'inventory', 'reports')
-                prcLicense = 'INV-REG-2024'
-                phone = '0919-456-7890'
-                status = 'Active'
-                avatar = $null
+                prcLicense  = 'INV-REG-2024'
+                phone       = '0919-456-7890'
+                status      = 'Active'
+                avatar      = $null
             }
         )
     }
@@ -136,9 +136,10 @@ if (-not (Test-Path $dbFile)) {
 # Determine active IP addresses for easy user reference
 $ipAddresses = try {
     [System.Net.Dns]::GetHostAddresses([System.Net.Dns]::GetHostName()) | 
-        Where-Object { $_.AddressFamily -eq [System.Net.Sockets.AddressFamily]::InterNetwork -and $_.IPAddressToString -ne '127.0.0.1' } |
-        ForEach-Object { $_.IPAddressToString }
-} catch { @() }
+    Where-Object { $_.AddressFamily -eq [System.Net.Sockets.AddressFamily]::InterNetwork -and $_.IPAddressToString -ne '127.0.0.1' } |
+    ForEach-Object { $_.IPAddressToString }
+}
+catch { @() }
 
 $tcpListener = New-Object System.Net.Sockets.TcpListener([System.Net.IPAddress]::Any, $Port)
 
@@ -153,7 +154,8 @@ try {
     }
     Write-Host "  - Shared DB:     $dbFile" -ForegroundColor Cyan
     Write-Host "==========================================================" -ForegroundColor Green
-} catch {
+}
+catch {
     Write-Error "Failed to start listener on port ${Port}: $_"
     exit 1
 }
@@ -162,19 +164,19 @@ function Get-ContentType($filePath) {
     $ext = [System.IO.Path]::GetExtension($filePath).ToLowerInvariant()
     switch ($ext) {
         ".html" { "text/html; charset=utf-8" }
-        ".htm"  { "text/html; charset=utf-8" }
-        ".css"  { "text/css; charset=utf-8" }
-        ".js"   { "application/javascript; charset=utf-8" }
+        ".htm" { "text/html; charset=utf-8" }
+        ".css" { "text/css; charset=utf-8" }
+        ".js" { "application/javascript; charset=utf-8" }
         ".json" { "application/json; charset=utf-8" }
-        ".png"  { "image/png" }
-        ".jpg"  { "image/jpeg" }
+        ".png" { "image/png" }
+        ".jpg" { "image/jpeg" }
         ".jpeg" { "image/jpeg" }
-        ".gif"  { "image/gif" }
-        ".svg"  { "image/svg+xml" }
-        ".ico"  { "image/x-icon" }
+        ".gif" { "image/gif" }
+        ".svg" { "image/svg+xml" }
+        ".ico" { "image/x-icon" }
         ".woff" { "font/woff" }
-        ".woff2"{ "font/woff2" }
-        ".ttf"  { "font/ttf" }
+        ".woff2" { "font/woff2" }
+        ".ttf" { "font/ttf" }
         Default { "application/octet-stream" }
     }
 }
@@ -235,7 +237,8 @@ try {
             if ($path -eq "api/data" -and $method -eq "GET") {
                 $dbJson = if (Test-Path $dbFile) {
                     [System.IO.File]::ReadAllText($dbFile, [System.Text.Encoding]::UTF8)
-                } else {
+                }
+                else {
                     '{"items":[],"transactions":[]}'
                 }
                 $resBytes = [System.Text.Encoding]::UTF8.GetBytes($dbJson)
@@ -264,7 +267,8 @@ try {
                     $payload = $body | ConvertFrom-Json
                     $existing = if (Test-Path $dbFile) {
                         (Get-Content -Path $dbFile -Raw -Encoding UTF8) | ConvertFrom-Json
-                    } else {
+                    }
+                    else {
                         New-Object PSObject
                     }
 
@@ -285,7 +289,8 @@ try {
                     Move-Item -Path $tempFile -Destination $dbFile -Force
 
                     $respJson = '{"success":true,"version":' + $newVersion + '}'
-                } catch {
+                }
+                catch {
                     $respJson = '{"success":false,"error":' + ($_.Exception.Message | ConvertTo-Json) + '}'
                 }
 
@@ -346,7 +351,8 @@ try {
                     $stream.Write($fileBytes, 0, $fileBytes.Length)
                 }
                 $stream.Flush()
-            } else {
+            }
+            else {
                 $notFound = [System.Text.Encoding]::UTF8.GetBytes("404 Not Found: $path")
                 $header = "HTTP/1.1 404 Not Found`r`nContent-Type: text/plain`r`nContent-Length: $($notFound.Length)`r`nConnection: close`r`n`r`n"
                 $headerBytes = [System.Text.Encoding]::UTF8.GetBytes($header)
@@ -356,12 +362,15 @@ try {
                 }
                 $stream.Flush()
             }
-        } catch {
+        }
+        catch {
             # Client socket errors
-        } finally {
+        }
+        finally {
             try { $client.Close() } catch {}
         }
     }
-} finally {
+}
+finally {
     $tcpListener.Stop()
 }

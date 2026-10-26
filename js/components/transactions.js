@@ -79,7 +79,7 @@ function createEmptyMedRow() {
 function renderTransactionsView(container) {
   const allTxns = window.pharmacyStore.getTransactions();
   const rawInventoryItems = window.pharmacyStore.getItems();
-  
+
   // Sort medicines alphabetically A-Z, placing out-of-stock items at the bottom
   const inventoryItems = [...rawInventoryItems].sort((a, b) => {
     const stockA = Number(a.currentStock) || 0;
@@ -381,8 +381,8 @@ function renderDetailsTabHtml(editingTxnId, currentTxnForm, allTxns, inventoryIt
                 <div style="padding: 0.25rem 0.65rem; border-radius: 4px; font-size: 0.76rem; font-weight: 700; display: inline-flex; align-items: center; gap: 0.35rem; ${isOverBudget ? 'background: #fee2e2; color: #b91c1c;' : 'background: #ecfdf5; color: #047857;'}">
                   <i data-lucide="${isOverBudget ? 'alert-triangle' : 'check'}" style="width: 13px; height: 13px;"></i>
                   <span>${isOverBudget
-          ? `Over Budget by ₱${(formGrandTotalSelling - customerBudget).toFixed(2)}`
-          : `Within Budget (₱${(customerBudget - formGrandTotalSelling).toFixed(2)} remaining)`}</span>
+        ? `Over Budget by ₱${(formGrandTotalSelling - customerBudget).toFixed(2)}`
+        : `Within Budget (₱${(customerBudget - formGrandTotalSelling).toFixed(2)} remaining)`}</span>
                 </div>
               ` : ''}
             </div>
@@ -532,14 +532,14 @@ function renderLogsTabHtml(filteredTxns, totalTxnCount, totalTxnPages, startTxnI
                 </td>
               </tr>
             ` : (() => {
-              // Helper to render an individual transaction row + expanded row
-              const renderSingleTxnRow = (t) => {
-                const isExpanded = expandedTxnId === t.id;
-                const isRefunded = t.status === 'Refunded';
-                const encName = t.encoderName || t.cashier || 'Encoder';
-                const encLicense = t.encoderLicense !== undefined ? t.encoderLicense : (t.cashierLicense || '');
+      // Helper to render an individual transaction row + expanded row
+      const renderSingleTxnRow = (t) => {
+        const isExpanded = expandedTxnId === t.id;
+        const isRefunded = t.status === 'Refunded';
+        const encName = t.encoderName || t.cashier || 'Encoder';
+        const encLicense = t.encoderLicense !== undefined ? t.encoderLicense : (t.cashierLicense || '');
 
-                return `
+        return `
                   <tr style="${isRefunded ? 'opacity: 0.6; background: #fff1f2;' : ''}">
                     <td style="text-align: center; cursor: pointer;" onclick="toggleExpandTxn('${t.id}')">
                       <span style="display: inline-flex; align-items: center; justify-content: center; color: var(--primary);">
@@ -584,21 +584,21 @@ function renderLogsTabHtml(filteredTxns, totalTxnCount, totalTxnPages, startTxnI
                     <td style="font-size: 0.82rem; padding: 0.6rem 0.75rem;">
                       <div style="display: flex; flex-direction: column; gap: 4px; font-weight: 500; color: var(--text-main);">
                         ${t.items.map(i => {
-                          const wasSubstituted = i.isSubstitute || (i.actualSuppliedName && i.actualSuppliedName !== i.name);
-                          if (wasSubstituted) {
-                            return `<div style="display: flex; align-items: flex-start; gap: 6px; line-height: 1.35;">
+          const wasSubstituted = i.isSubstitute || (i.actualSuppliedName && i.actualSuppliedName !== i.name);
+          if (wasSubstituted) {
+            return `<div style="display: flex; align-items: flex-start; gap: 6px; line-height: 1.35;">
                                       <span style="color: var(--primary); font-weight: 700; user-select: none;">•</span>
                                       <div>
                                         <strong>${escapeHtml(i.actualSuppliedName || i.name)}</strong> (x${i.qty})
                                         <span style="font-size: 0.7rem; color: #d97706; background: #fef3c7; padding: 1px 5px; border-radius: 3px; margin-left: 4px;">Substituted for ${escapeHtml(i.requestedName || i.name)}</span>
                                       </div>
                                     </div>`;
-                          }
-                          return `<div style="display: flex; align-items: flex-start; gap: 6px; line-height: 1.35;">
+          }
+          return `<div style="display: flex; align-items: flex-start; gap: 6px; line-height: 1.35;">
                                     <span style="color: var(--primary); font-weight: 700; user-select: none;">•</span>
                                     <span>${escapeHtml(i.name)} (x${i.qty})</span>
                                   </div>`;
-                        }).join('')}
+        }).join('')}
                       </div>
                     </td>
                     <td style="text-align: right; font-weight: 800; font-size: 0.95rem; color: var(--text-main);">
@@ -702,27 +702,27 @@ function renderLogsTabHtml(filteredTxns, totalTxnCount, totalTxnPages, startTxnI
                     </tr>
                   ` : ''}
                 `;
-              };
+      };
 
-              // If Barangay grouping is active, group the page items (or all filtered items)
-              if (txnGroupByBarangay) {
-                // Group transactions by normalized barangay name
-                const brgyGroups = new Map();
-                pageTxns.forEach(t => {
-                  const brgyKey = normalizeBarangayName(t.barangay);
-                  if (!brgyGroups.has(brgyKey)) {
-                    brgyGroups.set(brgyKey, []);
-                  }
-                  brgyGroups.get(brgyKey).push(t);
-                });
+      // If Barangay grouping is active, group the page items (or all filtered items)
+      if (txnGroupByBarangay) {
+        // Group transactions by normalized barangay name
+        const brgyGroups = new Map();
+        pageTxns.forEach(t => {
+          const brgyKey = normalizeBarangayName(t.barangay);
+          if (!brgyGroups.has(brgyKey)) {
+            brgyGroups.set(brgyKey, []);
+          }
+          brgyGroups.get(brgyKey).push(t);
+        });
 
-                // Render group headers and rows
-                let groupedHtml = '';
-                brgyGroups.forEach((groupTxns, brgyTitle) => {
-                  const groupTotalAmount = groupTxns.reduce((sum, item) => sum + (Number(item.netTotal) || 0), 0);
-                  const isUnspecified = brgyTitle === 'Barangay Not Specified';
+        // Render group headers and rows
+        let groupedHtml = '';
+        brgyGroups.forEach((groupTxns, brgyTitle) => {
+          const groupTotalAmount = groupTxns.reduce((sum, item) => sum + (Number(item.netTotal) || 0), 0);
+          const isUnspecified = brgyTitle === 'Barangay Not Specified';
 
-                  groupedHtml += `
+          groupedHtml += `
                     <!-- Barangay Group Heading Banner -->
                     <tr style="background: ${isUnspecified ? '#f8fafc' : '#f0fdf4'}; border-top: 2px solid ${isUnspecified ? '#cbd5e1' : '#86efac'}; border-bottom: 1.5px solid ${isUnspecified ? '#e2e8f0' : '#bbf7d0'};">
                       <td colspan="8" style="padding: 0.65rem 1rem;">
@@ -746,18 +746,18 @@ function renderLogsTabHtml(filteredTxns, totalTxnCount, totalTxnPages, startTxnI
                     </tr>
                   `;
 
-                  // Render each transaction belonging to this Barangay
-                  groupTxns.forEach(t => {
-                    groupedHtml += renderSingleTxnRow(t);
-                  });
-                });
+          // Render each transaction belonging to this Barangay
+          groupTxns.forEach(t => {
+            groupedHtml += renderSingleTxnRow(t);
+          });
+        });
 
-                return groupedHtml;
-              } else {
-                // Default chronological table listing
-                return pageTxns.map(t => renderSingleTxnRow(t)).join('');
-              }
-            })()}
+        return groupedHtml;
+      } else {
+        // Default chronological table listing
+        return pageTxns.map(t => renderSingleTxnRow(t)).join('');
+      }
+    })()}
           </tbody>
         </table>
       </div>
@@ -890,14 +890,15 @@ function renderMedRowHtml(row, idx, inventoryItems) {
             <datalist id="medList_${row.id}">
               <option value="+ Custom / Unlisted Medicine...">+ Custom / Unlisted Medicine...</option>
               ${inventoryItems.map(item => {
-                const congP = Number(item.congPrice || 0);
-                const sellP = Number(item.sellingPrice || 0);
-                const displayPrice = congP > 0 ? `Cong: ₱${congP.toFixed(2)}` : `₱${sellP.toFixed(2)}`;
-                return `
+    const congP = Number(item.congPrice || 0);
+    const sellP = Number(item.sellingPrice || 0);
+    const displayPrice = congP > 0 ? `Cong: ₱${congP.toFixed(2)}` : `₱${sellP.toFixed(2)}`;
+    return `
                 <option value="${escapeHtml(getMedicineDisplayName(item))}" data-id="${item.id}">
                   [${item.currentStock > 0 ? item.currentStock + ' in stock' : 'OUT OF STOCK'}] ${displayPrice}
                 </option>
-              `;}).join('')}
+              `;
+  }).join('')}
             </datalist>
           </div>
 
@@ -981,16 +982,17 @@ function renderMedRowHtml(row, idx, inventoryItems) {
                   />
                   <datalist id="subList_${row.id}">
                     ${inventoryItems
-          .filter(item => item.id !== row.selectedMedId)
-          .map(item => {
-            const congP = Number(item.congPrice || 0);
-            const sellP = Number(item.sellingPrice || 0);
-            const priceLabel = congP > 0 ? `Cong: ₱${congP.toFixed(2)}` : `₱${sellP.toFixed(2)}`;
-            return `
+        .filter(item => item.id !== row.selectedMedId)
+        .map(item => {
+          const congP = Number(item.congPrice || 0);
+          const sellP = Number(item.sellingPrice || 0);
+          const priceLabel = congP > 0 ? `Cong: ₱${congP.toFixed(2)}` : `₱${sellP.toFixed(2)}`;
+          return `
                         <option value="${escapeHtml(getMedicineDisplayName(item))}" data-id="${item.id}">
                           (${item.currentStock} in stock, ${priceLabel})
                         </option>
-                      `;}).join('')}
+                      `;
+        }).join('')}
                   </datalist>
                 </div>
                 ${actualItem ? `
@@ -1245,7 +1247,7 @@ window.onSelectPrimaryMedicine = function (rowId, selectedId) {
     row.customMedName = '';
     const stock = Number(found.currentStock || 0);
     const unitCost = Number(found.costPrice || found.unitPrice || 0);
-    
+
     // Selling price: if item has a valid selling price different from unit cost, use it; otherwise unitCost * 1.2
     let sellP = Number(found.sellingPrice || 0);
     if (unitCost > 0 && (sellP === 0 || Math.abs(sellP - unitCost) < 0.001)) {
@@ -2137,8 +2139,8 @@ function renderHourlyTabHtml(allTxns) {
       <!-- Custom SVG / CSS Bar Chart for Hourly Performance -->
       <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(80px, 1fr)); gap: 0.75rem; align-items: flex-end; height: 180px; padding: 1rem 0; border-bottom: 1px solid var(--border-color);">
         ${hourlySlots.map(s => {
-          const pct = Math.round((s.totalAmount / maxSlotAmount) * 100);
-          return `
+    const pct = Math.round((s.totalAmount / maxSlotAmount) * 100);
+    return `
             <div style="display: flex; flex-direction: column; align-items: center; height: 100%; justify-content: flex-end; gap: 6px;">
               <div style="font-size: 0.7rem; font-weight: 700; color: var(--text-main);">${s.totalAmount > 0 ? `₱${Math.round(s.totalAmount)}` : ''}</div>
               <div style="width: 100%; max-width: 42px; height: ${Math.max(pct, 4)}%; background: ${s === peakSlot && s.totalAmount > 0 ? 'linear-gradient(180deg, #f59e0b 0%, #d97706 100%)' : 'linear-gradient(180deg, var(--primary) 0%, var(--primary-dark) 100%)'}; border-radius: 4px 4px 0 0; transition: height 0.3s ease;" title="${s.label}: ₱${s.totalAmount.toFixed(2)} (${s.unitsDispensed} units)"></div>
@@ -2147,7 +2149,7 @@ function renderHourlyTabHtml(allTxns) {
               </div>
             </div>
           `;
-        }).join('')}
+  }).join('')}
       </div>
     </div>
 
@@ -2176,13 +2178,13 @@ function renderHourlyTabHtml(allTxns) {
           </thead>
           <tbody>
             ${hourlySlots.map(s => {
-              const topMeds = Object.entries(s.medMap)
-                .sort((a, b) => b[1] - a[1])
-                .slice(0, 3)
-                .map(([name, qty]) => `${name} (x${qty})`)
-                .join(', ');
+    const topMeds = Object.entries(s.medMap)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 3)
+      .map(([name, qty]) => `${name} (x${qty})`)
+      .join(', ');
 
-              return `
+    return `
                 <tr>
                   <td style="font-weight: 700; color: var(--brand-charcoal); font-size: 0.84rem;">
                     <i data-lucide="clock" style="width: 13px; height: 13px; display: inline-block; vertical-align: middle; margin-right: 4px; color: var(--primary);"></i>
@@ -2209,7 +2211,7 @@ function renderHourlyTabHtml(allTxns) {
                   </td>
                 </tr>
               `;
-            }).join('')}
+  }).join('')}
           </tbody>
         </table>
       </div>
@@ -2301,15 +2303,15 @@ function renderDailyInOutViewHtml(dailyData) {
 
         <div style="display: flex; gap: 0.75rem; align-items: flex-end; height: 160px; overflow-x: auto; padding-bottom: 0.5rem;">
           ${dailyData.slice(0, 14).reverse().map(d => {
-            const pct = Math.round((d.totalSales / maxDailySales) * 100);
-            return `
+    const pct = Math.round((d.totalSales / maxDailySales) * 100);
+    return `
               <div style="flex: 1; min-width: 45px; display: flex; flex-direction: column; align-items: center; height: 100%; justify-content: flex-end; gap: 4px;">
                 <span style="font-size: 0.68rem; font-weight: 700; color: var(--text-main);">₱${Math.round(d.totalSales)}</span>
                 <div style="width: 100%; max-width: 36px; height: ${Math.max(pct, 6)}%; background: linear-gradient(180deg, #028090 0%, #004e64 100%); border-radius: 4px 4px 0 0;" title="${d.date}: ₱${d.totalSales.toFixed(2)} (${d.unitsDispensed} units)"></div>
                 <span style="font-size: 0.68rem; color: var(--text-muted); font-weight: 600; white-space: nowrap;">${formatDateMMDDYY(d.date).slice(0, 5)}</span>
               </div>
             `;
-          }).join('')}
+  }).join('')}
         </div>
       </div>
     ` : ''}
@@ -2346,16 +2348,16 @@ function renderDailyInOutViewHtml(dailyData) {
                 </td>
               </tr>
             ` : dailyData.map(d => {
-              const topMeds = Object.entries(d.medMap)
-                .sort((a, b) => b[1] - a[1])
-                .slice(0, 2)
-                .map(([name, qty]) => `${name} (x${qty})`)
-                .join(', ');
-              const grossProfit = d.totalSales - d.totalCogs;
-              const marginPct = d.totalSales > 0 ? ((grossProfit / d.totalSales) * 100).toFixed(1) : 0;
-              const brgyList = Array.from(d.barangays).slice(0, 2).join(', ');
+    const topMeds = Object.entries(d.medMap)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 2)
+      .map(([name, qty]) => `${name} (x${qty})`)
+      .join(', ');
+    const grossProfit = d.totalSales - d.totalCogs;
+    const marginPct = d.totalSales > 0 ? ((grossProfit / d.totalSales) * 100).toFixed(1) : 0;
+    const brgyList = Array.from(d.barangays).slice(0, 2).join(', ');
 
-              return `
+    return `
                 <tr>
                   <td>
                     <div style="font-weight: 700; color: var(--brand-charcoal); font-size: 0.86rem;">
@@ -2386,7 +2388,7 @@ function renderDailyInOutViewHtml(dailyData) {
                   </td>
                 </tr>
               `;
-            }).join('')}
+  }).join('')}
           </tbody>
         </table>
       </div>
@@ -2473,8 +2475,8 @@ function renderMonthlyTabHtml(allTxns) {
         </h4>
         <div style="display: flex; flex-direction: column; gap: 1rem;">
           ${monthlyData.map(m => {
-            const pct = Math.round((m.totalSales / maxMonthSales) * 100);
-            return `
+    const pct = Math.round((m.totalSales / maxMonthSales) * 100);
+    return `
               <div>
                 <div style="display: flex; justify-content: space-between; font-size: 0.84rem; font-weight: 700; margin-bottom: 0.35rem;">
                   <span style="color: var(--brand-charcoal);">${m.label} (${m.txnCount} orders)</span>
@@ -2485,7 +2487,7 @@ function renderMonthlyTabHtml(allTxns) {
                 </div>
               </div>
             `;
-          }).join('')}
+  }).join('')}
         </div>
       </div>
     ` : ''}
@@ -2521,14 +2523,14 @@ function renderMonthlyTabHtml(allTxns) {
                 </td>
               </tr>
             ` : monthlyData.map(m => {
-              const topMeds = Object.entries(m.medMap)
-                .sort((a, b) => b[1] - a[1])
-                .slice(0, 3)
-                .map(([name, qty]) => `${name} (x${qty})`)
-                .join(', ');
-              const gp = m.totalSales - m.totalCogs;
+    const topMeds = Object.entries(m.medMap)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 3)
+      .map(([name, qty]) => `${name} (x${qty})`)
+      .join(', ');
+    const gp = m.totalSales - m.totalCogs;
 
-              return `
+    return `
                 <tr>
                   <td style="font-weight: 800; color: var(--brand-charcoal); font-size: 0.88rem;">
                     ${m.label}
@@ -2550,7 +2552,7 @@ function renderMonthlyTabHtml(allTxns) {
                   </td>
                 </tr>
               `;
-            }).join('')}
+  }).join('')}
           </tbody>
         </table>
       </div>

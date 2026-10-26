@@ -243,7 +243,7 @@ function renderInventoryView(container) {
             <th style="text-align: right; color: var(--primary); font-weight: 700;">Current Stock</th>
             <th style="text-align: right;" title="Original Unit Cost / Purchase Price">Unit Cost</th>
             <th style="text-align: right;" title="Selling Retail Price">Selling Price</th>
-            <th style="text-align: right; color: #028090; font-weight: 800; background: #f0fdfa;" title="Cong's Price (Primary Reference Price)">Cong's Price ★</th>
+            <th class="cong-price-col" style="text-align: right;" title="Cong's Price (Primary Reference Price)">Cong's Price ★</th>
             <th style="text-align: center; width: 140px;">Fast Adjust</th>
             <th style="text-align: center; width: 160px;">Actions</th>
           </tr>
@@ -311,7 +311,7 @@ function renderInventoryView(container) {
               <input type="number" id="modalSellingPrice" class="form-input" step="0.01" min="0" placeholder="0.00" required />
             </div>
             <div class="input-group">
-              <label style="font-size: 0.78rem; font-weight: 600; color: #028090; margin-bottom: 4px;">Cong's Price (₱)</label>
+              <label style="font-size: 0.78rem; font-weight: 700; color: #0284c7; margin-bottom: 4px;">Cong's Price (₱)</label>
               <input type="number" id="modalCongPrice" class="form-input" step="0.01" min="0" placeholder="0.00" />
             </div>
             <div class="input-group">
@@ -432,7 +432,7 @@ function renderInventoryView(container) {
                   <th style="text-align: right;">Unit Price (Cost)</th>
                   <th style="text-align: right;">Net Price</th>
                   <th style="text-align: right;">Selling Price</th>
-                  <th style="text-align: right; color: #028090; font-weight: 800; background: #f0fdfa;">Cong's Price ★</th>
+                  <th class="cong-price-col" style="text-align: right;">Cong's Price ★</th>
                   <th style="text-align: center;">Qty/Box</th>
                   <th>Expiry Date</th>
                   <th>Company</th>
@@ -820,7 +820,7 @@ function renderInventoryTableRows(displayedItems) {
         </td>
         <td style="text-align: right; font-size: 0.85rem; color: var(--text-muted);">₱${costVal.toFixed(2)}</td>
         <td style="text-align: right; font-weight: 700; color: var(--primary);">₱${sellVal.toFixed(2)}</td>
-        <td style="text-align: right; font-weight: 800; color: #028090; background: #f0fdfa;">
+        <td class="cong-price-col" style="text-align: right;">
           ${congVal > 0 ? `₱${congVal.toFixed(2)}` : '<span style="color: #ea580c; font-size: 0.72rem; font-weight: 700;" title="Cong\'s Price missing or unset">Unset</span>'}
         </td>
         <td style="text-align: center;" onclick="event.stopPropagation()">
@@ -1500,7 +1500,7 @@ function renderImportPreviewTable() {
              <i data-lucide="alert-triangle" style="width: 10px; height: 10px;"></i> Missing / 0
            </div>
          </td>`
-      : `<td style="text-align: right; font-weight: 800; color: #028090; background: #f0fdfa;">₱${d.congPrice.toFixed(2)}</td>`;
+      : `<td class="cong-price-col" style="text-align: right;">₱${d.congPrice.toFixed(2)}</td>`;
 
     return `
       <tr style="${rowBg} border-bottom: 1px solid #f1f5f9;">
