@@ -70,11 +70,12 @@
   position: relative;
   z-index: 10;
   width: 100%;
-  background: rgba(255, 255, 255, 0.98);
+  background: #111827;
+  border: 1px solid #1f2937;
   border-radius: 20px;
   padding: 2.25rem 2rem;
-  box-shadow: 0 20px 50px -10px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(255, 255, 255, 0.2);
-  backdrop-filter: blur(16px);
+  box-shadow: 0 25px 60px -15px rgba(0, 0, 0, 0.7), 0 0 0 1px rgba(255, 255, 255, 0.05);
+  backdrop-filter: blur(20px);
   display: flex;
   flex-direction: column;
 }
@@ -91,7 +92,7 @@
   }
 
   20%,
-  80% {
+  90% {
     transform: translate3d(4px, 0, 0);
   }
 
@@ -118,30 +119,31 @@
   max-width: 240px;
   height: auto;
   display: block;
+  filter: drop-shadow(0 2px 8px rgba(0, 0, 0, 0.4));
 }
 
 .login-tagline {
   font-size: 0.65rem;
   font-weight: 800;
   letter-spacing: 0.12em;
-  color: var(--primary-dark);
-  background: var(--primary-light);
-  border: 1px solid var(--primary-border);
+  color: #ff8533;
+  background: rgba(255, 90, 0, 0.12);
+  border: 1px solid rgba(255, 90, 0, 0.3);
   padding: 3px 12px;
   border-radius: 9999px;
-  margin-top: 8px;
+  margin-top: 10px;
 }
 
 .login-divider {
   height: 1px;
-  background: #f1f5f9;
+  background: #1f2937;
   margin-bottom: 1.25rem;
 }
 
 .login-title {
   font-size: 1.45rem;
   font-weight: 800;
-  color: #0f172a;
+  color: #f8fafc;
   letter-spacing: -0.02em;
   margin-bottom: 0.25rem;
   text-align: center;
@@ -149,16 +151,16 @@
 
 .login-subtitle {
   font-size: 0.85rem;
-  color: #64748b;
+  color: #94a3b8;
   text-align: center;
   margin-bottom: 1.25rem;
 }
 
 /* Error state */
 .login-error {
-  background: #fef2f2;
-  border: 1px solid #fecaca;
-  color: #dc2626;
+  background: rgba(239, 68, 68, 0.15);
+  border: 1px solid rgba(239, 68, 68, 0.35);
+  color: #fca5a5;
   padding: 0.65rem 0.9rem;
   border-radius: 8px;
   font-size: 0.82rem;
@@ -178,7 +180,7 @@
   display: block;
   font-size: 0.78rem;
   font-weight: 700;
-  color: #334155;
+  color: #cbd5e1;
   margin-bottom: 0.35rem;
 }
 
@@ -191,7 +193,7 @@
 .login-input-icon {
   position: absolute;
   left: 0.85rem;
-  color: #94a3b8;
+  color: #64748b;
   pointer-events: none;
 }
 
@@ -199,18 +201,23 @@
   width: 100%;
   padding: 0.68rem 2.5rem 0.68rem 2.45rem;
   font-size: 0.88rem;
-  border: 1.5px solid #e2e8f0;
+  border: 1.5px solid #334155;
   border-radius: 10px;
-  color: #0f172a;
-  background: #ffffff;
+  color: #f8fafc;
+  background: #0f172a;
   outline: none;
   transition: all 0.15s ease;
   font-family: inherit;
 }
 
+.login-input::placeholder {
+  color: #475569;
+}
+
 .login-input:focus {
   border-color: #ff5a00;
-  box-shadow: 0 0 0 3px rgba(255, 90, 0, 0.15);
+  box-shadow: 0 0 0 3px rgba(255, 90, 0, 0.2);
+  background: #0b1120;
 }
 
 .login-eye-btn {
@@ -218,16 +225,18 @@
   right: 0.75rem;
   background: none;
   border: none;
-  color: #94a3b8;
+  color: #64748b;
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
   padding: 4px;
+  border-radius: 4px;
+  transition: color 0.15s ease;
 }
 
 .login-eye-btn:hover {
-  color: #475569;
+  color: #cbd5e1;
 }
 
 /* Primary Submit Button */
@@ -265,7 +274,7 @@
 .login-demo {
   margin-top: 1.4rem;
   padding-top: 1.1rem;
-  border-top: 1px dashed #e2e8f0;
+  border-top: 1px dashed #1f2937;
   text-align: center;
 }
 
@@ -274,7 +283,7 @@
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.08em;
-  color: #94a3b8;
+  color: #64748b;
   margin-bottom: 0.6rem;
 }
 
@@ -286,9 +295,9 @@
 }
 
 .login-demo-pill {
-  background: #f8fafc;
-  border: 1px solid #cbd5e1;
-  color: #334155;
+  background: #1e293b;
+  border: 1px solid #334155;
+  color: #cbd5e1;
   padding: 0.3rem 0.65rem;
   border-radius: 6px;
   font-size: 0.75rem;
@@ -301,14 +310,14 @@
 }
 
 .login-demo-pill:hover {
-  background: var(--primary-light);
-  border-color: var(--primary);
-  color: var(--primary-dark);
+  background: rgba(255, 90, 0, 0.18);
+  border-color: rgba(255, 90, 0, 0.5);
+  color: #ff8533;
 }
 
 .login-footer-note {
   margin-top: 1.25rem;
   font-size: 0.72rem;
-  color: #94a3b8;
+  color: #64748b;
   text-align: center;
 }
