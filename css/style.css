@@ -2336,3 +2336,98 @@ body.dark-mode .pagination-btn:hover:not(:disabled) {
   border-color: var(--primary);
   color: #ff8533;
 }
+
+/* ── Barangay Group Header Rows (In-Out Logs) ── */
+.brgy-group-header-row {
+  background: #f1f5f9;
+  border-top: 2px solid #cbd5e1;
+  border-bottom: 1.5px solid #e2e8f0;
+  transition: background 0.15s ease;
+}
+.brgy-group-header-row.brgy-active {
+  background: #eef7f6;
+  border-top: 2px solid #9cd5cf;
+  border-bottom: 1.5px solid #bce4df;
+}
+.brgy-group-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: #e2e8f0;
+  color: #64748b;
+  font-size: 0.75rem;
+}
+.brgy-active .brgy-group-icon {
+  background: #d4edea;
+  color: #0d6d63;
+}
+.brgy-group-title {
+  font-weight: 800;
+  font-size: 0.92rem;
+  color: #475569;
+}
+.brgy-active .brgy-group-title {
+  color: #0f5147;
+}
+.brgy-group-badge {
+  font-size: 0.74rem;
+  font-weight: 700;
+  background: #ffffff;
+  border: 1px solid #cbd5e1;
+  color: #64748b;
+  padding: 2px 8px;
+  border-radius: 12px;
+}
+.brgy-active .brgy-group-badge {
+  background: #ffffff;
+  border-color: #bce4df;
+  color: #0d6d63;
+}
+.brgy-group-total {
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: #475569;
+}
+.brgy-active .brgy-group-total {
+  color: #0f5147;
+}
+
+/* Barangay Group Header - Dark Mode (Soft, eyestrain-free dark slate / muted teal) */
+body.dark-mode .brgy-group-header-row {
+  background: #182232 !important;
+  border-top: 2px solid #28394e !important;
+  border-bottom: 1.5px solid #1e2c3d !important;
+}
+body.dark-mode .brgy-group-header-row.brgy-active {
+  background: #13272d !important;
+  border-top: 2px solid #1e454b !important;
+  border-bottom: 1.5px solid #18383e !important;
+}
+body.dark-mode .brgy-group-icon {
+  background: #253346 !important;
+  color: #94a3b8 !important;
+}
+body.dark-mode .brgy-active .brgy-group-icon {
+  background: #194047 !important;
+  color: #5eead4 !important;
+}
+body.dark-mode .brgy-group-title {
+  color: #cbd5e1 !important;
+}
+body.dark-mode .brgy-active .brgy-group-title {
+  color: #5eead4 !important;
+}
+body.dark-mode .brgy-group-badge {
+  background: #182a30 !important;
+  border-color: #26555c !important;
+  color: #99f6e4 !important;
+}
+body.dark-mode .brgy-group-total {
+  color: #94a3b8 !important;
+}
+body.dark-mode .brgy-active .brgy-group-total {
+  color: #2dd4bf !important;
+}

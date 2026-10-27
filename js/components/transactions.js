@@ -724,21 +724,21 @@ function renderLogsTabHtml(filteredTxns, totalTxnCount, totalTxnPages, startTxnI
 
           groupedHtml += `
                     <!-- Barangay Group Heading Banner -->
-                    <tr style="background: ${isUnspecified ? '#f8fafc' : '#f0fdf4'}; border-top: 2px solid ${isUnspecified ? '#cbd5e1' : '#86efac'}; border-bottom: 1.5px solid ${isUnspecified ? '#e2e8f0' : '#bbf7d0'};">
+                    <tr class="brgy-group-header-row ${isUnspecified ? '' : 'brgy-active'}">
                       <td colspan="8" style="padding: 0.65rem 1rem;">
                         <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.5rem;">
                           <div style="display: flex; align-items: center; gap: 0.5rem;">
-                            <span style="display: inline-flex; align-items: center; justify-content: center; width: 24px; height: 24px; border-radius: 50%; background: ${isUnspecified ? '#e2e8f0' : '#dcfce7'}; color: ${isUnspecified ? '#64748b' : '#15803d'}; font-size: 0.75rem;">
+                            <span class="brgy-group-icon">
                               <i data-lucide="map-pin" style="width: 13px; height: 13px;"></i>
                             </span>
-                            <span style="font-weight: 800; font-size: 0.92rem; color: ${isUnspecified ? '#475569' : '#166534'};">
+                            <span class="brgy-group-title">
                               ${escapeHtml(brgyTitle)}
                             </span>
-                            <span style="font-size: 0.74rem; font-weight: 700; background: #ffffff; border: 1px solid ${isUnspecified ? '#cbd5e1' : '#bbf7d0'}; color: ${isUnspecified ? '#64748b' : '#15803d'}; padding: 2px 7px; border-radius: 12px;">
+                            <span class="brgy-group-badge">
                               ${groupTxns.length} customer transaction${groupTxns.length === 1 ? '' : 's'}
                             </span>
                           </div>
-                          <div style="font-size: 0.82rem; font-weight: 700; color: ${isUnspecified ? '#475569' : '#166534'};">
+                          <div class="brgy-group-total">
                             Group Total: ₱${groupTotalAmount.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                           </div>
                         </div>
