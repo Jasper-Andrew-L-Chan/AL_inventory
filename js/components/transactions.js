@@ -1490,6 +1490,7 @@ window.handleStartEditTxn = function (txnId) {
         selectedMedId: selectedMedId,
         customMedName: customMedName,
         actualInventoryId: actualInv ? actualInv.id : (item.actualInventoryId || item.id || ''),
+        originalRequestedName: requested || actualSupplied || '',
         isSubstitute: isSub,
         qty: rowQty,
         unitPrice: rowUnitPrice,
@@ -1612,9 +1613,17 @@ window.saveCustomerTransaction = function () {
       return;
     }
 
-    const origReqName = requestedName || actualDisplayName;
+    let origReqName = requestedName || actualDisplayName;
+    if (editingTxn && row.originalRequestedName && row.originalRequestedName.trim()) {
+      // If editing an existing transaction item and the medicine was replaced, retain original requested item
+      const cleanOrig = row.originalRequestedName.trim();
+      if (cleanOrig.toLowerCase() !== actualDisplayName.trim().toLowerCase()) {
+        origReqName = cleanOrig;
+      }
+    }
+
     const isSub = Boolean(
-      (row.isSubstitute || (row.selectedMedId && row.actualInventoryId !== row.selectedMedId)) &&
+      (row.isSubstitute || (row.selectedMedId && row.actualInventoryId !== row.selectedMedId) || (row.originalRequestedName && origReqName.trim().toLowerCase() !== actualDisplayName.trim().toLowerCase())) &&
       origReqName.trim().toLowerCase() !== actualDisplayName.trim().toLowerCase()
     );
     const rowCong = Number(row.congPrice !== undefined && row.congPrice !== null ? row.congPrice : (actualItem.congPrice || 0));
