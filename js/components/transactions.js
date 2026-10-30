@@ -584,19 +584,21 @@ function renderLogsTabHtml(filteredTxns, totalTxnCount, totalTxnPages, startTxnI
                     <td style="font-size: 0.82rem; padding: 0.6rem 0.75rem;">
                       <div style="display: flex; flex-direction: column; gap: 4px; font-weight: 500; color: var(--text-main);">
                         ${t.items.map(i => {
-          const wasSubstituted = i.isSubstitute || (i.actualSuppliedName && i.actualSuppliedName !== i.name);
+          const reqName = i.requestedName || i.name;
+          const suppliedName = i.actualSuppliedName || i.name;
+          const wasSubstituted = Boolean(i.isSubstitute && reqName && suppliedName && reqName.trim().toLowerCase() !== suppliedName.trim().toLowerCase());
           if (wasSubstituted) {
             return `<div style="display: flex; align-items: flex-start; gap: 6px; line-height: 1.35;">
                                       <span style="color: var(--primary); font-weight: 700; user-select: none;">•</span>
                                       <div>
-                                        <strong>${escapeHtml(i.actualSuppliedName || i.name)}</strong> (x${i.qty})
-                                        <span style="font-size: 0.7rem; color: #d97706; background: #fef3c7; padding: 1px 5px; border-radius: 3px; margin-left: 4px;">Substituted for ${escapeHtml(i.requestedName || i.name)}</span>
+                                        <strong>${escapeHtml(suppliedName)}</strong> (x${i.qty})
+                                        <span style="font-size: 0.7rem; color: #d97706; background: #fef3c7; padding: 1px 5px; border-radius: 3px; margin-left: 4px;">Substituted for ${escapeHtml(reqName)}</span>
                                       </div>
                                     </div>`;
           }
           return `<div style="display: flex; align-items: flex-start; gap: 6px; line-height: 1.35;">
                                     <span style="color: var(--primary); font-weight: 700; user-select: none;">•</span>
-                                    <span>${escapeHtml(i.name)} (x${i.qty})</span>
+                                    <span>${escapeHtml(suppliedName)} (x${i.qty})</span>
                                   </div>`;
         }).join('')}
                       </div>
@@ -662,12 +664,16 @@ function renderLogsTabHtml(filteredTxns, totalTxnCount, totalTxnPages, startTxnI
                               </tr>
                             </thead>
                             <tbody>
-                              ${t.items.map(item => `
+                              ${t.items.map(item => {
+                                const req = item.requestedName || item.name;
+                                const sup = item.actualSuppliedName || item.name;
+                                const isSub = Boolean(item.isSubstitute && req && sup && req.trim().toLowerCase() !== sup.trim().toLowerCase());
+                                return `
                                 <tr style="border-bottom: 1px solid #f1f5f9;">
-                                  <td style="padding: 6px 8px;">${escapeHtml(item.requestedName || item.name)}</td>
+                                  <td style="padding: 6px 8px;">${escapeHtml(req)}</td>
                                   <td style="padding: 6px 8px; font-weight: 600; color: var(--primary-dark);">
-                                    ${escapeHtml(item.actualSuppliedName || item.name)}
-                                    ${item.isSubstitute ? '<span style="color: #b45309; font-size: 0.7rem;"> (Substitute)</span>' : ''}
+                                    ${escapeHtml(sup)}
+                                    ${isSub ? '<span style="color: #b45309; font-size: 0.7rem;"> (Substitute)</span>' : ''}
                                   </td>
                                   <td style="padding: 6px 8px; text-align: center; font-weight: 700;">${item.qty}</td>
                                   <td style="padding: 6px 8px; text-align: right;">₱${Number(item.unitPrice || 0).toFixed(2)}</td>
@@ -675,7 +681,7 @@ function renderLogsTabHtml(filteredTxns, totalTxnCount, totalTxnPages, startTxnI
                                   <td style="padding: 6px 8px; text-align: right; color: #0284c7; font-weight: 600; background: rgba(224, 242, 254, 0.25);">₱${Number(item.congPrice || 0).toFixed(2)}</td>
                                   <td style="padding: 6px 8px; text-align: right; font-weight: 700;">₱${((item.congPrice !== undefined && Number(item.congPrice) > 0 ? Number(item.congPrice) : (item.sellingPrice || item.price || 0)) * item.qty).toFixed(2)}</td>
                                 </tr>
-                              `).join('')}
+                              `;}).join('')}
                             </tbody>
                             <tfoot>
                               <tr>
@@ -1454,14 +1460,16 @@ window.handleStartEditTxn = function (txnId) {
     date: txn.date || new Date().toISOString().split('T')[0],
     items: (txn.items && txn.items.length > 0) ? txn.items.map(item => {
       // Check if item corresponds to an inventory entry
-      const actualInv = inventoryItems.find(i => i.id === item.actualInventoryId || i.id === item.id || i.name === item.name);
-      const isSub = Boolean(item.isSubstitute || (item.actualSuppliedName && item.actualSuppliedName !== item.requestedName));
+      const actualInv = inventoryItems.find(i => i.id === item.actualInventoryId || i.id === item.id || i.name === item.name || getMedicineDisplayName(i) === item.name || getMedicineDisplayName(i) === item.actualSuppliedName);
+      const actualSupplied = item.actualSuppliedName || (actualInv ? getMedicineDisplayName(actualInv) : item.name);
+      const requested = item.requestedName || item.name;
+      const isSub = Boolean(item.isSubstitute && requested && actualSupplied && requested.trim().toLowerCase() !== actualSupplied.trim().toLowerCase());
 
       // Determine what was selected originally
       let selectedMedId = '';
       let customMedName = '';
       if (item.requestedName) {
-        const foundOrig = inventoryItems.find(i => i.name === item.requestedName);
+        const foundOrig = inventoryItems.find(i => i.id === item.id || getMedicineDisplayName(i) === item.requestedName || i.name === item.requestedName);
         if (foundOrig) {
           selectedMedId = foundOrig.id;
         } else {
@@ -1604,7 +1612,11 @@ window.saveCustomerTransaction = function () {
       return;
     }
 
-    const isSub = Boolean(row.isSubstitute || row.actualInventoryId !== row.selectedMedId);
+    const origReqName = requestedName || actualDisplayName;
+    const isSub = Boolean(
+      (row.isSubstitute || (row.selectedMedId && row.actualInventoryId !== row.selectedMedId)) &&
+      origReqName.trim().toLowerCase() !== actualDisplayName.trim().toLowerCase()
+    );
     const rowCong = Number(row.congPrice !== undefined && row.congPrice !== null ? row.congPrice : (actualItem.congPrice || 0));
     const rowSelling = Number(row.sellingPrice !== undefined && row.sellingPrice !== null ? row.sellingPrice : (actualItem.sellingPrice || 0));
 
@@ -1613,7 +1625,7 @@ window.saveCustomerTransaction = function () {
       actualInventoryId: actualItem.id,       // Targeted for stock deduction
       name: actualDisplayName,                // Actual medicine supplied name
       actualSuppliedName: actualDisplayName,
-      requestedName: requestedName || actualDisplayName, // Original name customer asked for
+      requestedName: origReqName,             // Original name customer asked for
       isSubstitute: isSub,
       qty: qty,
       unitPrice: Number(row.unitPrice || 0),

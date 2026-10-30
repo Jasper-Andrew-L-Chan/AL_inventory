@@ -638,7 +638,21 @@ class PharmacyStore {
 
   // --- Transactions ---
   getTransactions() {
-    const txns = JSON.parse(localStorage.getItem(STORAGE_KEYS.TRANSACTIONS)) || [];
+    const rawTxns = JSON.parse(localStorage.getItem(STORAGE_KEYS.TRANSACTIONS)) || [];
+    // Sanitize any false substitute flags where requested and actual medicines are the exact same item
+    const txns = rawTxns.map(t => {
+      if (Array.isArray(t.items)) {
+        t.items.forEach(item => {
+          const req = (item.requestedName || item.name || '').trim().toLowerCase();
+          const sup = (item.actualSuppliedName || item.name || '').trim().toLowerCase();
+          if (item.isSubstitute && req && sup && req === sup) {
+            item.isSubstitute = false;
+          }
+        });
+      }
+      return t;
+    });
+
     // Always keep customers who belong to the same Barangay grouped together
     const UNSPEC = 'BARANGAY NOT SPECIFIED';
     return txns.sort((a, b) => {
