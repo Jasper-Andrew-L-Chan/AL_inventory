@@ -91,8 +91,12 @@ function renderStaffView(container) {
         </thead>
         <tbody>
           ${staff.map(s => {
-            const isOwner = (s.level === 'Owner' || (s.role || '').toLowerCase().includes('owner'));
-            const isAdmin = (s.level === 'Admin' || (s.role || '').toLowerCase().includes('admin') || s.username === 'admin');
+            const rawRole = String(s.role || '').trim();
+            const isOwner = s.level === 'Owner' || rawRole.toLowerCase() === 'owner';
+            const isAdmin = !isOwner && (s.level === 'Admin' || rawRole.toLowerCase().includes('admin') || s.username === 'admin');
+            const displayRole = rawRole === 'Owner / Administrator'
+              ? (isOwner ? 'Owner' : 'Administrator')
+              : rawRole;
             const perms = Array.isArray(s.permissions) ? s.permissions : [];
             const hasAllPerms = isOwner || isAdmin || perms.length === allPerms.length;
 
@@ -120,7 +124,7 @@ function renderStaffView(container) {
                   </span>
                 </td>
                 <td style="padding: 12px 16px;">
-                  <div style="font-weight: 700; color: var(--brand-charcoal); font-size: 0.84rem;">${s.role}</div>
+                  <div style="font-weight: 700; color: var(--brand-charcoal); font-size: 0.84rem;">${displayRole}</div>
                   <div style="font-size: 0.72rem; color: var(--text-muted);">${s.phone}</div>
                 </td>
                 <td style="padding: 12px 16px; max-width: 320px;">
@@ -229,7 +233,8 @@ function renderStaffView(container) {
                   <option value="Staff Pharmacist">Staff Pharmacist</option>
                   <option value="Inventory Specialist">Inventory Specialist</option>
                   <option value="Pharmacist-in-Charge">Pharmacist-in-Charge</option>
-                  <option value="Owner / Administrator">Owner / Administrator</option>
+                  <option value="Administrator">Administrator</option>
+                  <option value="Owner">Owner</option>
                 </select>
               </div>
 
@@ -343,8 +348,13 @@ window.openEditStaffModal = function(id) {
   document.getElementById('staffPassword').value = '';
   document.getElementById('staffPassword').placeholder = 'Leave blank to keep the current password';
   document.getElementById('staffPassword').required = false;
-  document.getElementById('staffLevel').value = user.level || 'Staff';
-  document.getElementById('staffRole').value = user.role || 'Staff Pharmacist';
+  const normalizedLevel = user.level || 'Staff';
+  let normalizedRole = user.role || 'Staff Pharmacist';
+  if (normalizedRole === 'Owner / Administrator') {
+    normalizedRole = normalizedLevel === 'Owner' ? 'Owner' : 'Administrator';
+  }
+  document.getElementById('staffLevel').value = normalizedLevel;
+  document.getElementById('staffRole').value = normalizedRole;
   document.getElementById('staffLicense').value = user.prcLicense || '';
   document.getElementById('staffPhone').value = user.phone || '';
   document.getElementById('staffStatus').value = user.status || 'Active';
@@ -368,8 +378,17 @@ window.closeStaffModal = function() {
 
 window.handleStaffLevelChange = function() {
   const level = document.getElementById('staffLevel').value;
+  const roleEl = document.getElementById('staffRole');
   const adminNotice = document.getElementById('adminNoticePerms');
   const checkboxes = document.querySelectorAll('.perm-checkbox');
+
+  if (roleEl) {
+    if (level === 'Owner' && (roleEl.value === 'Administrator' || roleEl.value === 'Owner / Administrator')) {
+      roleEl.value = 'Owner';
+    } else if (level === 'Admin' && (roleEl.value === 'Owner' || roleEl.value === 'Owner / Administrator')) {
+      roleEl.value = 'Administrator';
+    }
+  }
 
   if (level === 'Owner' || level === 'Admin') {
     checkboxes.forEach(cb => {
@@ -386,10 +405,19 @@ window.handleStaffLevelChange = function() {
 
 window.applyRolePermissionPreset = function() {
   const role = document.getElementById('staffRole').value;
-  const level = document.getElementById('staffLevel').value;
+  const levelEl = document.getElementById('staffLevel');
+  if (levelEl) {
+    if (role === 'Owner') {
+      levelEl.value = 'Owner';
+    } else if (role === 'Administrator') {
+      levelEl.value = 'Admin';
+    }
+  }
+  const level = levelEl ? levelEl.value : 'Staff';
 
   if (level === 'Owner' || level === 'Admin') {
     window.toggleAllPermissions(true);
+    window.handleStaffLevelChange();
     return;
   }
 

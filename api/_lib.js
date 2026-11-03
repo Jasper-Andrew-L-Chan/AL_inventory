@@ -218,7 +218,7 @@ async function ensureSeed() {
     username: 'admin',
     password: pw,
     fullName: 'System Administrator',
-    role: 'Owner / Administrator',
+    role: 'Administrator',
     level: 'Admin',
     permissions: ALL_PERMISSIONS,
     prcLicense: 'N/A',

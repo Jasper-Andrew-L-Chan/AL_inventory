@@ -445,7 +445,12 @@ window.updateUserProfileUI = function () {
   if (session) {
     if (avatarEl) avatarEl.textContent = session.initials || session.firstName.slice(0, 2).toUpperCase();
     if (nameEl) nameEl.textContent = session.fullName;
-    if (roleEl) roleEl.textContent = session.role;
+    if (roleEl) {
+      const displayRole = session.role === 'Owner / Administrator'
+        ? (session.level === 'Owner' ? 'Owner' : 'Administrator')
+        : session.role;
+      roleEl.textContent = displayRole;
+    }
   } else {
     if (avatarEl) avatarEl.textContent = '--';
     if (nameEl) nameEl.textContent = 'Guest';

@@ -42,10 +42,10 @@ const INITIAL_SETTINGS = {
 };
 
 const INITIAL_STAFF = [
-  { id: 'stf-1', name: 'Jasper Andrew Chan', role: 'Pharmacist-in-Charge / Owner', license: 'PRC-0089142', phone: '0917-123-4567', status: 'Active' },
-  { id: 'stf-2', name: 'Lionel Santos', role: 'Staff Pharmacist', license: 'PRC-0092144', phone: '0918-234-5678', status: 'Active' },
-  { id: 'stf-3', name: 'Sarah Dela Cruz', role: 'Pharmacy Assistant', license: 'TESDA NC-III', phone: '0922-345-6789', status: 'Active' },
-  { id: 'stf-4', name: 'Mark Ramos', role: 'Inventory Specialist', license: '-', phone: '0919-456-7890', status: 'Active' }
+  { id: 'stf-1', name: 'Jasper Andrew Chan', role: 'Owner', level: 'Owner', license: 'PRC-0089142', phone: '0917-123-4567', status: 'Active' },
+  { id: 'stf-2', name: 'Lionel Santos', role: 'Staff Pharmacist', level: 'Staff', license: 'PRC-0092144', phone: '0918-234-5678', status: 'Active' },
+  { id: 'stf-3', name: 'Sarah Dela Cruz', role: 'Pharmacy Assistant', level: 'Staff', license: 'TESDA NC-III', phone: '0922-345-6789', status: 'Active' },
+  { id: 'stf-4', name: 'Mark Ramos', role: 'Inventory Specialist', level: 'Staff', license: '-', phone: '0919-456-7890', status: 'Active' }
 ];
 
 const INITIAL_DRAWER = {

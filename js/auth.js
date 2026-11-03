@@ -13,6 +13,8 @@ const USERS_CACHE_KEY = 'al_cache_users';
 const ALL_PERMISSIONS = ['home', 'dashboard', 'transactions', 'reports', 'inventory', 'staff', 'cashdrawer', 'settings'];
 
 const ROLE_PERMISSIONS_PRESETS = {
+  'Owner': ['home', 'dashboard', 'transactions', 'reports', 'inventory', 'staff', 'cashdrawer', 'settings'],
+  'Administrator': ['home', 'dashboard', 'transactions', 'reports', 'inventory', 'staff', 'cashdrawer', 'settings'],
   'Owner / Administrator': ['home', 'dashboard', 'transactions', 'reports', 'inventory', 'staff', 'cashdrawer', 'settings'],
   'Pharmacist-in-Charge': ['home', 'dashboard', 'transactions', 'reports', 'inventory', 'staff', 'cashdrawer', 'settings'],
   'Staff Pharmacist': ['home', 'dashboard', 'transactions', 'reports', 'inventory', 'cashdrawer'],
