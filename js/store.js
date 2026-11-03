@@ -49,13 +49,18 @@ const INITIAL_STAFF = [
 ];
 
 const INITIAL_DRAWER = {
-  shiftDate: '2026-10-01',
+  shiftDate: new Date().toISOString().split('T')[0],
   openedAt: '08:00 AM',
-  openedBy: 'Lionel Santos',
-  openingFloat: 2000.00, // ₱2,000 petty cash float
-  currentCashInDrawer: 3431.00,
-  expectedCash: 3431.00,
+  openedBy: 'Staff Pharmacist',
+  openingFloat: 0.00,
+  currentCashInDrawer: 0.00,
+  expectedCash: 0.00,
   discrepancy: 0.00,
+  cashOutTotal: 0.00,
+  adjustments: [],
+  excludedTxnIds: [],
+  resetAt: 0,
+  v2FreshClean: true,
   status: 'Open'
 };
 

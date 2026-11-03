@@ -2431,3 +2431,13 @@ body.dark-mode .brgy-group-total {
 body.dark-mode .brgy-active .brgy-group-total {
   color: #2dd4bf !important;
 }
+
+body.dark-mode .opening-float-input {
+  background-color: #0f172a !important;
+  border-color: #334155 !important;
+  color: #f8fafc !important;
+}
+
+body.dark-mode .opening-float-input:focus {
+  border-color: #ea580c !important;
+}
