@@ -261,7 +261,7 @@ function renderInventoryView(container) {
             <th style="text-align: right;" title="Unit Price from Excel">Unit Price</th>
             <th style="text-align: right;" title="Net Price from Excel">Net Price</th>
             <th style="text-align: center;" title="Quantity per Box (QTY/BOX)">QTY/BOX</th>
-            <th style="text-align: right;" title="Selling Price from Excel">Selling Price</th>
+            <th style="text-align: right;" title="Cong's Unit Price from Excel (CONGS UNIT PRICE)">Cong's Unit</th>
             <th class="cong-price-col" style="text-align: right;" title="Cong's Price (Primary Reference Price)">Cong's Price ★</th>
             <th style="text-align: center; width: 130px;">Fast Adjust</th>
             <th style="text-align: center; width: 145px;">Actions</th>
@@ -846,12 +846,12 @@ function renderInventoryPriceTotalsBar(displayedItems) {
   const list = Array.isArray(displayedItems) ? displayedItems : [];
   let sumUnitPrice = 0;
   let sumNetPrice = 0;
-  let sumSellingPrice = 0;
+  let sumCongUnitPrice = 0;
   let sumCongPrice = 0;
 
   let stockUnitValue = 0;
   let stockNetValue = 0;
-  let stockSellingValue = 0;
+  let stockCongUnitValue = 0;
   let stockCongValue = 0;
 
   for (let i = 0; i < list.length; i++) {
@@ -859,17 +859,17 @@ function renderInventoryPriceTotalsBar(displayedItems) {
     const qty = Math.max(0, Number(it.currentStock) || 0);
     const unitP = Number(it.unitPrice !== undefined ? it.unitPrice : (it.costPrice || 0)) || 0;
     const netP = Number(it.netPrice || 0) || 0;
-    const sellP = Number(it.sellingPrice || 0) || 0;
+    const congUnitP = Number(it.congUnitPrice || 0) || 0;
     const congP = Number(it.congPrice || 0) || 0;
 
     sumUnitPrice += unitP;
     sumNetPrice += netP;
-    sumSellingPrice += sellP;
+    sumCongUnitPrice += congUnitP;
     sumCongPrice += congP;
 
     stockUnitValue += qty * unitP;
     stockNetValue += qty * netP;
-    stockSellingValue += qty * sellP;
+    stockCongUnitValue += qty * congUnitP;
     stockCongValue += qty * congP;
   }
 
@@ -901,12 +901,12 @@ function renderInventoryPriceTotalsBar(displayedItems) {
 
       <div style="display: flex; align-items: center; justify-content: space-between; padding-right: 0.5rem; border-right: 1px solid var(--border, #e2e8f0);">
         <div>
-          <div style="font-size: 0.68rem; font-weight: 700; color: var(--primary); text-transform: uppercase; letter-spacing: 0.03em;">Total Selling Price</div>
-          <div style="font-size: 0.95rem; font-weight: 800; color: var(--primary);">₱${fmt(sumSellingPrice)}</div>
+          <div style="font-size: 0.68rem; font-weight: 700; color: var(--primary); text-transform: uppercase; letter-spacing: 0.03em;">Congs Unit Price</div>
+          <div style="font-size: 0.95rem; font-weight: 800; color: var(--primary);">₱${fmt(sumCongUnitPrice)}</div>
         </div>
-        <div style="text-align: right; font-size: 0.68rem; color: var(--text-muted);" title="Sum of (Current Stock × Selling Price) across all ${list.length.toLocaleString()} displayed items">
+        <div style="text-align: right; font-size: 0.68rem; color: var(--text-muted);" title="Sum of (Current Stock × Cong's Unit Price) across all ${list.length.toLocaleString()} displayed items">
           <div>Stock Value</div>
-          <div style="font-weight: 700; color: var(--primary);">₱${fmt(stockSellingValue)}</div>
+          <div style="font-weight: 700; color: var(--primary);">₱${fmt(stockCongUnitValue)}</div>
         </div>
       </div>
 
@@ -973,7 +973,7 @@ function renderInventoryTableRows(displayedItems) {
     const costVal = Number(item.unitPrice !== undefined ? item.unitPrice : (item.costPrice || 0));
     const netVal = Number(item.netPrice || 0);
     const qtyBoxVal = Number(item.qtyPerBox || 0);
-    const sellVal = Number(item.sellingPrice || 0);
+    const congUnitVal = Number(item.congUnitPrice || 0);
     const congVal = Number(item.congPrice || 0);
     const flags = Array.isArray(item.flags) ? item.flags : [];
     const isBranded = (item.category || '').toLowerCase() === 'branded';
@@ -1109,7 +1109,7 @@ function renderInventoryTableRows(displayedItems) {
         <td style="text-align: right; font-size: 0.83rem; color: var(--text-muted);">${formatPriceCell(costVal, item.rawUnitPrice)}</td>
         <td style="text-align: right; font-size: 0.83rem; color: var(--text-muted);">${formatPriceCell(netVal, item.rawNetPrice)}</td>
         <td style="text-align: center; font-size: 0.82rem;">${qtyBoxHtml}</td>
-        <td style="text-align: right; font-weight: 700; color: var(--primary);">${formatPriceCell(sellVal, item.rawSellingPrice)}</td>
+        <td style="text-align: right; font-weight: 700; color: var(--primary);">${formatPriceCell(congUnitVal, item.rawCongUnitPrice)}</td>
         <td class="cong-price-col" style="text-align: right;">
           ${formatPriceCell(congVal, item.rawCongPrice)}
         </td>
