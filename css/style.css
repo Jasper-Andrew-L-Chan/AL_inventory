@@ -1675,8 +1675,11 @@ body.dark-mode .data-table tr:hover {
   background-color: #273549 !important;
 }
 
-body.dark-mode .data-table tr.selected {
+body.dark-mode .data-table tr.selected,
+body.dark-mode .data-table tr.selected td {
+  background: #2b211d !important;
   background-color: rgba(255, 90, 0, 0.18) !important;
+  color: #f8fafc !important;
 }
 
 body.dark-mode .form-input,
