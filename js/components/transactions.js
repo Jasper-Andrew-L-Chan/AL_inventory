@@ -31,6 +31,7 @@ function formatDateMMDDYY(dateStr) {
 
 let txnSearchFilters = {
   date: '',
+  customer: '',
   time: '',
   receipt: '',
   encoder: '',
@@ -132,23 +133,39 @@ function renderTransactionsView(container) {
 
   const filteredTxns = allTxns.filter(t => {
     if (txnSearchFilters.date) {
-      const q = txnSearchFilters.date.toLowerCase();
-      const rawDate = (t.date || '').toLowerCase();
+      const q = txnSearchFilters.date.trim().toLowerCase();
+      const rawDate = String(t.date || '').toLowerCase();
       const formattedDate = formatDateMMDDYY(t.date).toLowerCase();
-      if (!rawDate.includes(q) && !formattedDate.includes(q)) return false;
+      const singleSlashDate = formattedDate.replace(/\/\//g, '/');
+      const rawTime = String(t.time || '').toLowerCase();
+      if (!rawDate.includes(q) && !formattedDate.includes(q) && !singleSlashDate.includes(q) && !rawTime.includes(q)) return false;
     }
-    if (txnSearchFilters.time && !t.time.toLowerCase().includes(txnSearchFilters.time.toLowerCase())) return false;
-    if (txnSearchFilters.receipt && !t.receiptNo.toLowerCase().includes(txnSearchFilters.receipt.toLowerCase())) return false;
+    if (txnSearchFilters.customer) {
+      const qCust = txnSearchFilters.customer.trim().toLowerCase();
+      const cName = String(t.customerName || 'Walk-in').toLowerCase();
+      const brgy = String(t.barangay || '').toLowerCase();
+      const normBrgy = normalizeBarangayName(t.barangay).toLowerCase();
+      const budgetStr = t.budget ? String(t.budget).toLowerCase() : '';
+      if (!cName.includes(qCust) && !brgy.includes(qCust) && !normBrgy.includes(qCust) && !budgetStr.includes(qCust)) return false;
+    }
+    if (txnSearchFilters.time && !String(t.time || '').toLowerCase().includes(txnSearchFilters.time.trim().toLowerCase())) return false;
+    if (txnSearchFilters.receipt && !String(t.receiptNo || '').toLowerCase().includes(txnSearchFilters.receipt.trim().toLowerCase())) return false;
     if (txnSearchFilters.encoder) {
-      const qEnc = txnSearchFilters.encoder.toLowerCase();
-      const encName = (t.encoderName || t.cashier || '').toLowerCase();
-      const encLic = (t.encoderLicense || '').toLowerCase();
+      const qEnc = txnSearchFilters.encoder.trim().toLowerCase();
+      const encName = String(t.encoderName || t.cashier || '').toLowerCase();
+      const encLic = String(t.encoderLicense || t.cashierLicense || '').toLowerCase();
       if (!encName.includes(qEnc) && !encLic.includes(qEnc)) return false;
     }
-    if (txnSearchFilters.total && !t.netTotal.toString().includes(txnSearchFilters.total)) return false;
+    if (txnSearchFilters.total) {
+      const qTot = txnSearchFilters.total.trim().replace(/[₱,\s]/g, '').toLowerCase();
+      const rawTot = String(t.netTotal !== undefined ? t.netTotal : '').toLowerCase();
+      const fixedTot = Number(t.netTotal || 0).toFixed(2).toLowerCase();
+      if (!rawTot.includes(qTot) && !fixedTot.includes(qTot)) return false;
+    }
     if (txnSearchFilters.items) {
-      const itemsStr = t.items.map(i => `${i.name} ${i.actualSuppliedName || ''}`).join(' ').toLowerCase();
-      if (!itemsStr.includes(txnSearchFilters.items.toLowerCase())) return false;
+      const qItems = txnSearchFilters.items.trim().toLowerCase();
+      const itemsStr = (t.items || []).map(i => `${i.name || ''} ${i.actualSuppliedName || ''} ${i.requestedName || ''}`).join(' ').toLowerCase();
+      if (!itemsStr.includes(qItems)) return false;
     }
     if (txnDateRange.from && t.date && t.date < txnDateRange.from) return false;
     if (txnDateRange.to && t.date && t.date > txnDateRange.to) return false;
@@ -507,13 +524,19 @@ function renderLogsTabHtml(filteredTxns, totalTxnCount, totalTxnPages, startTxnI
             <!-- Subheader Column Search -->
             <tr style="background: #ffffff;">
               <td></td>
-              <td><input type="text" placeholder="Search date..." value="${txnSearchFilters.date}" oninput="updateTxnFilter('date', this.value)" class="table-search-input" style="width: 100px;" /></td>
-              <td><input type="text" placeholder="Search customer..." value="" oninput="updateTxnFilter('items', this.value)" class="table-search-input" style="width: 120px;" /></td>
-              <td><input type="text" placeholder="Search ref..." value="${txnSearchFilters.receipt}" oninput="updateTxnFilter('receipt', this.value)" class="table-search-input" style="width: 100px;" /></td>
-              <td><input type="text" placeholder="Search encoder..." value="${txnSearchFilters.encoder}" oninput="updateTxnFilter('encoder', this.value)" class="table-search-input" style="width: 110px;" /></td>
-              <td><input type="text" placeholder="Search medicines..." value="${txnSearchFilters.items}" oninput="updateTxnFilter('items', this.value)" class="table-search-input" style="width: 180px;" /></td>
-              <td><input type="text" placeholder="Search ₱..." value="${txnSearchFilters.total}" oninput="updateTxnFilter('total', this.value)" class="table-search-input" style="width: 80px; text-align: right;" /></td>
-              <td></td>
+              <td><input type="text" id="txnSearchInput_date" placeholder="Search date..." value="${escapeHtml(txnSearchFilters.date || '')}" oninput="updateTxnFilter('date', this.value)" class="table-search-input" style="width: 100px;" /></td>
+              <td><input type="text" id="txnSearchInput_customer" placeholder="Search customer / brgy..." value="${escapeHtml(txnSearchFilters.customer || '')}" oninput="updateTxnFilter('customer', this.value)" class="table-search-input" style="width: 135px;" /></td>
+              <td><input type="text" id="txnSearchInput_receipt" placeholder="Search ref..." value="${escapeHtml(txnSearchFilters.receipt || '')}" oninput="updateTxnFilter('receipt', this.value)" class="table-search-input" style="width: 100px;" /></td>
+              <td><input type="text" id="txnSearchInput_encoder" placeholder="Search encoder..." value="${escapeHtml(txnSearchFilters.encoder || '')}" oninput="updateTxnFilter('encoder', this.value)" class="table-search-input" style="width: 110px;" /></td>
+              <td><input type="text" id="txnSearchInput_items" placeholder="Search medicines..." value="${escapeHtml(txnSearchFilters.items || '')}" oninput="updateTxnFilter('items', this.value)" class="table-search-input" style="width: 180px;" /></td>
+              <td><input type="text" id="txnSearchInput_total" placeholder="Search ₱..." value="${escapeHtml(txnSearchFilters.total || '')}" oninput="updateTxnFilter('total', this.value)" class="table-search-input" style="width: 80px; text-align: right;" /></td>
+              <td style="text-align: center;">
+                ${Object.values(txnSearchFilters).some(v => v && String(v).trim() !== '') ? `
+                  <button type="button" onclick="clearAllTxnSearchFilters()" class="btn-outline" style="padding: 3px 8px; font-size: 0.7rem; font-weight: 700;" title="Clear all column search filters">
+                    Clear
+                  </button>
+                ` : ''}
+              </td>
             </tr>
           </thead>
           <tbody>
@@ -574,7 +597,7 @@ function renderLogsTabHtml(filteredTxns, totalTxnCount, totalTxnPages, startTxnI
                       ${t.receiptNo}
                     </td>
                     <td style="font-size: 0.82rem; vertical-align: top; padding-top: 0.75rem;">
-                      <div style="font-weight: 700; color: #1e293b; font-size: 0.84rem;">
+                      <div style="font-weight: 700; color: var(--text-main); font-size: 0.84rem;">
                         ${escapeHtml(encName)}
                       </div>
                       <div style="font-size: 0.72rem; color: #888888; margin-top: 2px; font-weight: 500;">
@@ -1889,6 +1912,37 @@ function normalizeBarangayName(raw) {
 
 window.updateTxnFilter = function (key, val) {
   txnSearchFilters[key] = val;
+  txnHistoryPage = 1;
+  const activeEl = document.activeElement;
+  const activeId = activeEl ? activeEl.id : null;
+  const selStart = activeEl && typeof activeEl.selectionStart === 'number' ? activeEl.selectionStart : null;
+  const selEnd = activeEl && typeof activeEl.selectionEnd === 'number' ? activeEl.selectionEnd : null;
+
+  renderTransactionsView(document.getElementById('main-content'));
+
+  if (activeId) {
+    const restoredEl = document.getElementById(activeId);
+    if (restoredEl) {
+      restoredEl.focus();
+      if (typeof restoredEl.setSelectionRange === 'function' && selStart !== null) {
+        try {
+          restoredEl.setSelectionRange(selStart, selEnd !== null ? selEnd : selStart);
+        } catch (_) {}
+      }
+    }
+  }
+};
+
+window.clearAllTxnSearchFilters = function () {
+  txnSearchFilters = {
+    date: '',
+    customer: '',
+    time: '',
+    receipt: '',
+    encoder: '',
+    items: '',
+    total: ''
+  };
   txnHistoryPage = 1;
   renderTransactionsView(document.getElementById('main-content'));
 };
