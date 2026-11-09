@@ -86,7 +86,18 @@ class PharmacyStore {
     const ensure = (key, value) => {
       if (!localStorage.getItem(key)) localStorage.setItem(key, JSON.stringify(value));
     };
-    ensure(STORAGE_KEYS.ITEMS, []);
+    const seedVer = window.IMPORTED_MEDICINES_VERSION || '';
+    const seedItems = Array.isArray(window.IMPORTED_MEDICINES_SEED) ? window.IMPORTED_MEDICINES_SEED : [];
+    if (seedVer && seedItems.length > 0 && localStorage.getItem('al_inventory_seed_ver') !== seedVer) {
+      try {
+        localStorage.setItem(STORAGE_KEYS.ITEMS, JSON.stringify(seedItems));
+        localStorage.setItem('al_inventory_seed_ver', seedVer);
+      } catch (e) {
+        console.warn('[AffordaLabs Seed] Could not write seed items:', e.message);
+      }
+    } else {
+      ensure(STORAGE_KEYS.ITEMS, seedItems);
+    }
     ensure(STORAGE_KEYS.TRANSACTIONS, []);
     ensure(STORAGE_KEYS.SETTINGS, INITIAL_SETTINGS);
     ensure(STORAGE_KEYS.STAFF, INITIAL_STAFF);
@@ -95,7 +106,7 @@ class PharmacyStore {
 
   /** Forget this device's copy of the shared data (called on logout). */
   resetCache() {
-    [STORAGE_KEYS.ITEMS, STORAGE_KEYS.TRANSACTIONS, STORAGE_KEYS.SETTINGS, STORAGE_KEYS.STAFF, STORAGE_KEYS.DRAWER]
+    [STORAGE_KEYS.ITEMS, STORAGE_KEYS.TRANSACTIONS, STORAGE_KEYS.SETTINGS, STORAGE_KEYS.STAFF, STORAGE_KEYS.DRAWER, 'al_inventory_seed_ver']
       .forEach(k => localStorage.removeItem(k));
     this.serverVersion = -1;
     this.init();
@@ -148,6 +159,22 @@ class PharmacyStore {
       if (data.unchanged) {
         this.setStatus('ok');
         return false;
+      }
+      // If the central database does not yet have the verified Excel seed (2,691 records), push it now.
+      const seedVer = window.IMPORTED_MEDICINES_VERSION || '';
+      const seedItems = Array.isArray(window.IMPORTED_MEDICINES_SEED) ? window.IMPORTED_MEDICINES_SEED : [];
+      if (seedVer && seedItems.length > 0 && data.seedVer !== seedVer) {
+        try {
+          await window.alApi('/api/migrate', {
+            method: 'POST',
+            body: { items: seedItems, replaceItems: true, seedVersion: seedVer }
+          });
+          data.items = seedItems;
+          data.seedVer = seedVer;
+        } catch (migErr) {
+          console.warn('[AffordaLabs Seed] Remote seed sync deferred:', migErr.message);
+          data.items = seedItems;
+        }
       }
       // The user changed something while we were fetching: discard, the next poll fetches fresh data.
       if (seq !== this.localSeq || this.outbox.length || this.isFlushing) return false;
@@ -361,25 +388,22 @@ class PharmacyStore {
     const items = JSON.parse(localStorage.getItem(STORAGE_KEYS.ITEMS)) || [];
     return items.map(item => {
       const name = this.formatItemName(item);
-      const cost = Number(item.costPrice !== undefined ? item.costPrice : (item.unitPrice || 0));
-      let sellingPrice = Number(item.sellingPrice || 0);
-      let congPrice = Number(item.congPrice || 0);
-
-      // If sellingPrice was unset or erroneously set to cost price, heal with 1.2x multiplier
-      if (cost > 0 && (sellingPrice === 0 || Math.abs(sellingPrice - cost) < 0.001)) {
-        sellingPrice = parseFloat((cost * 1.20).toFixed(4));
-      }
-      // If congPrice was unset or erroneously set to cost price, heal with 2.4x multiplier
-      if (cost > 0 && (congPrice === 0 || Math.abs(congPrice - cost) < 0.001)) {
-        congPrice = parseFloat((cost * 2.40).toFixed(4));
-      }
+      const cost = Number(item.unitPrice !== undefined ? item.unitPrice : (item.costPrice || 0));
+      const netPrice = Number(item.netPrice !== undefined ? item.netPrice : 0);
+      const qtyPerBox = Number(item.qtyPerBox !== undefined ? item.qtyPerBox : 0);
+      const sellingPrice = Number(item.sellingPrice || 0);
+      const congUnitPrice = Number(item.congUnitPrice || 0);
+      const congPrice = Number(item.congPrice || 0);
 
       return {
         ...item,
         name,
         costPrice: cost,
         unitPrice: cost,
+        netPrice,
+        qtyPerBox,
         sellingPrice,
+        congUnitPrice,
         congPrice
       };
     });
@@ -563,30 +587,44 @@ class PharmacyStore {
         const formattedName = this.formatItemName(rawItem);
         const qty = Number(rawItem.initialQty !== undefined ? rawItem.initialQty : (rawItem.qty !== undefined ? rawItem.qty : rawItem.currentStock || 0));
         const newItem = {
-          id: 'med-' + Date.now().toString(36) + Math.random().toString(36).substring(2, 6),
+          id: rawItem.id || ('med-' + Date.now().toString(36) + Math.random().toString(36).substring(2, 6)),
           name: formattedName,
           brandName: (rawItem.brandName || '').trim(),
           genericName: (rawItem.genericName || '').trim(),
           dosage: (rawItem.dosage || '').trim(),
-          dosageForm: (rawItem.dosageForm || 'Tablet').trim(),
-          category: rawItem.category || 'General Medicine',
+          dosageForm: (rawItem.dosageForm || '').trim(),
+          category: rawItem.category || 'Branded',
+          sourceSheet: rawItem.sourceSheet || '',
+          excelRow: rawItem.excelRow || null,
           isRx: !!rawItem.isRx,
-          unit: (rawItem.unit || rawItem.dosageForm || 'pcs').trim(),
+          unit: (rawItem.unit || rawItem.dosageForm || '').trim(),
+          initialQty: qty,
           beginningStock: qty,
           addedStock: 0,
           deductedStock: 0,
           currentStock: qty,
           reorderLevel: Number(rawItem.reorderLevel || 20),
           batchLot: rawItem.batchLot || 'LOT-' + new Date().getFullYear() + '-' + Math.floor(1000 + Math.random() * 9000),
-          expiryDate: rawItem.expiryDate || '2028-12-31',
-          costPrice: Number(rawItem.costPrice || rawItem.unitPrice || 0),
-          unitPrice: Number(rawItem.unitPrice || rawItem.costPrice || 0),
+          expiryDate: rawItem.expiryDate !== undefined ? rawItem.expiryDate : '',
+          excelExpiryDisplay: rawItem.excelExpiryDisplay || rawItem.expiryDate || '',
+          costPrice: Number(rawItem.unitPrice !== undefined ? rawItem.unitPrice : (rawItem.costPrice || 0)),
+          unitPrice: Number(rawItem.unitPrice !== undefined ? rawItem.unitPrice : (rawItem.costPrice || 0)),
           netPrice: Number(rawItem.netPrice || 0),
           sellingPrice: Number(rawItem.sellingPrice || 0),
+          congUnitPrice: Number(rawItem.congUnitPrice || 0),
           congPrice: Number(rawItem.congPrice || 0),
-          qtyPerBox: Number(rawItem.qtyPerBox || 1),
-          company: (rawItem.company || rawItem.supplier || 'General Distributor').trim(),
-          supplier: (rawItem.company || rawItem.supplier || 'General Distributor').trim()
+          qtyPerBox: Number(rawItem.qtyPerBox || 0),
+          company: (rawItem.company || rawItem.supplier || '').trim(),
+          supplier: (rawItem.company || rawItem.supplier || '').trim(),
+          rawInitialQty: rawItem.rawInitialQty !== undefined ? rawItem.rawInitialQty : String(qty),
+          rawExpiry: rawItem.rawExpiry !== undefined ? rawItem.rawExpiry : (rawItem.expiryDate || ''),
+          rawUnitPrice: rawItem.rawUnitPrice !== undefined ? rawItem.rawUnitPrice : String(rawItem.unitPrice || ''),
+          rawNetPrice: rawItem.rawNetPrice !== undefined ? rawItem.rawNetPrice : String(rawItem.netPrice || ''),
+          rawQtyPerBox: rawItem.rawQtyPerBox !== undefined ? rawItem.rawQtyPerBox : String(rawItem.qtyPerBox || ''),
+          rawSellingPrice: rawItem.rawSellingPrice !== undefined ? rawItem.rawSellingPrice : String(rawItem.sellingPrice || ''),
+          rawCongUnitPrice: rawItem.rawCongUnitPrice !== undefined ? rawItem.rawCongUnitPrice : String(rawItem.congUnitPrice || ''),
+          rawCongPrice: rawItem.rawCongPrice !== undefined ? rawItem.rawCongPrice : String(rawItem.congPrice || ''),
+          flags: Array.isArray(rawItem.flags) ? rawItem.flags : []
         };
         newItem._ord = ordBase + createdItems.length;
         currentItems.unshift(newItem);

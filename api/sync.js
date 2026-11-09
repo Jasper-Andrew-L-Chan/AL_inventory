@@ -15,13 +15,14 @@ module.exports = L.handler(async (req, res) => {
 
   const [userJson, meta] = await L.rpipeline([
     ['HGET', L.K.users, userId],
-    ['HMGET', L.K.meta, 'ver', 'shift']
+    ['HMGET', L.K.meta, 'ver', 'shift', 'seedVer']
   ]);
   let user = null;
   try { user = userJson ? JSON.parse(userJson) : null; } catch (e) { user = null; }
   if (!user || !L.isActive(user)) return L.send(res, 401, { error: 'Account disabled or removed' });
 
   let ver = Number(meta && meta[0]) || 0;
+  const seedVer = (meta && meta[2]) || '';
   const shiftId = L.currentShiftId();
   if ((meta && meta[1]) !== shiftId) {
     const newVer = await L.rollShift(shiftId);
@@ -30,7 +31,7 @@ module.exports = L.handler(async (req, res) => {
 
   const since = Number(req.query && req.query.v);
   if (Number.isFinite(since) && since === ver) {
-    return L.send(res, 200, { unchanged: true, version: ver });
+    return L.send(res, 200, { unchanged: true, version: ver, seedVer });
   }
 
   const [itemsH, stockH, txnsH, settingsJ, drawerJ] = await L.rpipeline([
@@ -62,6 +63,7 @@ module.exports = L.handler(async (req, res) => {
 
   L.send(res, 200, {
     version: ver,
+    seedVer,
     items,
     transactions,
     settings: parse(settingsJ),

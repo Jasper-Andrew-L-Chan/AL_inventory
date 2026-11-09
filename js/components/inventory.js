@@ -10,6 +10,7 @@
  */
 
 let inventorySearchQuery = '';
+let inventoryCategoryFilter = 'ALL'; // 'ALL' | 'Branded' | 'Generic' | 'Flagged'
 let inventoryCurrentTab = 'inventory';
 let selectedInventoryItemIds = new Set();
 let lastClickedItemId = null;
@@ -17,27 +18,27 @@ let inventoryCurrentPage = 1;
 let inventoryPageSize = 50; // High performance chunking for smooth rendering on any PC
 let searchDebounceTimer = null;
 
+function parseIsoExpiryDate(expiryStr) {
+  if (!expiryStr || typeof expiryStr !== 'string') return null;
+  const s = expiryStr.trim();
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(s)) return null;
+  const d = new Date(s + 'T00:00:00');
+  return isNaN(d.getTime()) ? null : d;
+}
+
 function renderInventoryView(container) {
   const items = window.pharmacyStore.getItems();
-  const filteredItems = items.filter(item => {
-    if (!inventorySearchQuery) return true;
-    const q = inventorySearchQuery.toLowerCase();
-    return (
-      item.brandName.toLowerCase().includes(q) ||
-      item.genericName.toLowerCase().includes(q) ||
-      item.category.toLowerCase().includes(q) ||
-      (item.batchLot && item.batchLot.toLowerCase().includes(q))
-    );
-  });
+  const brandedCount = items.filter(i => (i.category || '').toLowerCase() === 'branded').length;
+  const genericCount = items.filter(i => (i.category || '').toLowerCase() === 'generic').length;
+  const flaggedCount = items.filter(i => Array.isArray(i.flags) && i.flags.length > 0).length;
 
   const now = new Date();
   const in90Days = new Date(now.getTime() + 90 * 24 * 60 * 60 * 1000);
 
   const lowStockItems = items.filter(i => (Number(i.currentStock) || 0) <= (Number(i.reorderLevel) || 10));
   const expiringItems = items.filter(i => {
-    if (!i.expiryDate) return false;
-    const exp = new Date(i.expiryDate);
-    return !isNaN(exp.getTime()) && exp <= in90Days;
+    const exp = parseIsoExpiryDate(i.expiryDate);
+    return exp !== null && exp <= in90Days;
   });
 
   // Get filtered and sorted items (in-stock alphabetical A-Z first, out-of-stock alphabetical A-Z at bottom)
@@ -51,7 +52,7 @@ function renderInventoryView(container) {
     <!-- Top Subtabs Bar -->
     <div class="subtabs-bar">
       <button class="subtab-btn ${inventoryCurrentTab === 'inventory' ? 'active' : ''}" onclick="switchInventoryTab('inventory')">
-        INVENTORY
+        INVENTORY (${items.length.toLocaleString()})
       </button>
       <button class="subtab-btn ${inventoryCurrentTab === 'expiry-alerts' ? 'active' : ''}" onclick="switchInventoryTab('expiry-alerts')" style="display: inline-flex; align-items: center; gap: 6px;">
         <i data-lucide="alert-triangle" style="width: 14px; height: 14px; color: ${lowStockItems.length + expiringItems.length > 0 ? '#ef4444' : 'inherit'};"></i>
@@ -63,64 +64,63 @@ function renderInventoryView(container) {
     </div>
 
     <!-- Inventory Stock & Alert KPI Summary Banner -->
-    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 1rem; margin-bottom: 1.25rem;">
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 1rem; margin-bottom: 1.25rem;">
       <!-- Total Medicines In Stock Box -->
-      <div class="card" onclick="switchInventoryTab('inventory')" style="margin-bottom: 0; padding: 1rem 1.25rem; border-left: 4px solid var(--primary); background: #f0fdfa; cursor: pointer; transition: transform 0.15s ease;">
+      <div class="card" onclick="setInventoryCategoryFilter('ALL')" style="margin-bottom: 0; padding: 1rem 1.25rem; border-left: 4px solid var(--primary); background: #f0fdfa; cursor: pointer; transition: transform 0.15s ease;">
         <div style="display: flex; justify-content: space-between; align-items: flex-start;">
           <div>
             <div style="font-size: 0.75rem; font-weight: 700; color: var(--primary); text-transform: uppercase; letter-spacing: 0.04em; display: flex; align-items: center; gap: 5px;">
-              <i data-lucide="package-check" style="width: 15px; height: 15px;"></i> Medicines In Stock
+              <i data-lucide="package-check" style="width: 15px; height: 15px;"></i> Total Inventory Records
             </div>
             <div style="font-size: 1.6rem; font-weight: 900; color: var(--primary); margin: 0.2rem 0;">
-              ${items.filter(i => (Number(i.currentStock) || 0) > 0).length} <span style="font-size: 0.88rem; font-weight: 600; color: var(--text-muted);">/ ${items.length} Products</span>
+              ${items.length.toLocaleString()} <span style="font-size: 0.85rem; font-weight: 600; color: var(--text-muted);">(${items.filter(i => (Number(i.currentStock) || 0) > 0).length.toLocaleString()} in stock)</span>
             </div>
             <div style="font-size: 0.73rem; color: var(--text-muted);">
-              <strong>${totalStockCount.toLocaleString()}</strong> total units available in inventory
+              <strong>${brandedCount.toLocaleString()}</strong> Branded &bull; <strong>${genericCount.toLocaleString()}</strong> Generic &bull; <strong>${totalStockCount.toLocaleString()}</strong> total units
             </div>
           </div>
           <span style="font-size: 0.7rem; font-weight: 700; background: rgba(2, 128, 144, 0.12); color: var(--primary); padding: 2px 8px; border-radius: 9999px;">
-            In Stock
+            Verified
           </span>
         </div>
       </div>
 
-      <!-- Needs Restock Box -->
-      <div class="card" onclick="switchInventoryTab('expiry-alerts')" style="margin-bottom: 0; padding: 1rem 1.25rem; border-left: 4px solid #ef4444; background: #fffafb; cursor: pointer; transition: transform 0.15s ease;">
+      <!-- Branded vs Generic Breakdown Box -->
+      <div class="card" onclick="setInventoryCategoryFilter(inventoryCategoryFilter === 'Branded' ? 'Generic' : 'Branded')" style="margin-bottom: 0; padding: 1rem 1.25rem; border-left: 4px solid #2563eb; background: #eff6ff; cursor: pointer; transition: transform 0.15s ease;">
         <div style="display: flex; justify-content: space-between; align-items: flex-start;">
           <div>
-            <div style="font-size: 0.75rem; font-weight: 700; color: #b91c1c; text-transform: uppercase; letter-spacing: 0.04em; display: flex; align-items: center; gap: 5px;">
-              <i data-lucide="package-plus" style="width: 15px; height: 15px;"></i> Needs Restock
+            <div style="font-size: 0.75rem; font-weight: 700; color: #1d4ed8; text-transform: uppercase; letter-spacing: 0.04em; display: flex; align-items: center; gap: 5px;">
+              <i data-lucide="layers" style="width: 15px; height: 15px;"></i> Branded &amp; Generic Categories
             </div>
-            <div style="font-size: 1.6rem; font-weight: 900; color: #dc2626; margin: 0.2rem 0;">
-              ${lowStockItems.length}
+            <div style="font-size: 1.35rem; font-weight: 900; color: #1e40af; margin: 0.25rem 0;">
+              ${brandedCount.toLocaleString()} Branded / ${genericCount.toLocaleString()} Generic
             </div>
             <div style="font-size: 0.73rem; color: var(--text-muted);">
-              ${lowStockItems.length > 0 ? lowStockItems.map(i => i.brandName).slice(0, 3).join(', ') + (lowStockItems.length > 3 ? ` +${lowStockItems.length - 3} more` : '') : 'All medicines at healthy stock'}
+              Click to toggle between Branded &amp; Generic sheets
             </div>
           </div>
-          <span class="reorder-pill-badge" style="font-size: 0.72rem; padding: 3px 10px;">
-            <span class="reorder-pill-dot"></span>
-            <span>Needs Restock</span>
+          <span style="font-size: 0.7rem; font-weight: 700; background: #dbeafe; color: #1d4ed8; padding: 2px 8px; border-radius: 9999px;">
+            2 Sheets
           </span>
         </div>
       </div>
 
-      <!-- Expiring Soon Box -->
-      <div class="card" onclick="switchInventoryTab('expiry-alerts')" style="margin-bottom: 0; padding: 1rem 1.25rem; border-left: 4px solid #f59e0b; background: #fffdfa; cursor: pointer; transition: transform 0.15s ease;">
+      <!-- Flagged For Review Box -->
+      <div class="card" onclick="setInventoryCategoryFilter('Flagged')" style="margin-bottom: 0; padding: 1rem 1.25rem; border-left: 4px solid #f59e0b; background: #fffdfa; cursor: pointer; transition: transform 0.15s ease;">
         <div style="display: flex; justify-content: space-between; align-items: flex-start;">
           <div>
             <div style="font-size: 0.75rem; font-weight: 700; color: #b45309; text-transform: uppercase; letter-spacing: 0.04em; display: flex; align-items: center; gap: 5px;">
-              <i data-lucide="clock" style="width: 15px; height: 15px;"></i> Expiring Within 90 Days
+              <i data-lucide="flag" style="width: 15px; height: 15px;"></i> Flagged For Review
             </div>
             <div style="font-size: 1.6rem; font-weight: 900; color: #d97706; margin: 0.2rem 0;">
-              ${expiringItems.length}
+              ${flaggedCount.toLocaleString()}
             </div>
             <div style="font-size: 0.73rem; color: var(--text-muted);">
-              ${expiringItems.length > 0 ? expiringItems.map(i => `${i.brandName} (${i.expiryDate})`).slice(0, 2).join(', ') + (expiringItems.length > 2 ? ` +${expiringItems.length - 2} more` : '') : 'No batches expiring soon'}
+              Blank fields, #DIV/0! errors, or non-standard expiry dates preserved as-is
             </div>
           </div>
           <span style="font-size: 0.7rem; font-weight: 700; background: #fef3c7; color: #b45309; padding: 2px 8px; border-radius: 9999px;">
-            Near Expiry
+            Review
           </span>
         </div>
       </div>
@@ -189,32 +189,41 @@ function renderInventoryView(container) {
       ` : ''}
     </div>
 
-    <!-- Search Toolbar with Date filters and Stock Pill -->
+    <!-- Search Toolbar with Category Filters and Stock Pill -->
     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem; flex-wrap: wrap; gap: 0.75rem;">
-      <div style="display: flex; align-items: center; gap: 1rem;">
+      <div style="display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap;">
         <input 
           type="text" 
           id="inventorySearchInput"
-          placeholder="Search by brand, generic, or lot #..." 
+          placeholder="Search generic, brand, dosage, company, or lot #..." 
           value="${inventorySearchQuery}" 
           oninput="handleInventorySearch(this.value)" 
           class="form-input" 
-          style="width: 300px; padding: 0.5rem 0.85rem;"
+          style="width: 290px; padding: 0.5rem 0.85rem;"
         />
-        <div style="font-size: 0.76rem; color: var(--text-muted); display: flex; align-items: center; gap: 4px;">
-          <kbd style="background: #e2e8f0; border-radius: 4px; padding: 2px 5px; font-size: 0.7rem; font-family: monospace;">Shift + Click</kbd>
-          <span>on any row to select a group</span>
+        <!-- Category Filter Pills (All / Branded / Generic / Flagged) -->
+        <div style="display: inline-flex; align-items: center; gap: 0.35rem; background: #f1f5f9; padding: 3px; border-radius: 8px; border: 1px solid #e2e8f0;">
+          <button type="button" onclick="setInventoryCategoryFilter('ALL')" style="border: none; padding: 5px 10px; border-radius: 6px; font-size: 0.76rem; font-weight: 700; cursor: pointer; background: ${inventoryCategoryFilter === 'ALL' ? 'var(--primary)' : 'transparent'}; color: ${inventoryCategoryFilter === 'ALL' ? '#fff' : '#475569'};">
+            All (${items.length.toLocaleString()})
+          </button>
+          <button type="button" onclick="setInventoryCategoryFilter('Branded')" style="border: none; padding: 5px 10px; border-radius: 6px; font-size: 0.76rem; font-weight: 700; cursor: pointer; background: ${inventoryCategoryFilter === 'Branded' ? '#2563eb' : 'transparent'}; color: ${inventoryCategoryFilter === 'Branded' ? '#fff' : '#1e40af'};">
+            Branded (${brandedCount.toLocaleString()})
+          </button>
+          <button type="button" onclick="setInventoryCategoryFilter('Generic')" style="border: none; padding: 5px 10px; border-radius: 6px; font-size: 0.76rem; font-weight: 700; cursor: pointer; background: ${inventoryCategoryFilter === 'Generic' ? '#059669' : 'transparent'}; color: ${inventoryCategoryFilter === 'Generic' ? '#fff' : '#065f46'};">
+            Generic (${genericCount.toLocaleString()})
+          </button>
+          <button type="button" onclick="setInventoryCategoryFilter('Flagged')" title="Show records with blank fields, #DIV/0! errors, or non-standard expiry dates flagged for review" style="border: none; padding: 5px 10px; border-radius: 6px; font-size: 0.76rem; font-weight: 700; cursor: pointer; background: ${inventoryCategoryFilter === 'Flagged' ? '#d97706' : 'transparent'}; color: ${inventoryCategoryFilter === 'Flagged' ? '#fff' : '#b45309'};">
+            ⚠ Flagged (${flaggedCount.toLocaleString()})
+          </button>
         </div>
       </div>
 
-      <div style="display: flex; align-items: center; gap: 1.2rem;">
+      <div style="display: flex; align-items: center; gap: 0.85rem; flex-wrap: wrap;">
         ${inventoryCurrentTab === 'expiry-alerts' ? `
           <button onclick="switchInventoryTab('inventory')" class="btn-outline" style="font-size: 0.75rem; padding: 3px 8px;">
-            View All Inventory (${items.length})
+            View All Inventory (${items.length.toLocaleString()})
           </button>
-        ` : `
-          <span style="font-size: 0.85rem; color: var(--primary); font-weight: 700; border-bottom: 2px solid var(--primary); padding-bottom: 2px;">All Items</span>
-        `}
+        ` : ''}
 
         <!-- Total medicines count and Shift Status badge -->
         <div style="background: rgba(2, 128, 144, 0.1); border: 1px solid rgba(2, 128, 144, 0.25); color: var(--primary); padding: 0.35rem 0.75rem; border-radius: var(--radius-sm); font-size: 0.75rem; font-weight: 700; display: flex; align-items: center; gap: 0.4rem;">
@@ -224,12 +233,12 @@ function renderInventoryView(container) {
 
         <div id="inventoryCountBadge" style="background: #e07a5f; color: white; padding: 0.4rem 1rem; border-radius: var(--radius-sm); font-size: 0.82rem; font-weight: 700; display: flex; align-items: center; gap: 0.5rem;">
           <i data-lucide="package" style="width: 15px; height: 15px;"></i>
-          <span id="inventoryCountText">${displayedItems.length} displayed &bull; ${displayedItems.filter(i => (Number(i.currentStock) || 0) > 0).length} in stock (${displayedItems.reduce((acc, c) => acc + (Number(c.currentStock) || 0), 0).toLocaleString()} units)</span>
+          <span id="inventoryCountText">${displayedItems.length.toLocaleString()} displayed &bull; ${displayedItems.filter(i => (Number(i.currentStock) || 0) > 0).length.toLocaleString()} in stock (${displayedItems.reduce((acc, c) => acc + (Number(c.currentStock) || 0), 0).toLocaleString()} units)</span>
         </div>
       </div>
     </div>
 
-    <!-- Inventory Data Table matching Image 2 columns -->
+    <!-- Inventory Data Table with all 11 verified Excel fields -->
     <div class="table-container">
       <table class="data-table" id="inventoryTable">
         <thead>
@@ -237,18 +246,20 @@ function renderInventoryView(container) {
             <th style="width: 35px; text-align: center;">
               <input type="checkbox" id="selectAllInventoryCheckbox" onchange="toggleSelectAllItems(this.checked)" ${allFilteredSelected ? 'checked' : ''} title="Select/Deselect All" />
             </th>
-            <th>Medicine Details & Generic Name</th>
-            <th>Category / Rx</th>
-            <th>Batch / Expiry</th>
-            <th style="text-align: right;" title="Opening inventory at start of shift">Beginning Shift</th>
-            <th style="text-align: right;" title="Stock received / added during this shift (resets at 6am / 9pm)">Added (Shift)</th>
-            <th style="text-align: right;" title="Stock dispensed / deducted during this shift (resets at 6am / 9pm)">Deducted (Shift)</th>
+            <th>Generic Name, Brand Name, Dosage, Form &amp; Company</th>
+            <th>Category / Source</th>
+            <th>Batch / Expiry Date</th>
+            <th style="text-align: right;" title="Initial Quantity / Beginning Shift Stock">Initial Qty</th>
+            <th style="text-align: right;" title="Stock received / added during this shift">Added</th>
+            <th style="text-align: right;" title="Stock dispensed / deducted during this shift">Deducted</th>
             <th style="text-align: right; color: var(--primary); font-weight: 700;">Current Stock</th>
-            <th style="text-align: right;" title="Original Unit Cost / Purchase Price">Unit Cost</th>
-            <th style="text-align: right;" title="Selling Retail Price">Selling Price</th>
+            <th style="text-align: right;" title="Unit Price from Excel">Unit Price</th>
+            <th style="text-align: right;" title="Net Price from Excel">Net Price</th>
+            <th style="text-align: center;" title="Quantity per Box (QTY/BOX)">QTY/BOX</th>
+            <th style="text-align: right;" title="Selling Price from Excel">Selling Price</th>
             <th class="cong-price-col" style="text-align: right;" title="Cong's Price (Primary Reference Price)">Cong's Price ★</th>
-            <th style="text-align: center; width: 140px;">Fast Adjust</th>
-            <th style="text-align: center; width: 160px;">Actions</th>
+            <th style="text-align: center; width: 130px;">Fast Adjust</th>
+            <th style="text-align: center; width: 145px;">Actions</th>
           </tr>
         </thead>
         <tbody id="inventoryTableBody">
@@ -271,20 +282,26 @@ function renderInventoryView(container) {
           <div class="modal-body" style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
             <input type="hidden" id="modalMedId" />
             <div class="input-group">
-              <label style="font-size: 0.78rem; font-weight: 600; color: var(--text-muted); margin-bottom: 4px;">Brand Name *</label>
-              <input type="text" id="modalBrandName" class="form-input" placeholder="e.g. Biogesic" required />
+              <label style="font-size: 0.78rem; font-weight: 600; color: var(--text-muted); margin-bottom: 4px;">Generic Name (RA 6675)</label>
+              <input type="text" id="modalGenericName" class="form-input" placeholder="e.g. Paracetamol" />
             </div>
             <div class="input-group">
-              <label style="font-size: 0.78rem; font-weight: 600; color: var(--text-muted); margin-bottom: 4px;">Generic Name (RA 6675) *</label>
-              <input type="text" id="modalGenericName" class="form-input" placeholder="e.g. Paracetamol" required />
+              <label style="font-size: 0.78rem; font-weight: 600; color: var(--text-muted); margin-bottom: 4px;">Brand Name</label>
+              <input type="text" id="modalBrandName" class="form-input" placeholder="e.g. Biogesic" />
             </div>
             <div class="input-group">
-              <label style="font-size: 0.78rem; font-weight: 600; color: var(--text-muted); margin-bottom: 4px;">Dosage & Formulation</label>
-              <input type="text" id="modalDosage" class="form-input" placeholder="e.g. 500mg Tablet" />
+              <label style="font-size: 0.78rem; font-weight: 600; color: var(--text-muted); margin-bottom: 4px;">Dosage</label>
+              <input type="text" id="modalDosage" class="form-input" placeholder="e.g. 500MG" />
             </div>
             <div class="input-group">
-              <label style="font-size: 0.78rem; font-weight: 600; color: var(--text-muted); margin-bottom: 4px;">Category / Therapeutic Class</label>
+              <label style="font-size: 0.78rem; font-weight: 600; color: var(--text-muted); margin-bottom: 4px;">Dosage Form / Unit</label>
+              <input type="text" id="modalUnit" class="form-input" placeholder="e.g. TAB, CAP, SYRUP, AMP" />
+            </div>
+            <div class="input-group">
+              <label style="font-size: 0.78rem; font-weight: 600; color: var(--text-muted); margin-bottom: 4px;">Category (Branded / Generic)</label>
               <select id="modalCategory" class="form-input">
+                <option value="Branded">Branded</option>
+                <option value="Generic">Generic</option>
                 <option value="Analgesic & Antipyretic">Analgesic & Antipyretic</option>
                 <option value="Antibiotics">Antibiotics</option>
                 <option value="Cough & Cold">Cough & Cold</option>
@@ -305,20 +322,28 @@ function renderInventoryView(container) {
               </select>
             </div>
             <div class="input-group">
-              <label style="font-size: 0.78rem; font-weight: 600; color: var(--text-muted); margin-bottom: 4px;">Unit of Measurement</label>
-              <input type="text" id="modalUnit" class="form-input" placeholder="e.g. pcs, box, capsule, bottle" required />
+              <label style="font-size: 0.78rem; font-weight: 600; color: var(--text-muted); margin-bottom: 4px;">Unit Price (₱)</label>
+              <input type="number" id="modalCostPrice" class="form-input" step="any" min="0" placeholder="0.00" />
             </div>
             <div class="input-group">
-              <label style="font-size: 0.78rem; font-weight: 600; color: var(--text-muted); margin-bottom: 4px;">Unit Cost Price (₱)</label>
-              <input type="number" id="modalCostPrice" class="form-input" step="0.01" min="0" placeholder="0.00" required />
+              <label style="font-size: 0.78rem; font-weight: 600; color: var(--text-muted); margin-bottom: 4px;">Net Price (₱)</label>
+              <input type="number" id="modalNetPrice" class="form-input" step="any" min="0" placeholder="0.00" />
             </div>
             <div class="input-group">
-              <label style="font-size: 0.78rem; font-weight: 600; color: var(--text-muted); margin-bottom: 4px;">Selling Retail Price (₱)</label>
-              <input type="number" id="modalSellingPrice" class="form-input" step="0.01" min="0" placeholder="0.00" required />
+              <label style="font-size: 0.78rem; font-weight: 600; color: var(--text-muted); margin-bottom: 4px;">Quantity per Box (QTY/BOX)</label>
+              <input type="number" id="modalQtyPerBox" class="form-input" step="any" min="0" placeholder="0" />
             </div>
             <div class="input-group">
-              <label style="font-size: 0.78rem; font-weight: 700; color: #0284c7; margin-bottom: 4px;">Cong's Price (₱)</label>
-              <input type="number" id="modalCongPrice" class="form-input" step="0.01" min="0" placeholder="0.00" />
+              <label style="font-size: 0.78rem; font-weight: 600; color: var(--text-muted); margin-bottom: 4px;">Selling Price (₱)</label>
+              <input type="number" id="modalSellingPrice" class="form-input" step="any" min="0" placeholder="0.00" />
+            </div>
+            <div class="input-group">
+              <label style="font-size: 0.78rem; font-weight: 600; color: #0284c7; margin-bottom: 4px;">Cong's Unit Price (₱)</label>
+              <input type="number" id="modalCongUnitPrice" class="form-input" step="any" min="0" placeholder="0.00" />
+            </div>
+            <div class="input-group">
+              <label style="font-size: 0.78rem; font-weight: 700; color: #0284c7; margin-bottom: 4px;">Cong's Price ★ (₱)</label>
+              <input type="number" id="modalCongPrice" class="form-input" step="any" min="0" placeholder="0.00" />
             </div>
             <div class="input-group">
               <label style="font-size: 0.78rem; font-weight: 600; color: var(--text-muted); margin-bottom: 4px;">Company / Distributor</label>
@@ -326,15 +351,15 @@ function renderInventoryView(container) {
             </div>
             <div class="input-group">
               <label style="font-size: 0.78rem; font-weight: 600; color: var(--text-muted); margin-bottom: 4px;">Batch / Lot Number (FDA)</label>
-              <input type="text" id="modalBatchLot" class="form-input" placeholder="e.g. LOT-2026-A1" required />
+              <input type="text" id="modalBatchLot" class="form-input" placeholder="e.g. LOT-BR-0001" />
             </div>
             <div class="input-group">
               <label style="font-size: 0.78rem; font-weight: 600; color: var(--text-muted); margin-bottom: 4px;">Expiration Date</label>
-              <input type="date" id="modalExpiryDate" class="form-input" required />
+              <input type="text" id="modalExpiryDate" class="form-input" placeholder="YYYY-MM-DD or MM/YY" />
             </div>
             <div class="input-group">
               <label style="font-size: 0.78rem; font-weight: 600; color: var(--text-muted); margin-bottom: 4px;">Initial / Current Stock</label>
-              <input type="number" id="modalQty" class="form-input" min="0" placeholder="0" required />
+              <input type="number" id="modalQty" class="form-input" step="any" min="0" placeholder="0" />
             </div>
             <div class="input-group">
               <label style="font-size: 0.78rem; font-weight: 600; color: var(--text-muted); margin-bottom: 4px;">Reorder Alert Level</label>
@@ -678,13 +703,21 @@ window.deleteSelectedItems = function() {
 function getFilteredInventoryItems() {
   const items = window.pharmacyStore.getItems();
   const filtered = items.filter(item => {
+    if (inventoryCategoryFilter === 'Branded' && (item.category || '').toLowerCase() !== 'branded') return false;
+    if (inventoryCategoryFilter === 'Generic' && (item.category || '').toLowerCase() !== 'generic') return false;
+    if (inventoryCategoryFilter === 'Flagged' && (!Array.isArray(item.flags) || item.flags.length === 0)) return false;
+
     if (!inventorySearchQuery) return true;
     const q = inventorySearchQuery.toLowerCase();
     return (
       (item.brandName || '').toLowerCase().includes(q) ||
       (item.genericName || '').toLowerCase().includes(q) ||
+      (item.dosage || '').toLowerCase().includes(q) ||
+      (item.dosageForm || '').toLowerCase().includes(q) ||
+      (item.company || item.supplier || '').toLowerCase().includes(q) ||
       (item.category || '').toLowerCase().includes(q) ||
-      (item.batchLot && item.batchLot.toLowerCase().includes(q))
+      (item.batchLot && item.batchLot.toLowerCase().includes(q)) ||
+      (Array.isArray(item.flags) && item.flags.some(f => f.toLowerCase().includes(q)))
     );
   });
 
@@ -695,8 +728,8 @@ function getFilteredInventoryItems() {
   if (inventoryCurrentTab === 'expiry-alerts') {
     targetList = filtered.filter(item => {
       const isLow = (Number(item.currentStock) || 0) <= (Number(item.reorderLevel) || 10);
-      const expDate = new Date(item.expiryDate);
-      const isExpiring = !isNaN(expDate.getTime()) && expDate <= in90Days;
+      const expDate = parseIsoExpiryDate(item.expiryDate);
+      const isExpiring = expDate !== null && expDate <= in90Days;
       return isLow || isExpiring;
     });
   }
@@ -804,11 +837,26 @@ function renderInventoryPaginationBar(totalItems) {
   `;
 }
 
+function formatPriceCell(val, rawStr) {
+  const raw = rawStr !== undefined && rawStr !== null ? String(rawStr).trim() : '';
+  if (raw.startsWith('#')) {
+    return `<span style="color: #dc2626; font-size: 0.72rem; font-weight: 800; background: #fee2e2; padding: 1px 5px; border-radius: 4px;" title="Excel formula error in source file: ${escapeHtml(raw)}">${escapeHtml(raw)} ⚠</span>`;
+  }
+  if (raw !== '' && isNaN(Number(raw)) && !raw.includes('+')) {
+    return `<span style="color: #dc2626; font-size: 0.72rem; font-weight: 800; background: #fee2e2; padding: 1px 5px; border-radius: 4px;" title="Non-numeric value in Excel: ${escapeHtml(raw)}">"${escapeHtml(raw)}" ⚠</span>`;
+  }
+  const num = Number(val || 0);
+  if (raw === '' && num === 0) {
+    return `<span style="color: #94a3b8; font-size: 0.75rem;" title="Blank in source Excel">—</span>`;
+  }
+  return `₱${num.toFixed(2)}`;
+}
+
 function renderInventoryTableRows(displayedItems) {
   if (!displayedItems || displayedItems.length === 0) {
     return `
       <tr>
-        <td colspan="13" style="text-align: center; padding: 3rem 1rem; color: var(--text-muted);">
+        <td colspan="15" style="text-align: center; padding: 3rem 1rem; color: var(--text-muted);">
           <div style="margin-bottom: 0.5rem; display: flex; justify-content: center;"><i data-lucide="${inventoryCurrentTab === 'expiry-alerts' ? 'check-circle' : 'package'}" style="width: 36px; height: 36px; opacity: 0.5; color: ${inventoryCurrentTab === 'expiry-alerts' ? '#10b981' : 'inherit'};"></i></div>
           <div style="font-weight: 700; font-size: 1.05rem; color: var(--text-main); margin-bottom: 0.25rem;">
             ${inventoryCurrentTab === 'expiry-alerts' ? 'No Low Stock or Expiring Batches Found' : (inventorySearchQuery ? `No medicines matching "${escapeHtml(inventorySearchQuery)}"` : 'No medicines in inventory')}
@@ -824,19 +872,79 @@ function renderInventoryTableRows(displayedItems) {
     `;
   }
 
-  // Slice for high-performance rendering (e.g. 50 items at a time instead of 1,593 simultaneous DOM elements)
+  // Slice for high-performance rendering (e.g. 50 items at a time)
   const paginatedItems = getPaginatedInventoryItems(displayedItems);
+  const now = new Date();
 
   return paginatedItems.map(item => {
     const isLow = item.currentStock <= item.reorderLevel;
-    const expDate = new Date(item.expiryDate);
-    const now = new Date();
-    const daysToExpiry = Math.ceil((expDate - now) / (1000 * 60 * 60 * 24));
-    const isExpiringSoon = daysToExpiry <= 90;
+    const expDate = parseIsoExpiryDate(item.expiryDate);
+    const daysToExpiry = expDate ? Math.ceil((expDate - now) / (1000 * 60 * 60 * 24)) : null;
+    const isExpiringSoon = daysToExpiry !== null && daysToExpiry <= 90;
     const isSelected = selectedInventoryItemIds.has(item.id);
-    const congVal = Number(item.congPrice || 0);
-    const costVal = Number(item.costPrice !== undefined ? item.costPrice : (item.unitPrice || 0));
+
+    const costVal = Number(item.unitPrice !== undefined ? item.unitPrice : (item.costPrice || 0));
+    const netVal = Number(item.netPrice || 0);
+    const qtyBoxVal = Number(item.qtyPerBox || 0);
     const sellVal = Number(item.sellingPrice || 0);
+    const congVal = Number(item.congPrice || 0);
+    const flags = Array.isArray(item.flags) ? item.flags : [];
+    const isBranded = (item.category || '').toLowerCase() === 'branded';
+
+    const genericDisplay = item.genericName
+      ? escapeHtml(item.genericName)
+      : `<span style="color: #d97706; font-size: 0.74rem; font-weight: 700; background: #fef3c7; padding: 1px 6px; border-radius: 4px;" title="Generic Name is blank in Excel">[Blank Generic Name]</span>`;
+
+    const brandDisplay = item.brandName
+      ? `<span style="font-weight: 700; color: #1e293b;">${escapeHtml(item.brandName)}</span>`
+      : `<span style="color: #d97706; font-size: 0.72rem; font-weight: 700; background: #fef3c7; padding: 1px 5px; border-radius: 4px;" title="Brand Name is blank in Excel">[Blank Brand Name]</span>`;
+
+    const dosageDisplay = item.dosage
+      ? `<span style="font-size: 0.74rem; color: var(--text-muted); font-weight: 600;">• ${escapeHtml(item.dosage)}</span>`
+      : `<span style="font-size: 0.7rem; color: #94a3b8;" title="Dosage blank in Excel">• [No Dosage]</span>`;
+
+    const formDisplay = (item.dosageForm || item.unit)
+      ? `<span style="font-size: 0.72rem; background: #e2e8f0; color: #334155; padding: 1px 5px; border-radius: 4px; margin-left: 4px; font-weight: 700;" title="Dosage Form">${escapeHtml(item.dosageForm || item.unit)}</span>`
+      : `<span style="font-size: 0.7rem; color: #94a3b8; margin-left: 4px;" title="Dosage Form blank in Excel">[No Form]</span>`;
+
+    const companyDisplay = (item.company || item.supplier)
+      ? `<span style="font-size: 0.71rem; background: #f1f5f9; color: #475569; padding: 1px 5px; border-radius: 4px; margin-left: 4px; font-weight: 600; border: 1px solid #cbd5e1;" title="Company / Supplier">${escapeHtml(item.company || item.supplier)}</span>`
+      : `<span style="font-size: 0.7rem; color: #94a3b8; margin-left: 4px;" title="Company blank in Excel">[No Company]</span>`;
+
+    let expiryBadgeHtml = '';
+    if (!item.expiryDate) {
+      expiryBadgeHtml = `<span style="background: #fef3c7; color: #b45309; font-weight: 700; padding: 1px 6px; border-radius: 4px; font-size: 0.71rem;" title="Expiry Date is blank in source Excel">Blank Expiry ⚠</span>`;
+    } else if (daysToExpiry === null) {
+      expiryBadgeHtml = `<span style="background: #fef3c7; color: #b45309; font-weight: 700; padding: 1px 6px; border-radius: 4px; font-size: 0.71rem;" title="Non-standard expiry format preserved from Excel">${escapeHtml(item.expiryDate)} ⚠</span>`;
+    } else if (daysToExpiry <= 0) {
+      expiryBadgeHtml = `
+        <span style="background: #fee2e2; color: #b91c1c; font-weight: 800; padding: 1px 6px; border-radius: 4px; display: inline-flex; align-items: center; gap: 3px;">
+          <i data-lucide="alert-octagon" style="width: 11px; height: 11px;"></i> EXPIRED (${escapeHtml(item.expiryDate)})
+        </span>`;
+    } else if (daysToExpiry <= 30) {
+      expiryBadgeHtml = `
+        <span style="background: #fee2e2; color: #dc2626; font-weight: 700; padding: 1px 6px; border-radius: 4px; display: inline-flex; align-items: center; gap: 3px;">
+          <i data-lucide="alert-triangle" style="width: 11px; height: 11px;"></i> Expires in ${daysToExpiry}d (${escapeHtml(item.expiryDate)})
+        </span>`;
+    } else if (isExpiringSoon) {
+      expiryBadgeHtml = `
+        <span style="background: #fef3c7; color: #b45309; font-weight: 700; padding: 1px 6px; border-radius: 4px; display: inline-flex; align-items: center; gap: 3px;">
+          <i data-lucide="clock" style="width: 11px; height: 11px;"></i> Exp in ${daysToExpiry}d (${escapeHtml(item.expiryDate)})
+        </span>`;
+    } else {
+      expiryBadgeHtml = `<span style="color: var(--text-muted);" title="Excel raw: ${escapeHtml(item.excelExpiryDisplay || item.expiryDate)}">Exp: ${escapeHtml(item.expiryDate)}</span>`;
+    }
+
+    const rawInitQty = item.rawInitialQty !== undefined ? String(item.rawInitialQty).trim() : '';
+    const initQtyHtml = (rawInitQty !== '' && isNaN(Number(rawInitQty)) && !rawInitQty.includes('+'))
+      ? `<span style="color: #dc2626; font-weight: 800;" title="Non-numeric Initial Qty in Excel: ${escapeHtml(rawInitQty)}">${item.beginningStock} ("${escapeHtml(rawInitQty)}" ⚠)</span>`
+      : (rawInitQty === '' && item.beginningStock === 0
+        ? `<span style="color: #94a3b8;" title="Blank Initial Qty in Excel">0 (Blank)</span>`
+        : `${item.beginningStock}`);
+
+    const qtyBoxHtml = (item.rawQtyPerBox === '' && qtyBoxVal === 0)
+      ? `<span style="color: #94a3b8; font-size: 0.75rem;" title="Blank QTY/BOX in Excel">—</span>`
+      : `<span style="font-weight: 600;">${qtyBoxVal}</span>`;
 
     return `
       <tr 
@@ -855,48 +963,45 @@ function renderInventoryTableRows(displayedItems) {
           />
         </td>
         <td>
-          <div style="font-weight: 800; color: var(--text-main); font-size: 0.92rem; text-transform: uppercase; letter-spacing: 0.01em;">
-            ${escapeHtml(item.genericName || 'UNNAMED GENERIC')}
+          <div style="font-weight: 800; color: var(--text-main); font-size: 0.88rem; text-transform: uppercase; letter-spacing: 0.01em;">
+            <span style="font-size: 0.68rem; color: #64748b; font-weight: 700; margin-right: 4px;">GENERIC:</span>${genericDisplay}
           </div>
-          <div style="font-size: 0.8rem; color: #475569; font-weight: 500; margin-top: 1px;">
-            ${escapeHtml(item.brandName || 'Generic / Unbranded')} <span style="font-size: 0.74rem; color: var(--text-muted); font-weight: normal;">• ${escapeHtml(item.dosage || '')} [${escapeHtml(item.dosageForm || item.unit || 'pcs')}]</span>
-            ${(item.company || item.supplier) ? `<span style="font-size: 0.72rem; background: #f1f5f9; color: #475569; padding: 1px 5px; border-radius: 4px; margin-left: 4px; font-weight: 600;" title="Company / Supplier">${escapeHtml(item.company || item.supplier)}</span>` : ''}
+          <div style="font-size: 0.8rem; color: #475569; font-weight: 500; margin-top: 2px; display: flex; align-items: center; flex-wrap: wrap; gap: 2px;">
+            <span style="font-size: 0.68rem; color: #64748b; font-weight: 700; margin-right: 3px;">BRAND:</span>${brandDisplay}
+            ${dosageDisplay}
+            ${formDisplay}
+            ${companyDisplay}
           </div>
         </td>
         <td>
-          <div style="font-size: 0.78rem; color: var(--text-muted);">${escapeHtml(item.category)}</div>
-          <span class="badge ${item.isRx ? 'badge-rx' : 'badge-otc'}" style="margin-top: 3px;">
-            ${item.isRx ? 'Rx Required' : 'OTC'}
-          </span>
+          <div style="display: flex; align-items: center; gap: 4px; flex-wrap: wrap;">
+            <span style="font-size: 0.72rem; font-weight: 800; padding: 2px 7px; border-radius: 9999px; background: ${isBranded ? '#dbeafe' : '#dcfce7'}; color: ${isBranded ? '#1e40af' : '#166534'};">
+              ${escapeHtml(item.category || 'Branded')}
+            </span>
+            ${item.excelRow ? `<span style="font-size: 0.68rem; font-family: monospace; color: #64748b;" title="Source Excel Row">${escapeHtml(item.sourceSheet || '')} #${item.excelRow}</span>` : ''}
+          </div>
+          ${flags.length > 0 ? `
+            <div style="margin-top: 3px;">
+              <span style="font-size: 0.68rem; font-weight: 700; background: #fef3c7; color: #b45309; padding: 1px 6px; border-radius: 4px; display: inline-block; border: 1px solid #fde68a;" title="${escapeHtml(flags.join(' | '))}">
+                ⚠ ${flags.length} flag${flags.length > 1 ? 's' : ''}
+              </span>
+            </div>
+          ` : ''}
         </td>
         <td>
-          <div style="font-family: monospace; font-size: 0.78rem; font-weight: 600;">${escapeHtml(item.batchLot)}</div>
+          <div style="font-family: monospace; font-size: 0.76rem; font-weight: 600;">${escapeHtml(item.batchLot || '')}</div>
           <div style="font-size: 0.72rem; margin-top: 2px;">
-            ${daysToExpiry <= 0 ? `
-              <span style="background: #fee2e2; color: #b91c1c; font-weight: 800; padding: 1px 6px; border-radius: 4px; display: inline-flex; align-items: center; gap: 3px;">
-                <i data-lucide="alert-octagon" style="width: 11px; height: 11px;"></i> EXPIRED (${item.expiryDate})
-              </span>
-            ` : (daysToExpiry <= 30 ? `
-              <span style="background: #fee2e2; color: #dc2626; font-weight: 700; padding: 1px 6px; border-radius: 4px; display: inline-flex; align-items: center; gap: 3px;">
-                <i data-lucide="alert-triangle" style="width: 11px; height: 11px;"></i> Expires in ${daysToExpiry}d (${item.expiryDate})
-              </span>
-            ` : (isExpiringSoon ? `
-              <span style="background: #fef3c7; color: #b45309; font-weight: 700; padding: 1px 6px; border-radius: 4px; display: inline-flex; align-items: center; gap: 3px;">
-                <i data-lucide="clock" style="width: 11px; height: 11px;"></i> Exp in ${daysToExpiry}d (${item.expiryDate})
-              </span>
-            ` : `
-              <span style="color: var(--text-muted);">Exp: ${item.expiryDate}</span>
-            `))}
+            ${expiryBadgeHtml}
           </div>
         </td>
-        <td style="text-align: right; color: var(--text-muted);">${item.beginningStock}</td>
+        <td style="text-align: right; color: var(--text-muted); font-size: 0.82rem;">${initQtyHtml}</td>
         <td style="text-align: right; color: #16a34a; font-weight: 600;">+${item.addedStock}</td>
         <td style="text-align: right; color: #dc2626; font-weight: 600;">-${item.deductedStock}</td>
         <td style="text-align: right; font-weight: 800; font-size: 0.95rem; ${isLow ? 'color: #dc2626;' : 'color: var(--text-main);'}">
           <div style="display: flex; flex-direction: column; align-items: flex-end; gap: 3px;">
             <span>${item.currentStock}</span>
             ${item.currentStock === 0 ? `
-              <span class="reorder-pill-badge out-of-stock" title="Critical: 0 stock remaining. Reorder urgently!">
+              <span class="reorder-pill-badge out-of-stock" title="0 stock in inventory">
                 <span class="reorder-pill-dot"></span>
                 <span>OUT OF STOCK</span>
               </span>
@@ -908,10 +1013,12 @@ function renderInventoryTableRows(displayedItems) {
             ` : '')}
           </div>
         </td>
-        <td style="text-align: right; font-size: 0.85rem; color: var(--text-muted);">₱${costVal.toFixed(2)}</td>
-        <td style="text-align: right; font-weight: 700; color: var(--primary);">₱${sellVal.toFixed(2)}</td>
+        <td style="text-align: right; font-size: 0.83rem; color: var(--text-muted);">${formatPriceCell(costVal, item.rawUnitPrice)}</td>
+        <td style="text-align: right; font-size: 0.83rem; color: var(--text-muted);">${formatPriceCell(netVal, item.rawNetPrice)}</td>
+        <td style="text-align: center; font-size: 0.82rem;">${qtyBoxHtml}</td>
+        <td style="text-align: right; font-weight: 700; color: var(--primary);">${formatPriceCell(sellVal, item.rawSellingPrice)}</td>
         <td class="cong-price-col" style="text-align: right;">
-          ${congVal > 0 ? `₱${congVal.toFixed(2)}` : '<span style="color: #ea580c; font-size: 0.72rem; font-weight: 700;" title="Cong\'s Price missing or unset">Unset</span>'}
+          ${formatPriceCell(congVal, item.rawCongPrice)}
         </td>
         <td style="text-align: center;" onclick="event.stopPropagation()">
           <div style="display: flex; align-items: center; justify-content: center; gap: 4px;">
@@ -919,19 +1026,19 @@ function renderInventoryTableRows(displayedItems) {
               type="number" 
               id="adj-input-${item.id}" 
               placeholder="Qty" 
-              style="width: 50px; padding: 3px 5px; font-size: 0.8rem; border: 1px solid var(--border-color); border-radius: 4px; text-align: center;" 
+              style="width: 46px; padding: 3px 4px; font-size: 0.78rem; border: 1px solid var(--border-color); border-radius: 4px; text-align: center;" 
             />
             <button 
               onclick="fastAdjustStock('${item.id}', 1)" 
               title="Add to Stock"
-              style="width: 24px; height: 24px; border-radius: 50%; background: #10b981; color: white; border: none; font-size: 0.85rem; font-weight: 700; cursor: pointer; display: flex; align-items: center; justify-content: center;"
+              style="width: 23px; height: 23px; border-radius: 50%; background: #10b981; color: white; border: none; font-size: 0.82rem; font-weight: 700; cursor: pointer; display: flex; align-items: center; justify-content: center;"
             >
               +
             </button>
             <button 
               onclick="fastAdjustStock('${item.id}', -1)" 
               title="Deduct Stock"
-              style="width: 24px; height: 24px; border-radius: 50%; background: #ef4444; color: white; border: none; font-size: 0.85rem; font-weight: 700; cursor: pointer; display: flex; align-items: center; justify-content: center;"
+              style="width: 23px; height: 23px; border-radius: 50%; background: #ef4444; color: white; border: none; font-size: 0.82rem; font-weight: 700; cursor: pointer; display: flex; align-items: center; justify-content: center;"
             >
               -
             </button>
@@ -987,7 +1094,7 @@ function refreshInventoryTableDOM() {
     if (countBadge) {
       const inStockCount = displayedItems.filter(i => (Number(i.currentStock) || 0) > 0).length;
       const totalUnits = displayedItems.reduce((acc, c) => acc + (Number(c.currentStock) || 0), 0);
-      countBadge.textContent = `${displayedItems.length} displayed • ${inStockCount} in stock (${totalUnits.toLocaleString()} units)`;
+      countBadge.textContent = `${displayedItems.length.toLocaleString()} displayed • ${inStockCount.toLocaleString()} in stock (${totalUnits.toLocaleString()} units)`;
     }
 
     // Target icon initialization only within the inventory table for maximum speed
@@ -1000,6 +1107,12 @@ function refreshInventoryTableDOM() {
     renderInventoryView(document.getElementById('main-content'));
   }
 }
+
+window.setInventoryCategoryFilter = function(cat) {
+  inventoryCategoryFilter = cat || 'ALL';
+  inventoryCurrentPage = 1;
+  renderInventoryView(document.getElementById('main-content'));
+};
 
 window.handleInventorySearch = function(query) {
   inventorySearchQuery = query;
@@ -1060,15 +1173,17 @@ window.handleQuickAdd = function(e) {
   window.pharmacyStore.addItem({
     brandName,
     genericName,
-    dosage: 'Standard',
-    category: 'General Medicine',
+    dosage: '',
+    dosageForm: unit,
+    category: 'Branded',
     unit,
     qty,
     sellingPrice: price,
-    costPrice: price * 0.65,
+    costPrice: 0,
+    unitPrice: 0,
     isRx: false,
     batchLot: 'LOT-' + new Date().getFullYear() + '-Q' + Math.floor(Math.random() * 900 + 100),
-    expiryDate: '2028-12-31'
+    expiryDate: ''
   });
 
   // Clear inputs
@@ -1087,8 +1202,9 @@ window.openAddMedicineModal = function() {
   document.getElementById('medModalTitle').textContent = 'Add New Medicine';
   document.getElementById('modalMedId').value = '';
   document.getElementById('medDetailForm').reset();
-  document.getElementById('modalExpiryDate').value = '2027-12-31';
-  document.getElementById('modalReorder').value = '30';
+  document.getElementById('modalCategory').value = 'Branded';
+  document.getElementById('modalExpiryDate').value = '';
+  document.getElementById('modalReorder').value = '20';
   document.getElementById('medicineModal').classList.add('active');
 };
 
@@ -1098,22 +1214,28 @@ window.openEditMedicineModal = function(id) {
 
   document.getElementById('medModalTitle').textContent = 'Edit Medicine & Lot Info';
   document.getElementById('modalMedId').value = item.id;
-  document.getElementById('modalBrandName').value = item.brandName;
-  document.getElementById('modalGenericName').value = item.genericName;
+  document.getElementById('modalBrandName').value = item.brandName || '';
+  document.getElementById('modalGenericName').value = item.genericName || '';
   document.getElementById('modalDosage').value = item.dosage || '';
-  document.getElementById('modalCategory').value = item.category || 'General Medicine';
+  document.getElementById('modalCategory').value = item.category || 'Branded';
   document.getElementById('modalIsRx').value = item.isRx ? 'true' : 'false';
-  document.getElementById('modalUnit').value = item.unit;
-  document.getElementById('modalCostPrice').value = item.costPrice || item.unitPrice || 0;
+  document.getElementById('modalUnit').value = item.dosageForm || item.unit || '';
+  document.getElementById('modalCostPrice').value = item.unitPrice !== undefined ? item.unitPrice : (item.costPrice || 0);
+  const netInput = document.getElementById('modalNetPrice');
+  if (netInput) netInput.value = item.netPrice || 0;
+  const qtyBoxInput = document.getElementById('modalQtyPerBox');
+  if (qtyBoxInput) qtyBoxInput.value = item.qtyPerBox || 0;
   document.getElementById('modalSellingPrice').value = item.sellingPrice || 0;
+  const congUnitInput = document.getElementById('modalCongUnitPrice');
+  if (congUnitInput) congUnitInput.value = item.congUnitPrice || 0;
   const congInput = document.getElementById('modalCongPrice');
   if (congInput) congInput.value = item.congPrice || 0;
   const companyInput = document.getElementById('modalCompany');
   if (companyInput) companyInput.value = item.company || item.supplier || '';
-  document.getElementById('modalBatchLot').value = item.batchLot;
-  document.getElementById('modalExpiryDate').value = item.expiryDate;
-  document.getElementById('modalQty').value = item.currentStock;
-  document.getElementById('modalReorder').value = item.reorderLevel;
+  document.getElementById('modalBatchLot').value = item.batchLot || '';
+  document.getElementById('modalExpiryDate').value = item.expiryDate || '';
+  document.getElementById('modalQty').value = item.currentStock || 0;
+  document.getElementById('modalReorder').value = item.reorderLevel || 20;
 
   document.getElementById('medicineModal').classList.add('active');
 };
@@ -1125,31 +1247,58 @@ window.closeMedicineModal = function() {
 window.handleSaveDetailedMedicine = function(e) {
   e.preventDefault();
   const id = document.getElementById('modalMedId').value;
+  const netInput = document.getElementById('modalNetPrice');
+  const qtyBoxInput = document.getElementById('modalQtyPerBox');
+  const congUnitInput = document.getElementById('modalCongUnitPrice');
   const congInput = document.getElementById('modalCongPrice');
   const companyInput = document.getElementById('modalCompany');
+  const unitVal = document.getElementById('modalUnit').value.trim();
+  const costVal = Number(document.getElementById('modalCostPrice').value) || 0;
+  const netVal = netInput ? (Number(netInput.value) || 0) : 0;
+  const qtyBoxVal = qtyBoxInput ? (Number(qtyBoxInput.value) || 0) : 0;
+  const sellVal = Number(document.getElementById('modalSellingPrice').value) || 0;
+  const congUnitVal = congUnitInput ? (Number(congUnitInput.value) || 0) : 0;
+  const congVal = congInput ? (Number(congInput.value) || 0) : 0;
+  const expVal = document.getElementById('modalExpiryDate').value.trim();
+  const qtyVal = Number(document.getElementById('modalQty').value) || 0;
+
   const data = {
     brandName: document.getElementById('modalBrandName').value.trim(),
     genericName: document.getElementById('modalGenericName').value.trim(),
     dosage: document.getElementById('modalDosage').value.trim(),
+    dosageForm: unitVal,
     category: document.getElementById('modalCategory').value,
     isRx: document.getElementById('modalIsRx').value === 'true',
-    unit: document.getElementById('modalUnit').value.trim(),
-    costPrice: Number(document.getElementById('modalCostPrice').value),
-    unitPrice: Number(document.getElementById('modalCostPrice').value),
-    sellingPrice: Number(document.getElementById('modalSellingPrice').value),
-    congPrice: congInput ? Number(congInput.value) || 0 : 0,
+    unit: unitVal,
+    costPrice: costVal,
+    unitPrice: costVal,
+    netPrice: netVal,
+    qtyPerBox: qtyBoxVal,
+    sellingPrice: sellVal,
+    congUnitPrice: congUnitVal,
+    congPrice: congVal,
+    rawUnitPrice: String(costVal),
+    rawNetPrice: String(netVal),
+    rawQtyPerBox: String(qtyBoxVal),
+    rawSellingPrice: String(sellVal),
+    rawCongUnitPrice: String(congUnitVal),
+    rawCongPrice: String(congVal),
+    rawExpiry: expVal,
+    rawInitialQty: String(qtyVal),
     company: companyInput ? companyInput.value.trim() : '',
     supplier: companyInput ? companyInput.value.trim() : '',
     batchLot: document.getElementById('modalBatchLot').value.trim(),
-    expiryDate: document.getElementById('modalExpiryDate').value,
-    currentStock: Number(document.getElementById('modalQty').value),
-    reorderLevel: Number(document.getElementById('modalReorder').value)
+    expiryDate: expVal,
+    excelExpiryDisplay: expVal,
+    currentStock: qtyVal,
+    reorderLevel: Number(document.getElementById('modalReorder').value) || 20
   };
 
   if (id) {
     window.pharmacyStore.updateItem(id, data);
   } else {
     data.beginningStock = data.currentStock;
+    data.initialQty = data.currentStock;
     window.pharmacyStore.addItem(data);
   }
 
@@ -1161,22 +1310,26 @@ window.handleSaveDetailedMedicine = function(e) {
 
 window.exportInventoryToCSV = function() {
   const items = window.pharmacyStore.getItems();
-  const headers = ['ID,Brand Name,Generic Name,Dosage,Category,Rx,Unit,Cong\'s Price (Reference),Unit Cost Price,Selling Price,Stock,Batch Lot,Expiry Date,Company'];
+  const headers = ['ID,Category,Generic Name,Brand Name,Dosage,Dosage Form,Initial Qty,Current Stock,Expiry Date,Unit Price,Net Price,QTY/BOX,Selling Price,Cong\'s Unit Price,Cong\'s Price,Company,Batch Lot,Flags'];
   const rows = items.map(i => [
     i.id,
-    `"${i.brandName}"`,
-    `"${i.genericName}"`,
-    `"${i.dosage || ''}"`,
-    `"${i.category}"`,
-    i.isRx ? 'Yes' : 'No',
-    i.unit,
-    (Number(i.congPrice) || 0).toFixed(2),
-    (Number(i.costPrice !== undefined ? i.costPrice : i.unitPrice) || 0).toFixed(2),
-    (Number(i.sellingPrice) || 0).toFixed(2),
+    `"${(i.category || '').replace(/"/g, '""')}"`,
+    `"${(i.genericName || '').replace(/"/g, '""')}"`,
+    `"${(i.brandName || '').replace(/"/g, '""')}"`,
+    `"${(i.dosage || '').replace(/"/g, '""')}"`,
+    `"${(i.dosageForm || i.unit || '').replace(/"/g, '""')}"`,
+    i.beginningStock !== undefined ? i.beginningStock : i.currentStock,
     i.currentStock,
-    i.batchLot,
-    i.expiryDate,
-    `"${i.company || i.supplier || ''}"`
+    `"${(i.expiryDate || '').replace(/"/g, '""')}"`,
+    (Number(i.unitPrice !== undefined ? i.unitPrice : i.costPrice) || 0).toFixed(2),
+    (Number(i.netPrice) || 0).toFixed(2),
+    Number(i.qtyPerBox) || 0,
+    (Number(i.sellingPrice) || 0).toFixed(2),
+    (Number(i.congUnitPrice) || 0).toFixed(2),
+    (Number(i.congPrice) || 0).toFixed(2),
+    `"${(i.company || i.supplier || '').replace(/"/g, '""')}"`,
+    `"${(i.batchLot || '').replace(/"/g, '""')}"`,
+    `"${(Array.isArray(i.flags) ? i.flags.join('; ') : '').replace(/"/g, '""')}"`
   ].join(','));
 
   const csvContent = 'data:text/csv;charset=utf-8,' + [headers, ...rows].join('\n');
@@ -1235,20 +1388,35 @@ window.handleInventoryFileSelect = function(event) {
     reader.onload = function(e) {
       try {
         const data = new Uint8Array(e.target.result);
-        const workbook = XLSX.read(data, { type: 'array', cellDates: true });
+        const workbook = XLSX.read(data, { type: 'array', cellDates: false });
         let rawJson = [];
-        for (const sheetName of workbook.SheetNames) {
+        const fnUpper = file.name.toUpperCase();
+        const preferGenericOnly = fnUpper.includes('GENERIC') && !fnUpper.includes('BRANDED');
+        const preferBrandedOnly = fnUpper.includes('BRANDED') && !fnUpper.includes('GENERIC');
+
+        const targetSheets = workbook.SheetNames.filter(sn => {
+          const sUpper = sn.trim().toUpperCase();
+          if (preferGenericOnly && sUpper === 'GENERIC') return true;
+          if (preferBrandedOnly && sUpper === 'BRANDED') return true;
+          if (!preferGenericOnly && !preferBrandedOnly) return true;
+          return false;
+        });
+        const sheetsToRead = targetSheets.length > 0 ? targetSheets : workbook.SheetNames;
+
+        for (const sheetName of sheetsToRead) {
           const grid = XLSX.utils.sheet_to_json(workbook.Sheets[sheetName], { header: 1, defval: '', raw: false });
-          // Locate header row by looking for generic name, brand name, medicine name, or product
           const hIdx = grid.findIndex(r => Array.isArray(r) && r.some(c => /generic|brand|medicine|dosage|drug/i.test(String(c || ''))));
           if (hIdx === -1) continue;
-          const headers = grid[hIdx].map(h => String(h || '').trim());
-          rawJson = grid.slice(hIdx + 1).map(r => {
-            const o = {};
-            headers.forEach((h, i) => { if (h) o[h] = r[i] !== undefined ? r[i] : ''; });
+          const headers = grid[hIdx].map((h, colIdx) => {
+            const trimmed = String(h || '').trim();
+            return trimmed || `__COL_${colIdx}`;
+          });
+          const sheetRows = grid.slice(hIdx + 1).map((r, rIdx) => {
+            const o = { _sheetName: sheetName.trim(), _excelRow: hIdx + 2 + rIdx };
+            headers.forEach((h, i) => { o[h] = r[i] !== undefined ? r[i] : ''; });
             return o;
           });
-          if (rawJson.length > 0) break;
+          rawJson = rawJson.concat(sheetRows);
         }
         if (rawJson.length === 0) {
           const ws = workbook.Sheets[workbook.SheetNames[0]];
@@ -1339,13 +1507,26 @@ function processImportRows(rawRows, fileName) {
   let displayRowIndex = 0;
 
   rawRows.forEach((row, index) => {
-    // 1. Intelligent column header mapping (case-insensitive & whitespace-tolerant)
-    const findVal = (keywords) => {
-      for (const key of Object.keys(row)) {
-        const cleanKey = key.trim().toLowerCase().replace(/[^a-z0-9]/g, '');
-        for (const kw of keywords) {
-          const cleanKw = kw.toLowerCase().replace(/[^a-z0-9]/g, '');
-          if (cleanKey === cleanKw || cleanKey.includes(cleanKw)) {
+    // 1. Exact-first column header mapping so UNIT PRICE never shadows SELLING PRICE
+    const findVal = (exactKeys, partialKeys = []) => {
+      const rowKeys = Object.keys(row).filter(k => !k.startsWith('_'));
+      // Pass 1: exact normalized match
+      for (const ek of exactKeys) {
+        const cleanEk = ek.trim().toLowerCase().replace(/[^a-z0-9-]/g, '');
+        for (const key of rowKeys) {
+          const cleanKey = key.trim().toLowerCase().replace(/[^a-z0-9-]/g, '');
+          if (cleanKey === cleanEk) {
+            return String(row[key] !== undefined ? row[key] : '').trim();
+          }
+        }
+      }
+      // Pass 2: partial match
+      for (const pk of partialKeys) {
+        const cleanPk = pk.trim().toLowerCase().replace(/[^a-z0-9]/g, '');
+        if (!cleanPk) continue;
+        for (const key of rowKeys) {
+          const cleanKey = key.trim().toLowerCase().replace(/[^a-z0-9]/g, '');
+          if (cleanKey.includes(cleanPk)) {
             return String(row[key] !== undefined ? row[key] : '').trim();
           }
         }
@@ -1353,89 +1534,87 @@ function processImportRows(rawRows, fileName) {
       return '';
     };
 
-    let genericName = findVal(['generic name', 'generic', 'molecule']);
-    let brandName = findVal(['brand name', 'brand', 'drug name', 'product name', 'medicine name', 'item name']);
+    const genericName = findVal(['generic name', 'generic'], ['generic', 'molecule']);
+    const brandName = findVal(['brand name', 'brand', 'drug name', 'product name', 'medicine name', 'item name'], ['brand']);
+    const dosage = findVal(['dosage', 'strength', 'formulation'], []);
+    const dosageForm = findVal(['dosage form', 'form', 'presentation'], ['dosageform']);
 
-    // Clean leading backticks or quotes if any
-    genericName = genericName.replace(/^[`'"]+|[`'"]+$/g, '').trim();
-    brandName = brandName.replace(/^[`'"]+|[`'"]+$/g, '').trim();
-
-    // Skip empty trailing rows (e.g. ,,,,,,,,,,,#DIV/0!,,,#DIV/0!,,,,,,,,,,,,)
-    if (!genericName && !brandName) {
+    // Skip completely empty template rows (where Generic, Brand, Dosage, and Dosage Form are all blank)
+    if (!genericName && !brandName && !dosage && !dosageForm) {
       return;
     }
 
-    const dosage = findVal(['dosage', 'strength', 'formulation']) || 'Standard';
-    const dosageForm = findVal(['dosage form', 'form', 'presentation']) || 'Tablet';
-    
-    // Numeric sanitization: handle Excel errors like #DIV/0!, #N/A, expressions like 83+77, currency symbols
-    const cleanNum = (str, fallback = 0) => {
-      if (str === '' || str === null || str === undefined) return fallback;
-      const s = String(str).trim();
-      if (s.startsWith('#') || s === '-' || s.toLowerCase() === 'nan') return fallback;
+    const sheetUpper = String(row._sheetName || fileName || '').toUpperCase();
+    const category = sheetUpper.includes('GENERIC') && !sheetUpper.includes('BRANDED') ? 'Generic' : 'Branded';
 
-      // Handle addition expressions like "83+77"
-      if (s.includes('+')) {
-        const parts = s.split('+').map(p => parseFloat(p.replace(/[^\d.-]/g, '')) || 0);
-        const sum = parts.reduce((a, b) => a + b, 0);
-        return isNaN(sum) ? fallback : sum;
+    const flags = [];
+    if (!genericName) flags.push('Blank Generic Name');
+    if (genericName.startsWith('`')) flags.push('Leading backtick in Generic Name');
+    if (!brandName) flags.push('Blank Brand Name');
+    if (!dosage) flags.push('Blank Dosage');
+    if (!dosageForm) flags.push('Blank Dosage Form');
+
+    const parseNumericField = (str, fieldLabel) => {
+      const s = String(str !== undefined && str !== null ? str : '').trim();
+      if (s === '') {
+        flags.push(`Blank ${fieldLabel}`);
+        return 0;
       }
-
-      const cleaned = s.replace(/[^\d.-]/g, '');
-      const num = parseFloat(cleaned);
-      return isNaN(num) ? fallback : num;
+      if (s.startsWith('#')) {
+        flags.push(`Formula error in ${fieldLabel} (${s})`);
+        return 0;
+      }
+      if (/^\d+(\.\d+)?(\+\d+(\.\d+)?)+$/.test(s)) {
+        return s.split('+').reduce((acc, p) => acc + (parseFloat(p) || 0), 0);
+      }
+      const cleaned = s.replace(/,/g, '');
+      const num = Number(cleaned);
+      if (isNaN(num)) {
+        flags.push(`Non-numeric ${fieldLabel} ("${s}")`);
+        return 0;
+      }
+      return Math.round(num * 10000) / 10000;
     };
 
     const rawInitialQty = findVal(['initial quantity', 'initial qty', 'initial qty.', 'initial stock', 'quantity', 'qty', 'stock', 'current stock']);
-    const initialQty = cleanNum(rawInitialQty, 0);
+    const initialQty = parseNumericField(rawInitialQty, 'Initial Quantity');
 
-    const rawUnitPrice = findVal(['unit price', 'cost price', 'cost', 'unit cost', 'purchase price']);
-    const unitPrice = cleanNum(rawUnitPrice, 0);
+    const rawUnitPrice = findVal(['unit price', 'cost price', 'unit cost', 'purchase price']);
+    const unitPrice = parseNumericField(rawUnitPrice, 'Unit Price');
 
-    const rawNetPrice = findVal(['net price', 'net cost', 'net']);
-    const netPrice = cleanNum(rawNetPrice, unitPrice);
+    const rawNetPrice = findVal(['net price', 'net cost']);
+    const netPrice = parseNumericField(rawNetPrice, 'Net Price');
 
-    const rawQtyPerBox = findVal(['quantity per box', 'qty/box', 'qty per box', 'units per box', 'box qty', 'packaging']);
-    const qtyPerBox = cleanNum(rawQtyPerBox, 1);
+    const rawQtyPerBox = findVal(['qty/box', 'quantity per box', 'qty per box', 'units per box', 'box qty']);
+    const qtyPerBox = parseNumericField(rawQtyPerBox, 'QTY/BOX');
 
-    const rawSellingPrice = findVal(['selling price', 'retail price', 'srp', 'price']);
-    // If selling price is 0 or missing but unitPrice is available, fallback: Unit Price × 1.2
-    let sellingPrice = cleanNum(rawSellingPrice, 0);
-    if (sellingPrice === 0 && unitPrice > 0) {
-      sellingPrice = parseFloat((unitPrice * 1.20).toFixed(4));
+    // Note: In GENERIC sheet, Selling Price header is '-'
+    const rawSellingPrice = findVal(['selling price', 'retail price', 'srp', '-']);
+    const sellingPrice = parseNumericField(rawSellingPrice, 'Selling Price');
+
+    const rawCongUnitPrice = findVal(['congs unit price', "cong's unit price", 'cong unit price']);
+    const congUnitPrice = rawCongUnitPrice ? (Number(String(rawCongUnitPrice).replace(/,/g, '')) || 0) : 0;
+
+    const rawCongPrice = findVal(["cong's price", 'congs price', 'cong price']);
+    let congPrice = 0;
+    if (rawCongPrice) {
+      if (rawCongPrice.startsWith('#')) {
+        flags.push(`Formula error in Cong's Price (${rawCongPrice})`);
+      } else {
+        congPrice = Math.round((Number(String(rawCongPrice).replace(/,/g, '')) || 0) * 10000) / 10000;
+      }
     }
 
-    const rawCongPrice = findVal(['cong price', "cong's price", 'congs price', 'cong', 'special price']);
-    // If Cong's price is 0 or missing but unitPrice is available, fallback: Unit Price × 2.4
-    let congPrice = cleanNum(rawCongPrice, 0);
-    if (congPrice === 0 && unitPrice > 0) {
-      congPrice = parseFloat((unitPrice * 2.40).toFixed(4));
-    }
+    const company = findVal(['company', 'manufacturer', 'supplier', 'distributor', 'mfg']);
+    if (!company) flags.push('Blank Company');
 
-    const company = findVal(['company', 'manufacturer', 'supplier', 'distributor', 'mfg']) || 'General Distributor';
-
-    // Parse and normalize expiry date
     const rawExpiry = findVal(['expiry date', 'expiry', 'exp date', 'expiration', 'exp']);
-    let expiryDate = normalizeDateString(rawExpiry);
+    const expiryDate = normalizeDateString(rawExpiry, flags);
 
-    // 2. Validate row & Cong's Price as primary reference price
     const errors = [];
-    const warnings = [];
-
-    if (initialQty < 0) {
-      errors.push('Initial Quantity cannot be negative');
-    }
-    if (sellingPrice < 0) {
-      errors.push('Selling Price cannot be negative');
-    }
-    if (unitPrice < 0) {
-      errors.push('Unit Price cannot be negative');
-    }
-
-    // Cong's price is the primary reference price: flag if missing or invalid (0 or unprovided)
-    if (!congPrice || congPrice <= 0) {
-      warnings.push("Cong's Price is missing or ₱0.00 (Primary reference price unset)");
-    }
+    if (initialQty < 0) errors.push('Initial Quantity cannot be negative');
+    if (sellingPrice < 0) errors.push('Selling Price cannot be negative');
+    if (unitPrice < 0) errors.push('Unit Price cannot be negative');
 
     const key = makeKey(brandName, genericName, dosage, dosageForm);
     const isDuplicate = existingMap.has(key);
@@ -1451,24 +1630,40 @@ function processImportRows(rawRows, fileName) {
     displayRowIndex++;
     parsedImportData.push({
       rowIndex: displayRowIndex,
-      status, // 'valid_new', 'duplicate', 'invalid'
+      status,
       errors,
-      warnings,
+      warnings: flags,
       key,
       existingItem,
       data: {
-        genericName: genericName || (brandName ? brandName : 'UNNAMED GENERIC'),
-        brandName: brandName || (genericName ? genericName : 'Generic / Unbranded'),
-        dosage: dosage,
-        dosageForm: dosageForm,
-        initialQty: initialQty,
-        unitPrice: unitPrice,
-        netPrice: netPrice,
-        qtyPerBox: qtyPerBox > 0 ? qtyPerBox : 1,
-        sellingPrice: sellingPrice,
-        congPrice: congPrice,
-        company: company,
-        expiryDate: expiryDate || '2028-12-31'
+        genericName,
+        brandName,
+        dosage,
+        dosageForm,
+        unit: dosageForm,
+        category,
+        sourceSheet: row._sheetName || category.toUpperCase(),
+        excelRow: row._excelRow || (index + 2),
+        initialQty,
+        unitPrice,
+        netPrice,
+        qtyPerBox,
+        sellingPrice,
+        congUnitPrice,
+        congPrice,
+        company,
+        supplier: company,
+        expiryDate,
+        excelExpiryDisplay: rawExpiry,
+        rawInitialQty,
+        rawExpiry,
+        rawUnitPrice,
+        rawNetPrice,
+        rawQtyPerBox,
+        rawSellingPrice,
+        rawCongUnitPrice,
+        rawCongPrice,
+        flags
       }
     });
   });
@@ -1477,55 +1672,59 @@ function processImportRows(rawRows, fileName) {
   showImportPreviewModal(fileName);
 }
 
-function normalizeDateString(dateVal) {
-  if (!dateVal) return '';
-  let str = String(dateVal).trim().replace(/\/+/g, '/'); // normalize double slashes like 10//27
-  
-  // 1. Check if already in YYYY-MM-DD
+function normalizeDateString(dateVal, flagsArr) {
+  if (!dateVal) {
+    if (Array.isArray(flagsArr)) flagsArr.push('Blank Expiry Date');
+    return '';
+  }
+  const str = String(dateVal).trim();
+
+  // 1. Already YYYY-MM-DD
   if (/^\d{4}-\d{2}-\d{2}$/.test(str)) {
     return str;
   }
 
-  // 2. Check MM/YY or M/YY (e.g. 10/27, 09/28, 5/27)
-  const mmyyMatch = str.match(/^(\d{1,2})\/(\d{2})$/);
+  // 2. MM/YY or M/YY or MM-YY (e.g. 10/27, 09/28, 05-27)
+  const mmyyMatch = str.match(/^(\d{1,2})[\/\-](\d{2})$/);
   if (mmyyMatch) {
-    const month = mmyyMatch[1].padStart(2, '0');
-    const year = '20' + mmyyMatch[2];
-    // Return last day of month
-    const d = new Date(Number(year), Number(month), 0);
-    const lastDay = String(d.getDate()).padStart(2, '0');
-    return `${year}-${month}-${lastDay}`;
+    const m = Number(mmyyMatch[1]);
+    const y = 2000 + Number(mmyyMatch[2]);
+    if (m >= 1 && m <= 12) {
+      const lastDay = String(new Date(y, m, 0).getDate()).padStart(2, '0');
+      return `${y}-${String(m).padStart(2, '0')}-${lastDay}`;
+    }
   }
 
-  // 3. Check MM/YYYY or M/YYYY (e.g. 08/2028, 10/2027)
-  const mmyyyyMatch = str.match(/^(\d{1,2})\/(\d{4})$/);
+  // 3. MM/YYYY or M/YYYY or MM-YYYY (e.g. 08/2028, 10/2027)
+  const mmyyyyMatch = str.match(/^(\d{1,2})[\/\-](\d{4})$/);
   if (mmyyyyMatch) {
-    const month = mmyyyyMatch[1].padStart(2, '0');
-    const year = mmyyyyMatch[2];
-    const d = new Date(Number(year), Number(month), 0);
-    const lastDay = String(d.getDate()).padStart(2, '0');
-    return `${year}-${month}-${lastDay}`;
+    const m = Number(mmyyyyMatch[1]);
+    const y = Number(mmyyyyMatch[2]);
+    if (m >= 1 && m <= 12 && y >= 2000 && y <= 2100) {
+      const lastDay = String(new Date(y, m, 0).getDate()).padStart(2, '0');
+      return `${y}-${String(m).padStart(2, '0')}-${lastDay}`;
+    }
   }
 
-  // 4. Check MM/DD/YYYY or MM/DD/YY
+  // 4. MM/DD/YYYY or MM/DD/YY
   const slashMatch = str.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})$/);
   if (slashMatch) {
-    const month = slashMatch[1].padStart(2, '0');
-    const day = slashMatch[2].padStart(2, '0');
-    const year = slashMatch[3].length === 2 ? '20' + slashMatch[3] : slashMatch[3];
-    return `${year}-${month}-${day}`;
+    const m = Number(slashMatch[1]);
+    const d = Number(slashMatch[2]);
+    const y = slashMatch[3].length === 2 ? 2000 + Number(slashMatch[3]) : Number(slashMatch[3]);
+    if (m >= 1 && m <= 12 && d >= 1 && d <= 31 && y >= 2000 && y <= 2100) {
+      const maxDay = new Date(y, m, 0).getDate();
+      if (d <= maxDay) {
+        return `${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+      }
+    }
   }
 
-  // 5. Try standard Date parsing
-  const d = new Date(str);
-  if (!isNaN(d.getTime())) {
-    const yyyy = d.getFullYear();
-    const mm = String(d.getMonth() + 1).padStart(2, '0');
-    const dd = String(d.getDate()).padStart(2, '0');
-    return `${yyyy}-${mm}-${dd}`;
+  // Preserve exact raw string and flag for review instead of guessing
+  if (Array.isArray(flagsArr)) {
+    flagsArr.push(`Unclear/Non-standard Expiry Date ("${str}")`);
   }
-
-  return '2028-12-31';
+  return str;
 }
 
 function showImportPreviewModal(fileName) {
