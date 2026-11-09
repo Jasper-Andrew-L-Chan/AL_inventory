@@ -876,35 +876,35 @@ function renderInventoryPriceTotalsBar(displayedItems) {
   const fmt = (n) => Number(n || 0).toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
   return `
-    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 0.6rem; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 0.55rem 0.85rem;">
-      <div style="display: flex; align-items: center; justify-content: space-between; padding-right: 0.5rem; border-right: 1px solid #e2e8f0;">
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 0.6rem; background: #f8fafc; border: 1px solid var(--border, #e2e8f0); border-radius: 8px; padding: 0.55rem 0.85rem;">
+      <div style="display: flex; align-items: center; justify-content: space-between; padding-right: 0.5rem; border-right: 1px solid var(--border, #e2e8f0);">
         <div>
-          <div style="font-size: 0.68rem; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: 0.03em;">Total Unit Price</div>
-          <div style="font-size: 0.95rem; font-weight: 800; color: #334155;">₱${fmt(sumUnitPrice)}</div>
+          <div style="font-size: 0.68rem; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.03em;">Total Unit Price</div>
+          <div style="font-size: 0.95rem; font-weight: 800; color: var(--text-main);">₱${fmt(sumUnitPrice)}</div>
         </div>
-        <div style="text-align: right; font-size: 0.68rem; color: #64748b;" title="Total Current Stock × Unit Price">
+        <div style="text-align: right; font-size: 0.68rem; color: var(--text-muted);" title="Sum of (Current Stock × Unit Price) across all ${list.length.toLocaleString()} displayed items">
           <div>Stock Value</div>
-          <div style="font-weight: 700; color: #475569;">₱${fmt(stockUnitValue)}</div>
+          <div style="font-weight: 700; color: var(--text-main);">₱${fmt(stockUnitValue)}</div>
         </div>
       </div>
 
-      <div style="display: flex; align-items: center; justify-content: space-between; padding-right: 0.5rem; border-right: 1px solid #e2e8f0;">
+      <div style="display: flex; align-items: center; justify-content: space-between; padding-right: 0.5rem; border-right: 1px solid var(--border, #e2e8f0);">
         <div>
-          <div style="font-size: 0.68rem; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: 0.03em;">Total Net Price</div>
-          <div style="font-size: 0.95rem; font-weight: 800; color: #334155;">₱${fmt(sumNetPrice)}</div>
+          <div style="font-size: 0.68rem; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.03em;">Total Net Price</div>
+          <div style="font-size: 0.95rem; font-weight: 800; color: var(--text-main);">₱${fmt(sumNetPrice)}</div>
         </div>
-        <div style="text-align: right; font-size: 0.68rem; color: #64748b;" title="Sum of Net Price across ${list.length.toLocaleString()} displayed items">
+        <div style="text-align: right; font-size: 0.68rem; color: var(--text-muted);" title="Sum of Net Price across ${list.length.toLocaleString()} displayed items">
           <div>Items Summed</div>
-          <div style="font-weight: 700; color: #475569;">${list.length.toLocaleString()} rows</div>
+          <div style="font-weight: 700; color: var(--text-main);">${list.length.toLocaleString()} rows</div>
         </div>
       </div>
 
-      <div style="display: flex; align-items: center; justify-content: space-between; padding-right: 0.5rem; border-right: 1px solid #e2e8f0;">
+      <div style="display: flex; align-items: center; justify-content: space-between; padding-right: 0.5rem; border-right: 1px solid var(--border, #e2e8f0);">
         <div>
           <div style="font-size: 0.68rem; font-weight: 700; color: var(--primary); text-transform: uppercase; letter-spacing: 0.03em;">Total Selling Price</div>
           <div style="font-size: 0.95rem; font-weight: 800; color: var(--primary);">₱${fmt(sumSellingPrice)}</div>
         </div>
-        <div style="text-align: right; font-size: 0.68rem; color: #64748b;" title="Total Current Stock × Selling Price">
+        <div style="text-align: right; font-size: 0.68rem; color: var(--text-muted);" title="Sum of (Current Stock × Selling Price) across all ${list.length.toLocaleString()} displayed items">
           <div>Stock Value</div>
           <div style="font-weight: 700; color: var(--primary);">₱${fmt(stockSellingValue)}</div>
         </div>
@@ -912,12 +912,12 @@ function renderInventoryPriceTotalsBar(displayedItems) {
 
       <div style="display: flex; align-items: center; justify-content: space-between;">
         <div>
-          <div style="font-size: 0.68rem; font-weight: 700; color: #0369a1; text-transform: uppercase; letter-spacing: 0.03em;">Total Cong's Price ★</div>
-          <div style="font-size: 0.95rem; font-weight: 800; color: #0284c7;">₱${fmt(sumCongPrice)}</div>
+          <div style="font-size: 0.68rem; font-weight: 700; color: #38bdf8; text-transform: uppercase; letter-spacing: 0.03em;">Total Cong's Price ★</div>
+          <div style="font-size: 0.95rem; font-weight: 800; color: #0ea5e9;">₱${fmt(sumCongPrice)}</div>
         </div>
-        <div style="text-align: right; font-size: 0.68rem; color: #64748b;" title="Total Current Stock × Cong's Price">
+        <div style="text-align: right; font-size: 0.68rem; color: var(--text-muted);" title="Sum of (Current Stock × Cong's Price) across all ${list.length.toLocaleString()} displayed items">
           <div>Stock Value</div>
-          <div style="font-weight: 700; color: #0369a1;">₱${fmt(stockCongValue)}</div>
+          <div style="font-weight: 700; color: #0ea5e9;">₱${fmt(stockCongValue)}</div>
         </div>
       </div>
     </div>
@@ -983,7 +983,7 @@ function renderInventoryTableRows(displayedItems) {
       : `<span style="color: #d97706; font-size: 0.74rem; font-weight: 700; background: #fef3c7; padding: 1px 6px; border-radius: 4px;" title="Generic Name is blank in Excel">[Blank Generic Name]</span>`;
 
     const brandDisplay = item.brandName
-      ? `<span style="font-weight: 700; color: #1e293b;">${escapeHtml(item.brandName)}</span>`
+      ? `<span style="font-weight: 700; color: var(--text-main);">${escapeHtml(item.brandName)}</span>`
       : `<span style="color: #d97706; font-size: 0.72rem; font-weight: 700; background: #fef3c7; padding: 1px 5px; border-radius: 4px;" title="Brand Name is blank in Excel">[Blank Brand Name]</span>`;
 
     const dosageDisplay = item.dosage
@@ -1057,10 +1057,10 @@ function renderInventoryTableRows(displayedItems) {
         </td>
         <td>
           <div style="font-weight: 800; color: var(--text-main); font-size: 0.88rem; text-transform: uppercase; letter-spacing: 0.01em;">
-            <span style="font-size: 0.68rem; color: #64748b; font-weight: 700; margin-right: 4px;">GENERIC:</span>${genericDisplay}
+            <span style="font-size: 0.68rem; color: var(--text-muted); font-weight: 700; margin-right: 4px;">GENERIC:</span>${genericDisplay}
           </div>
-          <div style="font-size: 0.8rem; color: #475569; font-weight: 500; margin-top: 2px; display: flex; align-items: center; flex-wrap: wrap; gap: 2px;">
-            <span style="font-size: 0.68rem; color: #64748b; font-weight: 700; margin-right: 3px;">BRAND:</span>${brandDisplay}
+          <div style="font-size: 0.8rem; color: var(--text-muted); font-weight: 500; margin-top: 2px; display: flex; align-items: center; flex-wrap: wrap; gap: 2px;">
+            <span style="font-size: 0.68rem; color: var(--text-muted); font-weight: 700; margin-right: 3px;">BRAND:</span>${brandDisplay}
             ${dosageDisplay}
             ${formDisplay}
             ${companyDisplay}
