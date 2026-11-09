@@ -1981,7 +1981,7 @@ window.exportTransactionsCSV = function () {
     'SELLING',
     'UNIT',
     'UNIT TOTAL',
-    'SELLING TOTAL',
+    "CONG'S TOTAL",
     'TOTAL',
     'RECEIVE DATE',
     'DELIVERY DATE'
