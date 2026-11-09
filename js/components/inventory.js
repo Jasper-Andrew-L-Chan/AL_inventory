@@ -238,6 +238,11 @@ function renderInventoryView(container) {
       </div>
     </div>
 
+    <!-- Compact Totals Strip: Total Unit Price, Total Net Price, Total Selling Price, Total Cong's Price -->
+    <div id="inventoryPriceTotalsContainer" style="margin-bottom: 0.75rem;">
+      ${renderInventoryPriceTotalsBar(displayedItems)}
+    </div>
+
     <!-- Inventory Data Table with all 11 verified Excel fields -->
     <div class="table-container">
       <table class="data-table" id="inventoryTable">
@@ -837,6 +842,88 @@ function renderInventoryPaginationBar(totalItems) {
   `;
 }
 
+function renderInventoryPriceTotalsBar(displayedItems) {
+  const list = Array.isArray(displayedItems) ? displayedItems : [];
+  let sumUnitPrice = 0;
+  let sumNetPrice = 0;
+  let sumSellingPrice = 0;
+  let sumCongPrice = 0;
+
+  let stockUnitValue = 0;
+  let stockNetValue = 0;
+  let stockSellingValue = 0;
+  let stockCongValue = 0;
+
+  for (let i = 0; i < list.length; i++) {
+    const it = list[i];
+    const qty = Math.max(0, Number(it.currentStock) || 0);
+    const unitP = Number(it.unitPrice !== undefined ? it.unitPrice : (it.costPrice || 0)) || 0;
+    const netP = Number(it.netPrice || 0) || 0;
+    const sellP = Number(it.sellingPrice || 0) || 0;
+    const congP = Number(it.congPrice || 0) || 0;
+
+    sumUnitPrice += unitP;
+    sumNetPrice += netP;
+    sumSellingPrice += sellP;
+    sumCongPrice += congP;
+
+    stockUnitValue += qty * unitP;
+    stockNetValue += qty * netP;
+    stockSellingValue += qty * sellP;
+    stockCongValue += qty * congP;
+  }
+
+  const fmt = (n) => Number(n || 0).toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+  return `
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 0.6rem; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 0.55rem 0.85rem;">
+      <div style="display: flex; align-items: center; justify-content: space-between; padding-right: 0.5rem; border-right: 1px solid #e2e8f0;">
+        <div>
+          <div style="font-size: 0.68rem; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: 0.03em;">Total Unit Price</div>
+          <div style="font-size: 0.95rem; font-weight: 800; color: #334155;">₱${fmt(sumUnitPrice)}</div>
+        </div>
+        <div style="text-align: right; font-size: 0.68rem; color: #64748b;" title="Total Current Stock × Unit Price">
+          <div>Stock Value</div>
+          <div style="font-weight: 700; color: #475569;">₱${fmt(stockUnitValue)}</div>
+        </div>
+      </div>
+
+      <div style="display: flex; align-items: center; justify-content: space-between; padding-right: 0.5rem; border-right: 1px solid #e2e8f0;">
+        <div>
+          <div style="font-size: 0.68rem; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: 0.03em;">Total Net Price</div>
+          <div style="font-size: 0.95rem; font-weight: 800; color: #334155;">₱${fmt(sumNetPrice)}</div>
+        </div>
+        <div style="text-align: right; font-size: 0.68rem; color: #64748b;" title="Sum of Net Price across ${list.length.toLocaleString()} displayed items">
+          <div>Items Summed</div>
+          <div style="font-weight: 700; color: #475569;">${list.length.toLocaleString()} rows</div>
+        </div>
+      </div>
+
+      <div style="display: flex; align-items: center; justify-content: space-between; padding-right: 0.5rem; border-right: 1px solid #e2e8f0;">
+        <div>
+          <div style="font-size: 0.68rem; font-weight: 700; color: var(--primary); text-transform: uppercase; letter-spacing: 0.03em;">Total Selling Price</div>
+          <div style="font-size: 0.95rem; font-weight: 800; color: var(--primary);">₱${fmt(sumSellingPrice)}</div>
+        </div>
+        <div style="text-align: right; font-size: 0.68rem; color: #64748b;" title="Total Current Stock × Selling Price">
+          <div>Stock Value</div>
+          <div style="font-weight: 700; color: var(--primary);">₱${fmt(stockSellingValue)}</div>
+        </div>
+      </div>
+
+      <div style="display: flex; align-items: center; justify-content: space-between;">
+        <div>
+          <div style="font-size: 0.68rem; font-weight: 700; color: #0369a1; text-transform: uppercase; letter-spacing: 0.03em;">Total Cong's Price ★</div>
+          <div style="font-size: 0.95rem; font-weight: 800; color: #0284c7;">₱${fmt(sumCongPrice)}</div>
+        </div>
+        <div style="text-align: right; font-size: 0.68rem; color: #64748b;" title="Total Current Stock × Cong's Price">
+          <div>Stock Value</div>
+          <div style="font-weight: 700; color: #0369a1;">₱${fmt(stockCongValue)}</div>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
 function formatPriceCell(val, rawStr) {
   const raw = rawStr !== undefined && rawStr !== null ? String(rawStr).trim() : '';
   if (raw.startsWith('#')) {
@@ -1081,6 +1168,7 @@ function refreshInventoryTableDOM() {
   const tbody = document.getElementById('inventoryTableBody');
   const countBadge = document.getElementById('inventoryCountText');
   const paginationContainer = document.getElementById('inventoryPaginationContainer');
+  const priceTotalsContainer = document.getElementById('inventoryPriceTotalsContainer');
 
   if (tbody) {
     const displayedItems = getFilteredInventoryItems();
@@ -1095,6 +1183,10 @@ function refreshInventoryTableDOM() {
     
     if (paginationContainer) {
       paginationContainer.innerHTML = renderInventoryPaginationBar(displayedItems);
+    }
+
+    if (priceTotalsContainer) {
+      priceTotalsContainer.innerHTML = renderInventoryPriceTotalsBar(displayedItems);
     }
 
     if (countBadge) {
