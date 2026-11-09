@@ -61,6 +61,77 @@ let currentTxnForm = {
   ]
 };
 
+function normalizeMedLookupText(str) {
+  return String(str || '').trim().replace(/\s+/g, ' ').toUpperCase();
+}
+
+function findMatchingExcelInventoryItem(txnItem, inventoryItems) {
+  if (!txnItem || !Array.isArray(inventoryItems) || inventoryItems.length === 0) return null;
+
+  const targetId = txnItem.actualInventoryId || txnItem.id || '';
+  const rawDesc = txnItem.actualSuppliedName || txnItem.name || txnItem.requestedName || '';
+  const normDesc = normalizeMedLookupText(rawDesc);
+
+  let candidates = [];
+  if (normDesc) {
+    candidates = inventoryItems.filter(inv => {
+      const disp = normalizeMedLookupText(getMedicineDisplayName(inv));
+      const name = normalizeMedLookupText(inv.name);
+      return disp === normDesc || name === normDesc;
+    });
+  }
+
+  if (targetId) {
+    const exactIdItem = inventoryItems.find(inv => inv.id === targetId);
+    if (exactIdItem) {
+      const exactIdDisp = normalizeMedLookupText(getMedicineDisplayName(exactIdItem));
+      if (!normDesc || exactIdDisp === normDesc || normalizeMedLookupText(exactIdItem.name) === normDesc) {
+        if (Number(exactIdItem.congUnitPrice || 0) > 0 || candidates.length <= 1) {
+          return exactIdItem;
+        }
+      }
+    }
+  }
+
+  if (candidates.length > 0) {
+    const itemUnit = Number(txnItem.unitPrice || 0);
+    const itemCong = Number(txnItem.congPrice || 0);
+
+    if (itemUnit > 0) {
+      const unitAndCongUnit = candidates.find(inv =>
+        Math.abs(Number(inv.unitPrice || inv.costPrice || 0) - itemUnit) < 0.05 &&
+        Number(inv.congUnitPrice || 0) > 0
+      );
+      if (unitAndCongUnit) return unitAndCongUnit;
+
+      const unitMatch = candidates.find(inv =>
+        Math.abs(Number(inv.unitPrice || inv.costPrice || 0) - itemUnit) < 0.05
+      );
+      if (unitMatch) return unitMatch;
+    }
+
+    if (itemCong > 0) {
+      const congMatch = candidates.find(inv =>
+        Math.abs(Number(inv.congPrice || 0) - itemCong) < 0.05 &&
+        Number(inv.congUnitPrice || 0) > 0
+      );
+      if (congMatch) return congMatch;
+    }
+
+    const withCongUnit = candidates.find(inv => Number(inv.congUnitPrice || 0) > 0);
+    if (withCongUnit) return withCongUnit;
+
+    return candidates[0];
+  }
+
+  if (targetId) {
+    const byId = inventoryItems.find(inv => inv.id === targetId);
+    if (byId) return byId;
+  }
+
+  return null;
+}
+
 function createEmptyMedRow() {
   return {
     id: 'row-' + Date.now() + '-' + Math.random().toString(36).substr(2, 4),
@@ -70,8 +141,9 @@ function createEmptyMedRow() {
     isSubstitute: false,
     qty: 1,
     unitPrice: 0,            // cost/unit price (reference)
+    congUnitPrice: 0,        // Cong's Unit price from Excel inventory
     congPrice: 0,            // cong price (main price used for total amount)
-    sellingPrice: 0,         // selling price per unit (reference only)
+    sellingPrice: 0,         // legacy selling price reference
     totalUnit: 1,            // total unit
     totalSellingPrice: 0     // qty * congPrice (main calculation)
   };
@@ -108,17 +180,20 @@ function renderTransactionsView(container) {
         row.selectedMedId = '';
         row.actualInventoryId = '';
         row.unitPrice = 0;
+        row.congUnitPrice = 0;
         row.sellingPrice = 0;
         row.congPrice = 0;
         row.totalSellingPrice = 0;
       } else {
-        // Item exists in inventory: keep unit, selling, and cong price aligned unless custom edited
+        // Item exists in inventory: keep unit, Cong's Unit, and cong price aligned unless custom edited
         const curItem = inventoryItems.find(i => i.id === row.selectedMedId);
         if (curItem && !row.isSubstitute) {
           const curUnit = Number(curItem.costPrice || curItem.unitPrice || 0);
+          const curCongUnit = Number(curItem.congUnitPrice || 0);
           const curCong = Number(curItem.congPrice !== undefined && curItem.congPrice !== null ? curItem.congPrice : (curUnit > 0 ? curUnit * 2.4 : 0));
           const curSell = Number(curItem.sellingPrice !== undefined && curItem.sellingPrice !== null ? curItem.sellingPrice : (curUnit > 0 ? curUnit * 1.2 : 0));
           if (!row.unitPrice) row.unitPrice = curUnit;
+          if (row.congUnitPrice === undefined || row.congUnitPrice === null || row.congUnitPrice === 0) row.congUnitPrice = curCongUnit;
           if (row.congPrice === undefined || row.congPrice === null || row.congPrice === 0) row.congPrice = curCong;
           if (!row.sellingPrice) row.sellingPrice = curSell;
           const mainPrice = Number(row.congPrice) || 0;
@@ -364,10 +439,10 @@ function renderDetailsTabHtml(editingTxnId, currentTxnForm, allTxns, inventoryIt
                   <th style="min-width: 240px;">Medicine Selection</th>
                   <th style="width: 100px; text-align: center;">Quantity (QTY)</th>
                   <th style="width: 120px; text-align: right;">Unit Price (Cost)</th>
-                  <th style="width: 120px; text-align: right;">Selling Price</th>
+                  <th style="width: 120px; text-align: right;">Cong's Unit</th>
                   <th style="width: 130px; text-align: right; background: #e0f2fe; color: #0369a1; font-weight: 800;">★ Cong Price (Main)</th>
                   <th style="width: 90px; text-align: center;">Total Unit</th>
-                  <th style="width: 130px; text-align: right;">Total Amount</th>
+                  <th style="width: 130px; text-align: right;">Cong's Total</th>
                   <th style="width: 50px; text-align: center;"></th>
                 </tr>
               </thead>
@@ -674,16 +749,17 @@ function renderLogsTabHtml(filteredTxns, totalTxnCount, totalTxnPages, startTxnI
                             <strong>Encoder:</strong> ${escapeHtml(encName)} ${encLicense ? `<span style="color: #888888;">(PRC: ${escapeHtml(encLicense)})</span>` : ''}
                           </div>
 
-                          <table style="width: 100%; max-width: 720px; font-size: 0.78rem; border-collapse: collapse; margin-bottom: 0.75rem;">
+                          <table style="width: 100%; max-width: 820px; font-size: 0.78rem; border-collapse: collapse; margin-bottom: 0.75rem;">
                             <thead>
                               <tr style="border-bottom: 1px solid #cbd5e1; text-align: left; background: #f1f5f9;">
                                 <th style="padding: 6px 8px;">Medicine Requested</th>
                                 <th style="padding: 6px 8px;">Actual Medicine Supplied (Deducted)</th>
                                 <th style="padding: 6px 8px; text-align: center;">Qty</th>
                                 <th style="padding: 6px 8px; text-align: right;">Unit Cost</th>
-                                <th style="padding: 6px 8px; text-align: right;">Selling Price</th>
+                                <th style="padding: 6px 8px; text-align: right;">Cong's Unit</th>
                                 <th style="padding: 6px 8px; text-align: right; background: #e0f2fe; color: #0369a1; font-weight: 800;">★ Cong's Price (Main)</th>
-                                <th style="padding: 6px 8px; text-align: right;">Subtotal</th>
+                                <th style="padding: 6px 8px; text-align: right;">Congs Unit Total</th>
+                                <th style="padding: 6px 8px; text-align: right;">Cong's Total</th>
                               </tr>
                             </thead>
                             <tbody>
@@ -691,6 +767,15 @@ function renderLogsTabHtml(filteredTxns, totalTxnCount, totalTxnPages, startTxnI
                                 const req = item.requestedName || item.name;
                                 const sup = item.actualSuppliedName || item.name;
                                 const isSub = Boolean(item.isSubstitute && req && sup && req.trim().toLowerCase() !== sup.trim().toLowerCase());
+                                const matchedInv = findMatchingExcelInventoryItem(item, inventoryItems);
+                                const resolvedUnit = Number(item.unitPrice || (matchedInv ? (matchedInv.unitPrice || matchedInv.costPrice || 0) : 0));
+                                const resolvedCongUnit = (item.congUnitPrice !== undefined && item.congUnitPrice !== null && Number(item.congUnitPrice) > 0)
+                                  ? Number(item.congUnitPrice)
+                                  : Number(matchedInv ? (matchedInv.congUnitPrice || 0) : 0);
+                                const resolvedCong = (item.congPrice !== undefined && Number(item.congPrice) > 0)
+                                  ? Number(item.congPrice)
+                                  : Number(matchedInv && matchedInv.congPrice > 0 ? matchedInv.congPrice : (item.sellingPrice || item.price || 0));
+                                const itemQty = Number(item.qty || 0);
                                 return `
                                 <tr style="border-bottom: 1px solid #f1f5f9;">
                                   <td style="padding: 6px 8px;">${escapeHtml(req)}</td>
@@ -698,17 +783,18 @@ function renderLogsTabHtml(filteredTxns, totalTxnCount, totalTxnPages, startTxnI
                                     ${escapeHtml(sup)}
                                     ${isSub ? '<span style="color: #b45309; font-size: 0.7rem;"> (Substitute)</span>' : ''}
                                   </td>
-                                  <td style="padding: 6px 8px; text-align: center; font-weight: 700;">${item.qty}</td>
-                                  <td style="padding: 6px 8px; text-align: right;">₱${Number(item.unitPrice || 0).toFixed(2)}</td>
-                                  <td style="padding: 6px 8px; text-align: right;">₱${Number(item.sellingPrice || item.price || 0).toFixed(2)}</td>
-                                  <td style="padding: 6px 8px; text-align: right; color: #0284c7; font-weight: 600; background: rgba(224, 242, 254, 0.25);">₱${Number(item.congPrice || 0).toFixed(2)}</td>
-                                  <td style="padding: 6px 8px; text-align: right; font-weight: 700;">₱${((item.congPrice !== undefined && Number(item.congPrice) > 0 ? Number(item.congPrice) : (item.sellingPrice || item.price || 0)) * item.qty).toFixed(2)}</td>
+                                  <td style="padding: 6px 8px; text-align: center; font-weight: 700;">${itemQty}</td>
+                                  <td style="padding: 6px 8px; text-align: right;">₱${resolvedUnit.toFixed(2)}</td>
+                                  <td style="padding: 6px 8px; text-align: right; color: #ea580c; font-weight: 600;">₱${resolvedCongUnit.toFixed(2)}</td>
+                                  <td style="padding: 6px 8px; text-align: right; color: #0284c7; font-weight: 600; background: rgba(224, 242, 254, 0.25);">₱${resolvedCong.toFixed(2)}</td>
+                                  <td style="padding: 6px 8px; text-align: right; font-weight: 600;">₱${(itemQty * resolvedCongUnit).toFixed(2)}</td>
+                                  <td style="padding: 6px 8px; text-align: right; font-weight: 700;">₱${(itemQty * resolvedCong).toFixed(2)}</td>
                                 </tr>
                               `;}).join('')}
                             </tbody>
                             <tfoot>
                               <tr>
-                                <td colspan="6" style="text-align: right; font-weight: 700; padding: 6px 8px;">Total:</td>
+                                <td colspan="7" style="text-align: right; font-weight: 700; padding: 6px 8px;">Total:</td>
                                 <td style="text-align: right; font-weight: 800; font-size: 0.88rem; color: var(--primary); padding: 6px 8px;">
                                   ₱${Number(t.netTotal).toFixed(2)}
                                 </td>
@@ -973,7 +1059,7 @@ function renderMedRowHtml(row, idx, inventoryItems) {
                 <span><strong>Unit:</strong> ${escapeHtml(selectedItem.unit || 'unit')}</span>
                 <span><strong>Batch:</strong> ${escapeHtml(selectedItem.batchLot || 'N/A')}</span>
                 <span><strong>Cost:</strong> ₱${Number(selectedItem.costPrice || 0).toFixed(2)}</span>
-                <span><strong>Selling:</strong> ₱${Number(selectedItem.sellingPrice || 0).toFixed(2)}</span>
+                <span><strong>Cong's Unit:</strong> <strong style="color: #ea580c;">₱${Number(selectedItem.congUnitPrice || 0).toFixed(2)}</strong></span>
                 <span><strong>Cong's Price:</strong> <strong style="color: #0369a1; font-weight: 800;">₱${Number(selectedItem.congPrice || 0).toFixed(2)}</strong></span>
                 ${(!selectedItem.congPrice || Number(selectedItem.congPrice) <= 0) ? `
                   <span style="color: #ea580c; font-weight: 700;">⚠ Missing Cong's Price</span>
@@ -1074,19 +1160,19 @@ function renderMedRowHtml(row, idx, inventoryItems) {
         </div>
       </td>
 
-      <!-- Selling Price -->
+      <!-- Cong's Unit Price -->
       <td style="text-align: right; vertical-align: top; padding-top: 0.9rem;">
         <div style="display: flex; align-items: center; justify-content: flex-end; gap: 2px;">
           <span style="font-size: 0.75rem; color: #64748b;">₱</span>
           <input 
             type="number" 
-            id="row-sellingPrice-${row.id}"
+            id="row-congUnitPrice-${row.id}"
             min="0" 
             step="0.0001" 
-            value="${row.sellingPrice}" 
+            value="${row.congUnitPrice !== undefined && row.congUnitPrice !== null ? row.congUnitPrice : (actualItem ? Number(actualItem.congUnitPrice || 0) : (selectedItem ? Number(selectedItem.congUnitPrice || 0) : 0))}" 
             class="form-input" 
             style="width: 90px; text-align: right; font-size: 0.82rem; font-weight: 600;" 
-            oninput="updateMedRowField('${row.id}', 'sellingPrice', this.value)"
+            oninput="updateMedRowField('${row.id}', 'congUnitPrice', this.value)"
             onkeydown="if(event.key==='Enter'){event.preventDefault(); this.blur();}"
           />
         </div>
@@ -1276,6 +1362,7 @@ window.onSelectPrimaryMedicine = function (rowId, selectedId) {
     row.customMedName = '';
     const stock = Number(found.currentStock || 0);
     const unitCost = Number(found.costPrice || found.unitPrice || 0);
+    const congUnitP = Number(found.congUnitPrice || 0);
 
     // Selling price: if item has a valid selling price different from unit cost, use it; otherwise unitCost * 1.2
     let sellP = Number(found.sellingPrice || 0);
@@ -1294,12 +1381,14 @@ window.onSelectPrimaryMedicine = function (rowId, selectedId) {
       row.isSubstitute = true;
       row.actualInventoryId = '';
       row.unitPrice = unitCost;
+      row.congUnitPrice = congUnitP;
       row.congPrice = congP;
       row.sellingPrice = sellP;
     } else {
       row.isSubstitute = false;
       row.actualInventoryId = found.id;
       row.unitPrice = unitCost;
+      row.congUnitPrice = congUnitP;
       row.congPrice = congP;
       row.sellingPrice = sellP;
     }
@@ -1307,12 +1396,14 @@ window.onSelectPrimaryMedicine = function (rowId, selectedId) {
     row.isSubstitute = true;
     row.actualInventoryId = '';
     row.unitPrice = 0;
+    row.congUnitPrice = 0;
     row.congPrice = 0;
     row.sellingPrice = 0;
   } else {
     row.actualInventoryId = '';
     row.isSubstitute = false;
     row.unitPrice = 0;
+    row.congUnitPrice = 0;
     row.congPrice = 0;
     row.sellingPrice = 0;
   }
@@ -1345,6 +1436,7 @@ window.toggleSubstituteMode = function (rowId) {
 
       row.actualInventoryId = orig.id;
       row.unitPrice = unitCost;
+      row.congUnitPrice = Number(orig.congUnitPrice || 0);
       row.congPrice = congP;
       row.sellingPrice = sellP;
       const mainPrice = Number(row.congPrice) || 0;
@@ -1374,6 +1466,7 @@ window.onSelectActualSubstitute = function (rowId, actualInvId) {
     }
 
     row.unitPrice = unitCost;
+    row.congUnitPrice = Number(subItem.congUnitPrice || 0);
     row.congPrice = congP;
     row.sellingPrice = sellP;
   }
@@ -1401,11 +1494,11 @@ window.updateMedRowField = function (rowId, field, val) {
     if (newUnit > 0) {
       row.sellingPrice = parseFloat((newUnit * 1.2).toFixed(4));
       row.congPrice = parseFloat((newUnit * 2.4).toFixed(4));
-      const sellInput = document.getElementById(`row-sellingPrice-${row.id}`);
-      if (sellInput) sellInput.value = row.sellingPrice;
       const congInput = document.getElementById(`row-congPrice-${row.id}`);
       if (congInput) congInput.value = row.congPrice;
     }
+  } else if (field === 'congUnitPrice') {
+    row.congUnitPrice = Number(val) || 0;
   } else if (field === 'congPrice') {
     row.congPrice = Number(val) || 0;
   } else if (field === 'sellingPrice') {
@@ -1483,7 +1576,7 @@ window.handleStartEditTxn = function (txnId) {
     date: txn.date || new Date().toISOString().split('T')[0],
     items: (txn.items && txn.items.length > 0) ? txn.items.map(item => {
       // Check if item corresponds to an inventory entry
-      const actualInv = inventoryItems.find(i => i.id === item.actualInventoryId || i.id === item.id || i.name === item.name || getMedicineDisplayName(i) === item.name || getMedicineDisplayName(i) === item.actualSuppliedName);
+      const actualInv = findMatchingExcelInventoryItem(item, inventoryItems);
       const actualSupplied = item.actualSuppliedName || (actualInv ? getMedicineDisplayName(actualInv) : item.name);
       const requested = item.requestedName || item.name;
       const isSub = Boolean(item.isSubstitute && requested && actualSupplied && requested.trim().toLowerCase() !== actualSupplied.trim().toLowerCase());
@@ -1492,7 +1585,7 @@ window.handleStartEditTxn = function (txnId) {
       let selectedMedId = '';
       let customMedName = '';
       if (item.requestedName) {
-        const foundOrig = inventoryItems.find(i => i.id === item.id || getMedicineDisplayName(i) === item.requestedName || i.name === item.requestedName);
+        const foundOrig = findMatchingExcelInventoryItem({ name: item.requestedName, id: item.id, unitPrice: item.unitPrice, congPrice: item.congPrice }, inventoryItems);
         if (foundOrig) {
           selectedMedId = foundOrig.id;
         } else {
@@ -1504,7 +1597,10 @@ window.handleStartEditTxn = function (txnId) {
       }
 
       const rowQty = Number(item.qty) || 1;
-      const rowUnitPrice = Number(item.unitPrice || 0);
+      const rowUnitPrice = Number(item.unitPrice || (actualInv ? (actualInv.unitPrice || actualInv.costPrice || 0) : 0));
+      const rowCongUnitPrice = (item.congUnitPrice !== undefined && item.congUnitPrice !== null && Number(item.congUnitPrice) > 0)
+        ? Number(item.congUnitPrice)
+        : Number(actualInv ? (actualInv.congUnitPrice || 0) : 0);
       const rowCongPrice = Number(item.congPrice !== undefined ? item.congPrice : (actualInv ? actualInv.congPrice : 0)) || 0;
       const rowSellingPrice = Number(item.sellingPrice || item.price || 0);
 
@@ -1517,6 +1613,7 @@ window.handleStartEditTxn = function (txnId) {
         isSubstitute: isSub,
         qty: rowQty,
         unitPrice: rowUnitPrice,
+        congUnitPrice: rowCongUnitPrice,
         congPrice: rowCongPrice,
         sellingPrice: rowSellingPrice,
         totalUnit: rowQty,
@@ -1650,6 +1747,7 @@ window.saveCustomerTransaction = function () {
       origReqName.trim().toLowerCase() !== actualDisplayName.trim().toLowerCase()
     );
     const rowCong = Number(row.congPrice !== undefined && row.congPrice !== null ? row.congPrice : (actualItem.congPrice || 0));
+    const rowCongUnit = Number(row.congUnitPrice !== undefined && row.congUnitPrice !== null && Number(row.congUnitPrice) > 0 ? row.congUnitPrice : (actualItem.congUnitPrice || 0));
     const rowSelling = Number(row.sellingPrice !== undefined && row.sellingPrice !== null ? row.sellingPrice : (actualItem.sellingPrice || 0));
 
     transactionItems.push({
@@ -1661,6 +1759,7 @@ window.saveCustomerTransaction = function () {
       isSubstitute: isSub,
       qty: qty,
       unitPrice: Number(row.unitPrice || 0),
+      congUnitPrice: rowCongUnit,
       congPrice: rowCong,
       sellingPrice: rowSelling,
       price: rowCong,                         // Primary transaction calculation price (Cong's Price)
@@ -1961,6 +2060,7 @@ window.handleRefundTxn = function (id) {
 
 window.exportTransactionsCSV = function () {
   const allTxns = window.pharmacyStore.getTransactions();
+  const inventoryItems = window.pharmacyStore.getItems();
   // Filter according to currently active date range filters if set
   const txns = allTxns.filter(t => {
     if (txnDateRange.from && t.date && t.date < txnDateRange.from) return false;
@@ -1978,9 +2078,10 @@ window.exportTransactionsCSV = function () {
     'DESCRIPTION',
     'QTY',
     'CONG PRICE',
-    'SELLING',
+    'CONGS UNIT',
     'UNIT',
     'UNIT TOTAL',
+    'CONGS UNIT TOTAL',
     "CONG'S TOTAL",
     'TOTAL',
     'RECEIVE DATE',
@@ -2013,22 +2114,45 @@ window.exportTransactionsCSV = function () {
           name: 'No items recorded',
           qty: 0,
           congPrice: 0,
+          congUnitPrice: 0,
           sellingPrice: 0,
           unitPrice: 0
         }
       ];
 
-      const grandTotal = Number(t.netTotal || 0).toFixed(2);
+      const computedGrandTotal = items.reduce((sum, item) => {
+        const q = Number(item.qty || 0);
+        const matched = findMatchingExcelInventoryItem(item, inventoryItems);
+        const c = (item.congPrice !== undefined && item.congPrice !== null && Number(item.congPrice) > 0)
+          ? Number(item.congPrice)
+          : Number(matched && matched.congPrice > 0 ? matched.congPrice : (item.price || 0));
+        return sum + (q * c);
+      }, 0);
+      const grandTotal = (computedGrandTotal > 0 ? computedGrandTotal : Number(t.netTotal || 0)).toFixed(2);
 
       items.forEach((item, index) => {
         const isFirst = index === 0;
         const desc = item.actualSuppliedName || item.name || '';
         const qty = Number(item.qty || 0);
-        const cong = Number(item.congPrice || 0);
-        const selling = Number(item.sellingPrice || item.price || 0);
-        const unit = Number(item.unitPrice || 0);
+
+        // Match against the imported Excel inventory records (BRANDED.xlsx & GENERIC.xlsx)
+        const matchedInv = findMatchingExcelInventoryItem(item, inventoryItems);
+
+        const cong = (item.congPrice !== undefined && item.congPrice !== null && Number(item.congPrice) > 0)
+          ? Number(item.congPrice)
+          : Number(matchedInv && matchedInv.congPrice > 0 ? matchedInv.congPrice : (item.price || 0));
+
+        const congUnit = (item.congUnitPrice !== undefined && item.congUnitPrice !== null && Number(item.congUnitPrice) > 0)
+          ? Number(item.congUnitPrice)
+          : Number(matchedInv ? (matchedInv.congUnitPrice || 0) : 0);
+
+        const unit = (item.unitPrice !== undefined && item.unitPrice !== null && Number(item.unitPrice) > 0)
+          ? Number(item.unitPrice)
+          : Number(matchedInv ? (matchedInv.unitPrice || matchedInv.costPrice || 0) : 0);
+
         const unitTotal = (qty * unit).toFixed(2);
-        const sellingTotal = (qty * selling).toFixed(2);
+        const congsUnitTotal = (qty * congUnit).toFixed(2);
+        const congsTotal = (qty * cong).toFixed(2);
 
         rows.push([
           escapeCsv(isFirst ? barangay : ''),
@@ -2037,10 +2161,11 @@ window.exportTransactionsCSV = function () {
           escapeCsv(desc),
           qty,
           cong.toFixed(2),
-          selling.toFixed(2),
+          congUnit.toFixed(2),
           unit.toFixed(2),
           unitTotal,
-          sellingTotal,
+          congsUnitTotal,
+          congsTotal,
           isFirst ? grandTotal : '',
           escapeCsv(isFirst ? receiveDate : ''),
           escapeCsv(isFirst ? deliveryDate : '')
