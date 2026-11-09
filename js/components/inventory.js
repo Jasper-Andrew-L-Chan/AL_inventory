@@ -915,7 +915,10 @@ function renderInventoryTableRows(displayedItems) {
     if (!item.expiryDate) {
       expiryBadgeHtml = `<span style="background: #fef3c7; color: #b45309; font-weight: 700; padding: 1px 6px; border-radius: 4px; font-size: 0.71rem;" title="Expiry Date is blank in source Excel">Blank Expiry ⚠</span>`;
     } else if (daysToExpiry === null) {
-      expiryBadgeHtml = `<span style="background: #fef3c7; color: #b45309; font-weight: 700; padding: 1px 6px; border-radius: 4px; font-size: 0.71rem;" title="Non-standard expiry format preserved from Excel">${escapeHtml(item.expiryDate)} ⚠</span>`;
+      const hasExpiryFlag = flags.some(f => f.includes('Expiry'));
+      expiryBadgeHtml = hasExpiryFlag
+        ? `<span style="background: #fef3c7; color: #b45309; font-weight: 700; padding: 1px 6px; border-radius: 4px; font-size: 0.71rem;" title="Non-standard expiry format preserved from Excel">${escapeHtml(item.expiryDate)} ⚠</span>`
+        : `<span style="color: var(--text-muted);" title="Expiry: ${escapeHtml(item.expiryDate)}">Exp: ${escapeHtml(item.expiryDate)}</span>`;
     } else if (daysToExpiry <= 0) {
       expiryBadgeHtml = `
         <span style="background: #fee2e2; color: #b91c1c; font-weight: 800; padding: 1px 6px; border-radius: 4px; display: inline-flex; align-items: center; gap: 3px;">
@@ -932,7 +935,10 @@ function renderInventoryTableRows(displayedItems) {
           <i data-lucide="clock" style="width: 11px; height: 11px;"></i> Exp in ${daysToExpiry}d (${escapeHtml(item.expiryDate)})
         </span>`;
     } else {
-      expiryBadgeHtml = `<span style="color: var(--text-muted);" title="Excel raw: ${escapeHtml(item.excelExpiryDisplay || item.expiryDate)}">Exp: ${escapeHtml(item.expiryDate)}</span>`;
+      const expText = (item.excelExpiryDisplay && item.excelExpiryDisplay !== item.expiryDate)
+        ? `${item.excelExpiryDisplay} (${item.expiryDate})`
+        : item.expiryDate;
+      expiryBadgeHtml = `<span style="color: var(--text-muted);" title="Excel raw: ${escapeHtml(item.excelExpiryDisplay || item.expiryDate)}">Exp: ${escapeHtml(expText)}</span>`;
     }
 
     const rawInitQty = item.rawInitialQty !== undefined ? String(item.rawInitialQty).trim() : '';
@@ -1679,13 +1685,19 @@ function normalizeDateString(dateVal, flagsArr) {
   }
   const str = String(dateVal).trim();
 
-  // 1. Already YYYY-MM-DD
+  // 1. Already YYYY-MM-DD (check if Excel converted MM/YY into 2026-MM-DD where DD is 27..31)
   if (/^\d{4}-\d{2}-\d{2}$/.test(str)) {
+    const parts = str.split('-').map(Number);
+    if (parts[0] === 2026 && parts[2] >= 27 && parts[2] <= 31) {
+      const realYear = 2000 + parts[2];
+      const lastDay = String(new Date(realYear, parts[1], 0).getDate()).padStart(2, '0');
+      return `${realYear}-${String(parts[1]).padStart(2, '0')}-${lastDay}`;
+    }
     return str;
   }
 
-  // 2. MM/YY or M/YY or MM-YY (e.g. 10/27, 09/28, 05-27)
-  const mmyyMatch = str.match(/^(\d{1,2})[\/\-](\d{2})$/);
+  // 2. MM/YY or M/YY or MM-YY (e.g. 10/27, 09/28, 05-27, 02/29, 02/30)
+  const mmyyMatch = str.match(/^(\d{1,2})[\/\-]+(\d{2})$/);
   if (mmyyMatch) {
     const m = Number(mmyyMatch[1]);
     const y = 2000 + Number(mmyyMatch[2]);
@@ -1696,7 +1708,7 @@ function normalizeDateString(dateVal, flagsArr) {
   }
 
   // 3. MM/YYYY or M/YYYY or MM-YYYY (e.g. 08/2028, 10/2027)
-  const mmyyyyMatch = str.match(/^(\d{1,2})[\/\-](\d{4})$/);
+  const mmyyyyMatch = str.match(/^(\d{1,2})[\/\-](\d{4})\.?$/);
   if (mmyyyyMatch) {
     const m = Number(mmyyyyMatch[1]);
     const y = Number(mmyyyyMatch[2]);
@@ -1706,17 +1718,21 @@ function normalizeDateString(dateVal, flagsArr) {
     }
   }
 
-  // 4. MM/DD/YYYY or MM/DD/YY
-  const slashMatch = str.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})$/);
+  // 4. MM/DD/YYYY or MM/DD/YY or MM/DD-YYYY
+  const slashMatch = str.match(/^(\d{1,2})\/(\d{1,2})[\/\-](\d{2,4})$/);
   if (slashMatch) {
     const m = Number(slashMatch[1]);
     const d = Number(slashMatch[2]);
     const y = slashMatch[3].length === 2 ? 2000 + Number(slashMatch[3]) : Number(slashMatch[3]);
     if (m >= 1 && m <= 12 && d >= 1 && d <= 31 && y >= 2000 && y <= 2100) {
-      const maxDay = new Date(y, m, 0).getDate();
-      if (d <= maxDay) {
-        return `${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+      if (y === 2026 && d >= 27 && d <= 31) {
+        const realYear = 2000 + d;
+        const lastDay = String(new Date(realYear, m, 0).getDate()).padStart(2, '0');
+        return `${realYear}-${String(m).padStart(2, '0')}-${lastDay}`;
       }
+      const maxDay = new Date(y, m, 0).getDate();
+      const clampedDay = Math.min(d, maxDay);
+      return `${y}-${String(m).padStart(2, '0')}-${String(clampedDay).padStart(2, '0')}`;
     }
   }
 

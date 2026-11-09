@@ -241,8 +241,8 @@ class AppRouter {
     const lowStockCount = items.filter(i => (Number(i.currentStock) || 0) <= (Number(i.reorderLevel) || 10)).length;
     const in90Days = new Date(Date.now() + 90 * 24 * 60 * 60 * 1000);
     const expiringCount = items.filter(i => {
-      if (!i.expiryDate) return false;
-      const d = new Date(i.expiryDate);
+      if (!i.expiryDate || !/^\d{4}-\d{2}-\d{2}$/.test(String(i.expiryDate).trim())) return false;
+      const d = new Date(String(i.expiryDate).trim() + 'T00:00:00');
       return !isNaN(d.getTime()) && d <= in90Days;
     }).length;
 
@@ -325,10 +325,10 @@ window.renderAlertsDropdownContent = function () {
 
   const lowStockItems = items.filter(i => (Number(i.currentStock) || 0) <= (Number(i.reorderLevel) || 10));
   const expiringItems = items.filter(i => {
-    if (!i.expiryDate) return false;
-    const exp = new Date(i.expiryDate);
+    if (!i.expiryDate || !/^\d{4}-\d{2}-\d{2}$/.test(String(i.expiryDate).trim())) return false;
+    const exp = new Date(String(i.expiryDate).trim() + 'T00:00:00');
     return !isNaN(exp.getTime()) && exp <= in90Days;
-  }).sort((a, b) => new Date(a.expiryDate) - new Date(b.expiryDate));
+  }).sort((a, b) => new Date(String(a.expiryDate).trim() + 'T00:00:00') - new Date(String(b.expiryDate).trim() + 'T00:00:00'));
 
   let alertEntries = [];
 

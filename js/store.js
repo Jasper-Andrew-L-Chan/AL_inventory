@@ -900,12 +900,13 @@ class PharmacyStore {
     const grossProfit = totalNetSales - costOfGoods;
     const lowStockCount = items.filter(i => i.currentStock <= i.reorderLevel).length;
 
-    // Check items expiring within 90 days
+    // Check items expiring within 90 days (strictly ISO YYYY-MM-DD dates)
     const now = new Date();
     const in90Days = new Date(now.getTime() + 90 * 24 * 60 * 60 * 1000);
     const expiringSoonCount = items.filter(i => {
-      const exp = new Date(i.expiryDate);
-      return exp <= in90Days;
+      if (!i.expiryDate || !/^\d{4}-\d{2}-\d{2}$/.test(String(i.expiryDate).trim())) return false;
+      const exp = new Date(String(i.expiryDate).trim() + 'T00:00:00');
+      return !isNaN(exp.getTime()) && exp <= in90Days;
     }).length;
 
     // Items sold log for real-time live feed (all recorded sales)
@@ -951,10 +952,10 @@ class PharmacyStore {
     const now = new Date();
     const threshold = new Date(now.getTime() + daysAhead * 24 * 60 * 60 * 1000);
     return this.getItems().filter(i => {
-      if (!i.expiryDate) return false;
-      const exp = new Date(i.expiryDate);
+      if (!i.expiryDate || !/^\d{4}-\d{2}-\d{2}$/.test(String(i.expiryDate).trim())) return false;
+      const exp = new Date(String(i.expiryDate).trim() + 'T00:00:00');
       return !isNaN(exp.getTime()) && exp <= threshold;
-    }).sort((a, b) => new Date(a.expiryDate) - new Date(b.expiryDate));
+    }).sort((a, b) => new Date(String(a.expiryDate).trim() + 'T00:00:00') - new Date(String(b.expiryDate).trim() + 'T00:00:00'));
   }
 
   // --- Settings ---
