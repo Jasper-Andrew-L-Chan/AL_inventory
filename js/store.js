@@ -27,8 +27,8 @@ const INITIAL_TRANSACTIONS = [];
 const INITIAL_SETTINGS = {
   pharmacyName: 'AffordaLabs Pharmacy',
   tagline: 'Your Trusted Community Drugstore',
-  branch: 'Main Branch - Pasig City',
-  address: '128 Mabini St, Kapasigan, Pasig City, Metro Manila',
+  branch: 'Pampang - Angeles City',
+  address: 'Pampang, Angeles City, Pampanga',
   tin: '302-841-925-000',
   pharmacistInCharge: 'Jasper Andrew Chan, RPh',
   prcLicense: 'PRC-0089142',
@@ -49,7 +49,7 @@ const INITIAL_STAFF = [
 ];
 
 const INITIAL_DRAWER = {
-  shiftDate: new Date().toISOString().split('T')[0],
+  shiftDate: new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Manila', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date()),
   openedAt: '08:00 AM',
   openedBy: 'Staff Pharmacist',
   openingFloat: 0.00,
@@ -312,6 +312,9 @@ class PharmacyStore {
   setStatus(state, message = '') {
     this.status = { state, message, at: new Date() };
     this.renderStatusBadge();
+    if (typeof window.updateAppVersionDisplay === 'function') {
+      window.updateAppVersionDisplay();
+    }
   }
 
   renderStatusBadge() {
@@ -346,6 +349,11 @@ class PharmacyStore {
     el.title = this.status.message || 'All PCs use the same central database.';
     el.style.background = bg;
     el.style.color = fg;
+
+    const dashSyncEl = document.getElementById('dashboardSyncedAtTime');
+    if (dashSyncEl && time) {
+      dashSyncEl.textContent = time;
+    }
   }
 
   /**
@@ -755,7 +763,7 @@ class PharmacyStore {
       customerName: txnData.customerName || 'Walk-in Customer',
       budget: Number(txnData.budget || 0),
       barangay: txnData.barangay || '',
-      date: txnData.date || now.toISOString().split('T')[0],
+      date: txnData.date || this.getManilaDateStr(now),
       time: txnData.time || now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
       cashier: txnData.encoderName || txnData.cashier || (window.authStore && window.authStore.getSession() ? (window.authStore.getSession().fullName || window.authStore.getSession().username) : 'Staff Pharmacist'),
       encoderName: txnData.encoderName || txnData.cashier || (window.authStore && window.authStore.getSession() ? (window.authStore.getSession().fullName || window.authStore.getSession().username) : 'Staff Pharmacist'),
@@ -926,30 +934,28 @@ class PharmacyStore {
     });
 
     const grossProfit = totalNetSales - costOfGoods;
-    const lowStockCount = items.filter(i => i.currentStock <= i.reorderLevel).length;
+    const { lowStockCount, expiringSoonCount } = this.getAlertCounts(items);
 
-    // Check items expiring within 90 days (strictly ISO YYYY-MM-DD dates)
-    const now = new Date();
-    const in90Days = new Date(now.getTime() + 90 * 24 * 60 * 60 * 1000);
-    const expiringSoonCount = items.filter(i => {
-      if (!i.expiryDate || !/^\d{4}-\d{2}-\d{2}$/.test(String(i.expiryDate).trim())) return false;
-      const exp = new Date(String(i.expiryDate).trim() + 'T00:00:00');
-      return !isNaN(exp.getTime()) && exp <= in90Days;
-    }).length;
-
-    // Items sold log for real-time live feed (all recorded sales)
+    // Items sold log for real-time live feed (reconciled to Cong's Price / transaction subtotal)
     const recentSoldList = [];
     txns.forEach(t => {
       (t.items || []).forEach(item => {
+        const qty = Number(item.qty || 0);
+        const unitSalePrice = (item.congPrice !== undefined && item.congPrice !== null && Number(item.congPrice) > 0)
+          ? Number(item.congPrice)
+          : Number(item.price || item.sellingPrice || 0);
+        const totalPrice = (item.subtotal !== undefined && item.subtotal !== null)
+          ? Number(item.subtotal)
+          : qty * unitSalePrice;
         recentSoldList.push({
           time: t.time || '',
           date: t.date || '',
           receiptNo: t.receiptNo || '',
           customerName: t.customerName || 'Walk-in',
           name: item.actualSuppliedName || item.name || 'Medicine',
-          qty: Number(item.qty || 1),
-          sellingPrice: Number(item.sellingPrice || item.price || 0),
-          totalPrice: Number(item.qty || 1) * Number(item.sellingPrice || item.price || 0),
+          qty: qty,
+          sellingPrice: unitSalePrice,
+          totalPrice: totalPrice,
           isSubstitute: !!item.isSubstitute
         });
       });
@@ -972,6 +978,18 @@ class PharmacyStore {
       allCompletedTxns: txns,
       allTxnsAnyDate: allNonRefunded
     };
+  }
+
+  getAlertCounts(itemsList) {
+    const items = Array.isArray(itemsList) ? itemsList : this.getItems();
+    const lowStockCount = items.filter(i => (Number(i.currentStock) || 0) <= (Number(i.reorderLevel) || 10)).length;
+    const in90Days = new Date(Date.now() + 90 * 24 * 60 * 60 * 1000);
+    const expiringSoonCount = items.filter(i => {
+      if (!i.expiryDate || !/^\d{4}-\d{2}-\d{2}$/.test(String(i.expiryDate).trim())) return false;
+      const exp = new Date(String(i.expiryDate).trim() + 'T00:00:00');
+      return !isNaN(exp.getTime()) && exp <= in90Days;
+    }).length;
+    return { lowStockCount, expiringSoonCount, totalAlerts: lowStockCount + expiringSoonCount };
   }
 
   getLowStockItems() {

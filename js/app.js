@@ -265,16 +265,14 @@ class AppRouter {
   }
 
   updateBadges() {
-    const items = window.pharmacyStore.getItems();
-    const lowStockCount = items.filter(i => (Number(i.currentStock) || 0) <= (Number(i.reorderLevel) || 10)).length;
-    const in90Days = new Date(Date.now() + 90 * 24 * 60 * 60 * 1000);
-    const expiringCount = items.filter(i => {
-      if (!i.expiryDate || !/^\d{4}-\d{2}-\d{2}$/.test(String(i.expiryDate).trim())) return false;
-      const d = new Date(String(i.expiryDate).trim() + 'T00:00:00');
-      return !isNaN(d.getTime()) && d <= in90Days;
-    }).length;
+    const { lowStockCount, expiringSoonCount, totalAlerts } = window.pharmacyStore.getAlertCounts();
 
-    const totalAlerts = lowStockCount + expiringCount;
+    // Update topbar branch badge dynamically from settings
+    const branchEl = document.getElementById('topbarBranchName');
+    if (branchEl && window.pharmacyStore) {
+      const settings = window.pharmacyStore.getSettings();
+      if (settings && settings.branch) branchEl.textContent = settings.branch;
+    }
 
     // Sidebar Inventory badge
     const invBadge = document.getElementById('inventoryBadge');
@@ -576,8 +574,8 @@ window.applyThemeMode = function (isDark) {
   if (isDark) {
     document.body.classList.add('dark-mode');
     localStorage.setItem(THEME_STORAGE_KEY, 'dark');
-    if (labelEl) labelEl.textContent = 'Light Mode';
-    if (iconEl) iconEl.innerHTML = '<i data-lucide="sun"></i>';
+    if (labelEl) labelEl.textContent = 'Dark Mode';
+    if (iconEl) iconEl.innerHTML = '<i data-lucide="moon"></i>';
   } else {
     document.body.classList.remove('dark-mode');
     localStorage.setItem(THEME_STORAGE_KEY, 'light');

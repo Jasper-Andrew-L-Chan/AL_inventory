@@ -964,7 +964,7 @@ function renderInventoryTableRows(displayedItems) {
   const now = new Date();
 
   return paginatedItems.map(item => {
-    const isLow = item.currentStock <= item.reorderLevel;
+    const isLow = (Number(item.currentStock) || 0) <= (Number(item.reorderLevel) || 10);
     const expDate = parseIsoExpiryDate(item.expiryDate);
     const daysToExpiry = expDate ? Math.ceil((expDate - now) / (1000 * 60 * 60 * 24)) : null;
     const isExpiringSoon = daysToExpiry !== null && daysToExpiry <= 90;

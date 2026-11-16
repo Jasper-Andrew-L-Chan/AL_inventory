@@ -32,19 +32,6 @@ function renderCashDrawerView(container) {
   const session = window.authStore ? window.authStore.getSession() : null;
   const currentOperator = session ? session.fullName : drawer.openedBy;
 
-  // One-time automatic clean so old demo/stale numbers (₱3000 / ₱2430.08) start fresh at ₱0.00
-  if (!drawer.v2FreshClean) {
-    drawer.openingFloat = 0;
-    drawer.cashOutTotal = 0;
-    drawer.adjustments = [];
-    drawer.excludedTxnIds = [];
-    drawer.resetAt = Date.now();
-    drawer.shiftDate = new Date().toISOString().split('T')[0];
-    if (session && session.fullName) drawer.openedBy = session.fullName;
-    drawer.v2FreshClean = true;
-    window.pharmacyStore.saveDrawer(drawer);
-  }
-
   const txns = getActiveShiftCashTxns(drawer);
   const cashSales = txns.reduce((sum, t) => sum + Number(t.netTotal || 0), 0);
   const openingFloatVal = Number(drawer.openingFloat || 0);
@@ -297,7 +284,7 @@ window.handleSetOpeningFloat = function(event) {
   const drawer = window.pharmacyStore.getDrawer();
   const session = window.authStore ? window.authStore.getSession() : null;
   drawer.openingFloat = parsed;
-  drawer.shiftDate = new Date().toISOString().split('T')[0];
+  drawer.shiftDate = window.pharmacyStore ? window.pharmacyStore.getManilaDateStr() : new Date().toISOString().split('T')[0];
   if (session && session.fullName) {
     drawer.openedBy = session.fullName;
   }
@@ -375,7 +362,7 @@ window.handleResetCashDrawer = function() {
   drawer.adjustments = [];
   drawer.excludedTxnIds = [];
   drawer.resetAt = Date.now();
-  drawer.shiftDate = new Date().toISOString().split('T')[0];
+  drawer.shiftDate = window.pharmacyStore ? window.pharmacyStore.getManilaDateStr() : new Date().toISOString().split('T')[0];
   if (session && session.fullName) {
     drawer.openedBy = session.fullName;
   }
@@ -395,7 +382,7 @@ window.handlePromptOpeningFloat = function() {
     if (!isNaN(parsed) && parsed >= 0) {
       const session = window.authStore ? window.authStore.getSession() : null;
       drawer.openingFloat = parsed;
-      drawer.shiftDate = new Date().toISOString().split('T')[0];
+      drawer.shiftDate = window.pharmacyStore ? window.pharmacyStore.getManilaDateStr() : new Date().toISOString().split('T')[0];
       if (session && session.fullName) {
         drawer.openedBy = session.fullName;
       }

@@ -85,7 +85,8 @@ function renderDashboardView(container) {
   const isToday = selDate === todayStr;
   const metrics = window.pharmacyStore.getDashboardMetrics(selDate);
   const now = new Date();
-  const timeStr = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+  const syncAt = (window.pharmacyStore && window.pharmacyStore.status && window.pharmacyStore.status.at) || now;
+  const timeStr = syncAt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
   const dateLabel = dashboardLongDate(selDate);
 
   const session = window.authStore ? window.authStore.getSession() : null;
@@ -299,7 +300,7 @@ function renderDashboardView(container) {
           <button type="button" onclick="setDashboardDate('${todayStr}')" class="btn-outline" ${isToday ? 'disabled' : ''} style="padding: 3px 9px; font-size: 0.76rem; font-weight: 700; ${isToday ? 'opacity: 0.5; cursor: default;' : 'color: var(--primary); border-color: var(--primary);'}" title="Jump to today">Today</button>
         </div>
         <div style="background: var(--bg-card); border: 1px solid var(--border-color); border-radius: var(--radius-sm); padding: 0.4rem 0.75rem; font-size: 0.78rem; color: var(--text-muted);">
-          ${isToday ? '' : `${dateLabel} &middot; `}Synced at <strong>${timeStr}</strong>
+          ${isToday ? '' : `${dateLabel} &middot; `}Synced at <strong id="dashboardSyncedAtTime">${timeStr}</strong>
         </div>
       </div>
     </div>

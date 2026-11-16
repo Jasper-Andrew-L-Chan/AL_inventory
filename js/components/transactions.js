@@ -55,7 +55,7 @@ let currentTxnForm = {
   customerName: '',
   budget: '',
   barangay: '',
-  date: new Date().toISOString().split('T')[0],
+  date: window.pharmacyStore ? window.pharmacyStore.getManilaDateStr() : new Date().toISOString().split('T')[0],
   items: [
     createEmptyMedRow()
   ]
@@ -1259,7 +1259,7 @@ window.resetCustomerForm = function () {
     customerName: '',
     budget: '',
     barangay: '',
-    date: new Date().toISOString().split('T')[0],
+    date: window.pharmacyStore ? window.pharmacyStore.getManilaDateStr() : new Date().toISOString().split('T')[0],
     items: [createEmptyMedRow()]
   };
   renderTransactionsView(document.getElementById('main-content'));
@@ -1573,7 +1573,7 @@ window.handleStartEditTxn = function (txnId) {
     customerName: txn.customerName || '',
     budget: txn.budget > 0 ? txn.budget : '',
     barangay: txn.barangay || '',
-    date: txn.date || new Date().toISOString().split('T')[0],
+    date: txn.date || (window.pharmacyStore ? window.pharmacyStore.getManilaDateStr() : new Date().toISOString().split('T')[0]),
     items: (txn.items && txn.items.length > 0) ? txn.items.map(item => {
       // Check if item corresponds to an inventory entry
       const actualInv = findMatchingExcelInventoryItem(item, inventoryItems);
@@ -1780,7 +1780,7 @@ window.saveCustomerTransaction = function () {
     customerName: currentTxnForm.customerName.trim(),
     budget: Number(currentTxnForm.budget) || 0,
     barangay: (currentTxnForm.barangay || '').trim(),
-    date: currentTxnForm.date || new Date().toISOString().split('T')[0],
+    date: currentTxnForm.date || (window.pharmacyStore ? window.pharmacyStore.getManilaDateStr() : new Date().toISOString().split('T')[0]),
     cashier: currentEncoderName,
     encoderName: currentEncoderName,
     encoderLicense: currentEncoderLicense,
@@ -2424,7 +2424,7 @@ function computeDailyInOutData(allTxns) {
   const dayMap = {};
 
   allTxns.forEach(t => {
-    const rawDate = t.date || new Date().toISOString().split('T')[0];
+    const rawDate = t.date || (window.pharmacyStore ? window.pharmacyStore.getManilaDateStr() : new Date().toISOString().split('T')[0]);
     if (!dayMap[rawDate]) {
       dayMap[rawDate] = {
         date: rawDate,
