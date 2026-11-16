@@ -125,6 +125,7 @@ class AppRouter {
       ? window.authStore.hasPermission(viewName)
       : true;
 
+    const prevView = this.currentView;
     this.currentView = viewName;
 
     // Update active nav in sidebar
@@ -157,6 +158,33 @@ class AppRouter {
       this.renderCurrent();
     }
     this.updateBadges();
+    if (viewName !== prevView) this.playPageTransition();
+  }
+
+  /**
+   * Subtle fade + 10px upward slide on the content area (opacity/transform only, compositor-run).
+   * Content is already rendered before this starts, so data/render never waits on the animation.
+   * A new call cancels the previous one, so the latest tab click always wins.
+   */
+  playPageTransition() {
+    const el = this.contentEl;
+    if (!el || typeof el.animate !== 'function') return;
+    if (this._pageAnim) {
+      this._pageAnim.cancel();
+      this._pageAnim = null;
+    }
+    if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    const anim = el.animate(
+      [
+        { opacity: 0, transform: 'translate3d(0, 10px, 0)' },
+        { opacity: 1, transform: 'translate3d(0, 0, 0)' }
+      ],
+      { duration: 200, easing: 'ease-out' }
+    );
+    this._pageAnim = anim;
+    const done = () => { if (this._pageAnim === anim) this._pageAnim = null; };
+    anim.onfinish = done;
+    anim.oncancel = done;
   }
 
   renderAccessDenied(viewName) {

@@ -227,7 +227,7 @@ body {
   font-size: 0.88rem;
   font-weight: 500;
   cursor: pointer;
-  transition: all 0.15s ease;
+  transition: background-color 0.2s ease-out, color 0.2s ease-out, box-shadow 0.2s ease-out, border-color 0.2s ease-out;
   position: relative;
   white-space: nowrap;
   overflow: hidden;
