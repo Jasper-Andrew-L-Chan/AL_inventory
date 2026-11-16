@@ -58,6 +58,22 @@ window.setDashboardDate = function (dateStr) {
   renderDashboardView(document.getElementById('main-content'));
 };
 
+// Typing a date fires "change" on every digit; wait until the user pauses / presses Enter / leaves the box.
+let dashboardDateTimer = null;
+function dashboardDateIsComplete(v) {
+  return /^\d{4}-\d{2}-\d{2}$/.test(v || '') && Number(v.slice(0, 4)) >= 2000;
+}
+window.queueDashboardDate = function (v) {
+  clearTimeout(dashboardDateTimer);
+  if (!dashboardDateIsComplete(v)) return;
+  dashboardDateTimer = setTimeout(() => applyDashboardDate(v), 1800);
+};
+window.applyDashboardDate = function (v) {
+  clearTimeout(dashboardDateTimer);
+  if (!dashboardDateIsComplete(v) || v === dashboardSelectedDate) return;
+  window.setDashboardDate(v);
+};
+
 window.shiftDashboardDate = function (days) {
   window.setDashboardDate(dashboardShiftDate(dashboardActiveDate(), days));
 };
@@ -278,7 +294,7 @@ function renderDashboardView(container) {
         <div style="background: var(--bg-card); border: 1px solid var(--border-color); border-radius: var(--radius-sm); padding: 0.3rem 0.5rem; display: flex; align-items: center; gap: 0.4rem; font-size: 0.82rem; color: var(--text-muted); box-shadow: var(--shadow-sm);">
           <span>Date Filter:</span>
           <button type="button" onclick="shiftDashboardDate(-1)" class="btn-outline" style="padding: 2px 7px; font-size: 0.9rem; font-weight: 800; line-height: 1;" title="Previous day">‹</button>
-          <input type="date" id="dashboardDatePicker" value="${selDate}" max="${todayStr}" onchange="setDashboardDate(this.value)" style="background: var(--bg-card); color: var(--text-main); border: 1px solid var(--border-color); border-radius: 4px; padding: 3px 6px; font-size: 0.8rem; font-weight: 700; color-scheme: light dark;" title="Pick a date (12:00am - 11:59pm)" />
+          <input type="date" id="dashboardDatePicker" value="${selDate}" min="2000-01-01" max="${todayStr}" onchange="queueDashboardDate(this.value)" onblur="applyDashboardDate(this.value)" onkeydown="if(event.key==='Enter'){applyDashboardDate(this.value);}" style="background: var(--bg-card); color: var(--text-main); border: 1px solid var(--border-color); border-radius: 4px; padding: 3px 6px; font-size: 0.8rem; font-weight: 700; color-scheme: light dark;" title="Pick a date (12:00am - 11:59pm)" />
           <button type="button" onclick="shiftDashboardDate(1)" class="btn-outline" ${isToday ? 'disabled' : ''} style="padding: 2px 7px; font-size: 0.9rem; font-weight: 800; line-height: 1; ${isToday ? 'opacity: 0.4; cursor: not-allowed;' : ''}" title="Next day">›</button>
           <button type="button" onclick="setDashboardDate('${todayStr}')" class="btn-outline" ${isToday ? 'disabled' : ''} style="padding: 3px 9px; font-size: 0.76rem; font-weight: 700; ${isToday ? 'opacity: 0.5; cursor: default;' : 'color: var(--primary); border-color: var(--primary);'}" title="Jump to today">Today</button>
         </div>
