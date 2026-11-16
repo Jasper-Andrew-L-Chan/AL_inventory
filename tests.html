@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>AffordaLabs Pharmacy POS — Unit Tests</title>
+  <style>
+    body { font-family: Inter, system-ui, -apple-system, sans-serif; background: #0f172a; color: #e2e8f0; margin: 0; padding: 2rem; }
+    .wrap { max-width: 880px; margin: 0 auto; }
+    h1 { margin: 0 0 0.25rem; font-size: 1.5rem; }
+    .sub { color: #94a3b8; font-size: 0.9rem; margin-bottom: 1.25rem; }
+    .summary { padding: 1rem 1.25rem; border-radius: 10px; font-weight: 700; margin-bottom: 1.25rem; display: flex; justify-content: space-between; align-items: center; }
+    .summary.pass { background: rgba(16, 185, 129, 0.15); border: 1px solid #10b981; color: #6ee7b7; }
+    .summary.fail { background: rgba(239, 68, 68, 0.15); border: 1px solid #ef4444; color: #fca5a5; }
+    .case { background: #1e293b; border: 1px solid #334155; border-radius: 8px; padding: 0.75rem 1rem; margin-bottom: 0.6rem; display: flex; justify-content: space-between; gap: 1rem; align-items: flex-start; }
+    .badge { padding: 2px 8px; border-radius: 999px; font-size: 0.75rem; font-weight: 800; flex-shrink: 0; }
+    .badge.ok { background: #065f46; color: #6ee7b7; }
+    .badge.err { background: #7f1d1d; color: #fecaca; }
+    .err-msg { color: #fca5a5; font-family: monospace; font-size: 0.8rem; margin-top: 0.35rem; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>AffordaLabs Unit Test Suite</h1>
+    <div class="sub">Isolated browser tests for calculations, discounts, stock, expiry, Asia/Manila dates, per-day dashboard filtering, and cache invalidation.</div>
+    <div id="summary" class="summary">Running tests…</div>
+    <div id="results"></div>
+  </div>
+
+  <!-- Stub auth/api before store.js loads so no network requests fire -->
+  <script>
+    window.authStore = { isLoggedIn: () => false, getSession: () => null, syncUsersFromRemote: () => false };
+    window.alApi = async () => ({ unchanged: true });
+    window.IMPORTED_MEDICINES_SEED = [];
+    window.IMPORTED_MEDICINES_VERSION = '';
+  </script>
+  <script src="js/store.js?v=20261116e"></script>
+  <script>
+    (function () {
+      const STORAGE_SNAP_KEYS = [
+        'al_cache_items', 'al_cache_transactions', 'al_cache_settings',
+        'al_cache_staff', 'al_cache_drawer', 'al_outbox_v1', 'al_inventory_seed_ver'
+      ];
+      const snapshot = {};
+      STORAGE_SNAP_KEYS.forEach(k => { snapshot[k] = localStorage.getItem(k); });
+
+      const results = [];
+      function assert(cond, msg) {
+        if (!cond) throw new Error(msg || 'Assertion failed');
+      }
+      function assertClose(a, b, msg, eps = 0.01) {
+        if (Math.abs(a - b) > eps) throw new Error(`${msg || 'Mismatch'}: expected ${b}, got ${a}`);
+      }
+      function test(name, fn) {
+        try {
+          fn();
+          results.push({ name, ok: true });
+        } catch (err) {
+          results.push({ name, ok: false, error: err && err.message ? err.message : String(err) });
+        }
+      }
+
+      function freshStore(items = [], txns = []) {
+        STORAGE_SNAP_KEYS.forEach(k => localStorage.removeItem(k));
+        localStorage.setItem('al_cache_items', JSON.stringify(items));
+        localStorage.setItem('al_cache_transactions', JSON.stringify(txns));
+        return new PharmacyStore();
+      }
+
+      try {
+        test('1. Sales, COGS, Gross Profit, Payment Breakdown, and Recent Sold reconcile', () => {
+          const store = freshStore(
+            [
+              { id: 'm1', brandName: 'MedA', genericName: 'GenA', currentStock: 100, reorderLevel: 10, costPrice: 10, unitPrice: 10, congPrice: 25 },
+              { id: 'm2', brandName: 'MedB', genericName: 'GenB', currentStock: 50, reorderLevel: 10, costPrice: 0, unitPrice: 0, congPrice: 44 }
+            ],
+            [
+              {
+                id: 'txn-1', date: '2026-11-16', status: 'Completed', paymentMethod: 'Cash', netTotal: 250, discountAmount: 0,
+                items: [{ id: 'm1', actualInventoryId: 'm1', name: 'MedA', qty: 10, unitPrice: 10, congPrice: 25, price: 25, subtotal: 250 }]
+              },
+              {
+                id: 'txn-2', date: '2026-11-16', status: 'Completed', paymentMethod: 'GCash', netTotal: 88, discountAmount: 0,
+                items: [{ id: 'm2', actualInventoryId: 'm2', name: 'MedB', qty: 2, unitPrice: 0, congPrice: 44, price: 44, subtotal: 88 }]
+              }
+            ]
+          );
+          const m = store.getDashboardMetrics('2026-11-16');
+          assertClose(m.netSales, 338, 'netSales');
+          assertClose(m.costOfGoods, 100, 'costOfGoods (no artificial 0.65 markup when unitPrice is 0)');
+          assertClose(m.grossProfit, 238, 'grossProfit');
+          assertClose(m.itemsDispensed, 12, 'itemsDispensed');
+          const paySum = Object.values(m.paymentTotals).reduce((a, b) => a + b, 0);
+          assertClose(paySum, m.netSales, 'paymentTotals sum == netSales');
+          const recentSum = m.recentSold.reduce((a, r) => a + r.totalPrice, 0);
+          assertClose(recentSum, m.netSales, 'recentSold sum == netSales');
+        });
+
+        test('2. Senior Citizen & PWD discount math (12% VAT exempt + 20% discount)', () => {
+          // Standard Philippine RA 9994 / RA 10754 calculation:
+          // Vat-exempt price = gross / 1.12; 20% discount = vatExempt * 0.20; net = vatExempt * 0.80
+          const gross = 112;
+          const vatExempt = gross / 1.12;
+          const scDiscount = vatExempt * 0.20;
+          const netPayable = vatExempt - scDiscount;
+          assertClose(vatExempt, 100, 'VAT-exempt base');
+          assertClose(scDiscount, 20, '20% Senior/PWD discount');
+          assertClose(netPayable, 80, 'Net payable');
+
+          const store = freshStore([], [
+            { id: 'txn-sc', date: '2026-11-16', status: 'Completed', paymentMethod: 'Cash', subtotal: 112, discountAmount: 20, netTotal: 80, items: [] }
+          ]);
+          const m = store.getDashboardMetrics('2026-11-16');
+          assertClose(m.discounts, 20, 'Dashboard discounts total');
+          assertClose(m.netSales, 80, 'Dashboard discounted netSales');
+        });
+
+        test('3. Stock deduction on sale, addition on receiving, return restoration, and negative clamp', () => {
+          const store = freshStore([
+            { id: 'm1', brandName: 'MedA', currentStock: 10, addedStock: 0, deductedStock: 0, reorderLevel: 5, unitPrice: 5, congPrice: 10 }
+          ]);
+          store.adjustStock('m1', -4, 'Sale');
+          let item = store.getItemById('m1');
+          assert(item.currentStock === 6 && item.deductedStock === 4, 'Sale deducted 4 -> stock 6');
+
+          store.adjustStock('m1', 10, 'Receive');
+          item = store.getItemById('m1');
+          assert(item.currentStock === 16 && item.addedStock === 10, 'Receive added 10 -> stock 16');
+
+          store.adjustStock('m1', 2, 'Return', true);
+          item = store.getItemById('m1');
+          assert(item.currentStock === 18 && item.deductedStock === 2, 'Return restored 2 -> stock 18, deducted 2');
+
+          store.adjustStock('m1', -999, 'Over-deduct');
+          item = store.getItemById('m1');
+          assert(item.currentStock === 0, 'Stock clamped at 0 (never negative)');
+        });
+
+        test('4. Batch expiry & low-stock alert counts (90-day window + reorderLevel || 10)', () => {
+          const today = new Date();
+          const in30 = new Date(today.getTime() + 30 * 86400000).toISOString().slice(0, 10);
+          const in200 = new Date(today.getTime() + 200 * 86400000).toISOString().slice(0, 10);
+          const expired = '2025-01-01';
+          const store = freshStore([
+            { id: 'e1', currentStock: 5, reorderLevel: 0, expiryDate: in30 },     // low (<=10) & expiring
+            { id: 'e2', currentStock: 50, reorderLevel: 10, expiryDate: expired }, // ok stock, expired (<= in90Days)
+            { id: 'e3', currentStock: 50, reorderLevel: 10, expiryDate: in200 },   // ok stock, not expiring
+            { id: 'e4', currentStock: 0, reorderLevel: 0, expiryDate: '' }         // low (<=10), blank expiry ignored
+          ]);
+          const counts = store.getAlertCounts();
+          assert(counts.lowStockCount === 2, 'lowStockCount == 2, got ' + counts.lowStockCount);
+          assert(counts.expiringSoonCount === 2, 'expiringSoonCount == 2, got ' + counts.expiringSoonCount);
+          assert(counts.totalAlerts === 4, 'totalAlerts == 4');
+        });
+
+        test('5. Asia/Manila date boundary (UTC 16:30 -> next calendar day in Manila)', () => {
+          const store = freshStore();
+          const utcDate = new Date('2026-11-15T16:30:00Z'); // 2026-11-16 00:30 AM in Asia/Manila
+          const manila = store.getManilaDateStr(utcDate);
+          assert(manila === '2026-11-16', 'Expected 2026-11-16 in Asia/Manila, got ' + manila);
+        });
+
+        test('6. Per-day Dashboard filtering, Refund exclusion, and Empty Day zeros', () => {
+          const store = freshStore([], [
+            { id: 't1', date: '2026-11-15', status: 'Completed', paymentMethod: 'Cash', netTotal: 500, items: [{ id: 'm1', qty: 5, unitPrice: 10, congPrice: 100, subtotal: 500 }] },
+            { id: 't2', date: '2026-11-16', status: 'Completed', paymentMethod: 'Maya', netTotal: 200, items: [{ id: 'm1', qty: 2, unitPrice: 10, congPrice: 100, subtotal: 200 }] },
+            { id: 't3', date: '2026-11-16', status: 'Refunded', paymentMethod: 'Cash', netTotal: 150, items: [{ id: 'm1', qty: 1, unitPrice: 10, congPrice: 150, subtotal: 150 }] }
+          ]);
+          const nov16 = store.getDashboardMetrics('2026-11-16');
+          assertClose(nov16.netSales, 200, 'Nov 16 netSales excludes Nov 15 and Refunded');
+          assertClose(nov16.totalRefunds, 150, 'Nov 16 totalRefunds == 150');
+          assert(nov16.transactionCount === 1, 'Nov 16 transactionCount == 1');
+
+          const emptyDay = store.getDashboardMetrics('2026-11-10');
+          assertClose(emptyDay.netSales, 0, 'Empty day netSales == 0');
+          assertClose(emptyDay.grossProfit, 0, 'Empty day grossProfit == 0');
+          assert(emptyDay.transactionCount === 0 && emptyDay.recentSold.length === 0, 'Empty day has 0 txns and 0 recentSold');
+        });
+
+        test('7. Memoization cache returns same array until mutated, then invalidates', () => {
+          const store = freshStore([{ id: 'm1', brandName: 'MedA', currentStock: 20, reorderLevel: 5, unitPrice: 5, congPrice: 10 }], []);
+          const a = store.getItems();
+          const b = store.getItems();
+          assert(a === b, 'getItems() returns memoized array reference when unchanged');
+          store.adjustStock('m1', -3, 'Sale');
+          const c = store.getItems();
+          assert(c !== a && c[0].currentStock === 17, 'getItems() invalidates after adjustStock');
+
+          const t1 = store.getTransactions();
+          const t2 = store.getTransactions();
+          assert(t1 === t2, 'getTransactions() returns memoized array reference when unchanged');
+          store.addTransaction({ date: '2026-11-16', netTotal: 30, items: [{ id: 'm1', actualInventoryId: 'm1', qty: 3, unitPrice: 5, congPrice: 10, subtotal: 30 }] });
+          const t3 = store.getTransactions();
+          assert(t3 !== t1 && t3.length === 1, 'getTransactions() invalidates after addTransaction');
+          assert(store.getItemById('m1').currentStock === 14, 'addTransaction deducted 3 -> 14');
+
+          store.refundTransaction(t3[0].id, 'Test return');
+          assert(store.getItemById('m1').currentStock === 17, 'refundTransaction restored 3 -> 17');
+        });
+      } finally {
+        STORAGE_SNAP_KEYS.forEach(k => {
+          if (snapshot[k] === null) localStorage.removeItem(k);
+          else localStorage.setItem(k, snapshot[k]);
+        });
+      }
+
+      const passed = results.filter(r => r.ok).length;
+      const failed = results.length - passed;
+      const summaryEl = document.getElementById('summary');
+      summaryEl.className = 'summary ' + (failed === 0 ? 'pass' : 'fail');
+      summaryEl.innerHTML = `<span>${failed === 0 ? 'ALL TESTS PASSED' : 'SOME TESTS FAILED'}</span><span>${passed} passed / ${failed} failed (${results.length} total)</span>`;
+
+      document.getElementById('results').innerHTML = results.map(r => `
+        <div class="case">
+          <div>
+            <div><strong>${r.name}</strong></div>
+            ${r.error ? `<div class="err-msg">${r.error}</div>` : ''}
+          </div>
+          <span class="badge ${r.ok ? 'ok' : 'err'}">${r.ok ? 'PASS' : 'FAIL'}</span>
+        </div>
+      `).join('');
+      window.__TEST_RESULTS__ = { passed, failed, total: results.length, results };
+    })();
+  </script>
+</body>
+</html>

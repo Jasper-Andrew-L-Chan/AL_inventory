@@ -70,6 +70,8 @@ class PharmacyStore {
     this.isSyncing = false;
     this.isFlushing = false;
     this.localSeq = 0;          // bumps on every local change (guards against stale poll responses)
+    this._itemsCache = null;
+    this._txnsCache = null;
     this.pollTimer = null;
     this.flushTimer = null;
     this.POLL_MS = 2500;        // other PCs' changes appear within ~2.5 seconds (near real-time)
@@ -92,6 +94,8 @@ class PharmacyStore {
     ensure(STORAGE_KEYS.SETTINGS, INITIAL_SETTINGS);
     ensure(STORAGE_KEYS.STAFF, INITIAL_STAFF);
     ensure(STORAGE_KEYS.DRAWER, INITIAL_DRAWER);
+    this._itemsCache = null;
+    this._txnsCache = null;
   }
 
   /** Forget this device's copy of the shared data (called on logout). */
@@ -99,6 +103,8 @@ class PharmacyStore {
     [STORAGE_KEYS.ITEMS, STORAGE_KEYS.TRANSACTIONS, STORAGE_KEYS.SETTINGS, STORAGE_KEYS.STAFF, STORAGE_KEYS.DRAWER, 'al_inventory_seed_ver']
       .forEach(k => localStorage.removeItem(k));
     this.serverVersion = -1;
+    this._itemsCache = null;
+    this._txnsCache = null;
     this.init();
   }
 
@@ -198,8 +204,14 @@ class PharmacyStore {
       }
     };
 
-    if (Array.isArray(d.items)) changed.items = put(STORAGE_KEYS.ITEMS, d.items);
-    if (Array.isArray(d.transactions)) changed.txns = put(STORAGE_KEYS.TRANSACTIONS, d.transactions);
+    if (Array.isArray(d.items)) {
+      changed.items = put(STORAGE_KEYS.ITEMS, d.items);
+      if (changed.items) this._itemsCache = null;
+    }
+    if (Array.isArray(d.transactions)) {
+      changed.txns = put(STORAGE_KEYS.TRANSACTIONS, d.transactions);
+      if (changed.txns) this._txnsCache = null;
+    }
     if (d.settings && typeof d.settings === 'object') changed.settings = put(STORAGE_KEYS.SETTINGS, d.settings);
     if (d.drawer && typeof d.drawer === 'object') changed.drawer = put(STORAGE_KEYS.DRAWER, d.drawer);
     if (window.authStore) changed.users = window.authStore.syncUsersFromRemote(d.users, d.me);
@@ -302,6 +314,7 @@ class PharmacyStore {
       if (t && t.receiptNo !== receiptNo) {
         t.receiptNo = receiptNo;
         localStorage.setItem(STORAGE_KEYS.TRANSACTIONS, JSON.stringify(txns));
+        this._txnsCache = null;
         window.dispatchEvent(new CustomEvent('pharmacy:txns-updated'));
       }
     } catch (e) { /* ignore */ }
@@ -398,9 +411,10 @@ class PharmacyStore {
   }
 
   getItems() {
+    if (this._itemsCache) return this._itemsCache;
     const items = JSON.parse(localStorage.getItem(STORAGE_KEYS.ITEMS)) || [];
     const seedMap = this._getSeedLookupMap();
-    return items.map(item => {
+    this._itemsCache = items.map(item => {
       const seedItem = seedMap.get(item.id);
       const name = this.formatItemName(item);
       const cost = Number(item.unitPrice !== undefined ? item.unitPrice : (item.costPrice || 0));
@@ -433,6 +447,7 @@ class PharmacyStore {
         congPrice
       };
     });
+    return this._itemsCache;
   }
 
   getItemById(id) {
@@ -441,6 +456,7 @@ class PharmacyStore {
 
   /** Write the local cache only (the caller queues the matching server operation). */
   saveItems(items) {
+    this._itemsCache = null;
     localStorage.setItem(STORAGE_KEYS.ITEMS, JSON.stringify(items));
     window.dispatchEvent(new CustomEvent('pharmacy:items-updated'));
   }
@@ -707,6 +723,7 @@ class PharmacyStore {
 
   // --- Transactions ---
   getTransactions() {
+    if (this._txnsCache) return this._txnsCache;
     const rawTxns = JSON.parse(localStorage.getItem(STORAGE_KEYS.TRANSACTIONS)) || [];
     // Sanitize any false substitute flags where requested and actual medicines are the exact same item
     const txns = rawTxns.map(t => {
@@ -724,7 +741,7 @@ class PharmacyStore {
 
     // Always keep customers who belong to the same Barangay grouped together
     const UNSPEC = 'BARANGAY NOT SPECIFIED';
-    return txns.sort((a, b) => {
+    this._txnsCache = txns.sort((a, b) => {
       const cleanBrgy = raw => {
         if (!raw || !String(raw).trim()) return UNSPEC;
         const c = String(raw).trim().replace(/\s+/g, ' ');
@@ -737,10 +754,12 @@ class PharmacyStore {
       if (kb === UNSPEC) return -1;
       return ka.localeCompare(kb, undefined, { numeric: true, sensitivity: 'base' });
     });
+    return this._txnsCache;
   }
 
   /** Write the local cache only (the caller queues the matching server operation). */
   saveTransactions(txns) {
+    this._txnsCache = null;
     localStorage.setItem(STORAGE_KEYS.TRANSACTIONS, JSON.stringify(txns));
     window.dispatchEvent(new CustomEvent('pharmacy:txns-updated'));
   }

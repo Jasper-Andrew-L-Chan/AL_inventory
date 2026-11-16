@@ -7,6 +7,8 @@
 let reportsCurrentTab = 'CHARTS';
 let reportsSelectedDate = ''; // YYYY-MM-DD (Asia/Manila); '' = today
 let reportsDateTimer = null;
+let reportsProductMixPage = 1;
+const REPORTS_MIX_PAGE_SIZE = 50;
 
 function reportsTodayStr() {
   return window.pharmacyStore.getManilaDateStr();
@@ -34,6 +36,7 @@ window.setReportsDate = function (dateStr) {
   const today = reportsTodayStr();
   if (!/^\d{4}-\d{2}-\d{2}$/.test(dateStr || '')) return;
   reportsSelectedDate = dateStr > today ? today : dateStr;
+  reportsProductMixPage = 1;
   renderReportsView(document.getElementById('main-content'));
 };
 
@@ -184,6 +187,12 @@ function renderReportsView(container) {
 
   const rxEntries = txns.flatMap(t => (t.items || []).filter(i => i.isRx).map(i => ({ txn: t, item: i })));
   const discTxns = txns.filter(t => Number(t.discountAmount || 0) > 0);
+  const totalMixItems = itemStats.length;
+  const totalMixPages = Math.ceil(totalMixItems / REPORTS_MIX_PAGE_SIZE) || 1;
+  if (reportsProductMixPage > totalMixPages) reportsProductMixPage = totalMixPages;
+  if (reportsProductMixPage < 1) reportsProductMixPage = 1;
+  const mixStartIdx = (reportsProductMixPage - 1) * REPORTS_MIX_PAGE_SIZE;
+  const pagedMixItems = itemStats.slice(mixStartIdx, mixStartIdx + REPORTS_MIX_PAGE_SIZE);
 
   container.innerHTML = `
     <!-- Top Subtabs -->
@@ -296,11 +305,11 @@ function renderReportsView(container) {
             </tr>
           </thead>
           <tbody>
-            ${itemStats.length === 0 ? `
+            ${pagedMixItems.length === 0 ? `
               <tr><td colspan="8" style="text-align: center; padding: 2rem; color: var(--text-muted);">No medicines sold on ${dateLabel}.</td></tr>
-            ` : itemStats.map((item, idx) => `
+            ` : pagedMixItems.map((item, idx) => `
               <tr>
-                <td style="font-weight: 700; color: var(--text-muted);">${idx + 1}</td>
+                <td style="font-weight: 700; color: var(--text-muted);">${mixStartIdx + idx + 1}</td>
                 <td>
                   <div style="font-weight: 700;">${escapeReportHtml(item.brandName || item.name)}</div>
                   <div style="font-size: 0.72rem; color: var(--primary);">${escapeReportHtml(item.genericName || '')}</div>
@@ -311,14 +320,24 @@ function renderReportsView(container) {
                 <td style="text-align: right; font-weight: 600;">₱${item.revenue.toFixed(2)}</td>
                 <td style="text-align: right; color: #16a34a; font-weight: 700;">₱${item.profit.toFixed(2)}</td>
                 <td style="text-align: center;">
-                  <span class="badge" style="${idx < 3 ? 'background: #dcfce7; color: #15803d;' : 'background: #f1f5f9; color: #64748b;'}">
-                    ${idx < 3 ? 'Fast Mover (Class A)' : 'Normal Mover (Class B)'}
+                  <span class="badge" style="${(mixStartIdx + idx) < 3 ? 'background: #dcfce7; color: #15803d;' : 'background: #f1f5f9; color: #64748b;'}">
+                    ${(mixStartIdx + idx) < 3 ? 'Fast Mover (Class A)' : 'Normal Mover (Class B)'}
                   </span>
                 </td>
               </tr>
             `).join('')}
           </tbody>
         </table>
+        ${totalMixItems > REPORTS_MIX_PAGE_SIZE ? `
+          <div style="display: flex; justify-content: space-between; align-items: center; padding: 0.75rem 1.25rem; border-top: 1px solid var(--border-light); font-size: 0.78rem; color: var(--text-muted);">
+            <span>Showing <strong>${mixStartIdx + 1}</strong> to <strong>${Math.min(mixStartIdx + REPORTS_MIX_PAGE_SIZE, totalMixItems)}</strong> of <strong>${totalMixItems}</strong> SKUs</span>
+            <div style="display: flex; gap: 0.4rem; align-items: center;">
+              <button type="button" onclick="handleReportsMixPageChange(${reportsProductMixPage - 1})" class="btn-outline" ${reportsProductMixPage === 1 ? 'disabled' : ''} style="padding: 3px 10px; font-size: 0.75rem;">‹ Prev</button>
+              <span style="font-weight: 700; color: var(--text-main);">Page ${reportsProductMixPage} of ${totalMixPages}</span>
+              <button type="button" onclick="handleReportsMixPageChange(${reportsProductMixPage + 1})" class="btn-outline" ${reportsProductMixPage === totalMixPages ? 'disabled' : ''} style="padding: 3px 10px; font-size: 0.75rem;">Next ›</button>
+            </div>
+          </div>
+        ` : ''}
       </div>
     ` : ''}
 
@@ -448,5 +467,11 @@ function renderReportsView(container) {
 
 window.switchReportsTab = function (tab) {
   reportsCurrentTab = tab;
+  reportsProductMixPage = 1;
+  renderReportsView(document.getElementById('main-content'));
+};
+
+window.handleReportsMixPageChange = function (newPage) {
+  reportsProductMixPage = newPage;
   renderReportsView(document.getElementById('main-content'));
 };

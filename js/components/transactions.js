@@ -433,6 +433,23 @@ function renderDetailsTabHtml(editingTxnId, currentTxnForm, allTxns, inventoryIt
           </div>
 
           <div style="overflow-x: auto;">
+            <datalist id="sharedPrimaryMedList">
+              <option value="+ Custom / Unlisted Medicine...">+ Custom / Unlisted Medicine...</option>
+              ${inventoryItems.map(item => {
+    const congP = Number(item.congPrice || 0);
+    const sellP = Number(item.sellingPrice || 0);
+    const displayPrice = congP > 0 ? `Cong: ₱${congP.toFixed(2)}` : `₱${sellP.toFixed(2)}`;
+    return `<option value="${escapeHtml(getMedicineDisplayName(item))}" data-id="${item.id}">[${item.currentStock > 0 ? item.currentStock + ' in stock' : 'OUT OF STOCK'}] ${displayPrice}</option>`;
+  }).join('')}
+            </datalist>
+            <datalist id="sharedSubstituteMedList">
+              ${inventoryItems.map(item => {
+    const congP = Number(item.congPrice || 0);
+    const sellP = Number(item.sellingPrice || 0);
+    const priceLabel = congP > 0 ? `Cong: ₱${congP.toFixed(2)}` : `₱${sellP.toFixed(2)}`;
+    return `<option value="${escapeHtml(getMedicineDisplayName(item))}" data-id="${item.id}">(${item.currentStock} in stock, ${priceLabel})</option>`;
+  }).join('')}
+            </datalist>
             <table class="med-entry-table">
               <thead>
                 <tr>
@@ -993,7 +1010,7 @@ function renderMedRowHtml(row, idx, inventoryItems) {
           <div style="display: flex; gap: 0.4rem; align-items: center;">
             <input 
               type="text"
-              list="medList_${row.id}"
+              list="sharedPrimaryMedList"
               id="medSearchInput_${row.id}"
               class="form-input" 
               placeholder="🔍 Search or type medicine (e.g. Pantoprazole, Omeprazole)..."
@@ -1002,19 +1019,6 @@ function renderMedRowHtml(row, idx, inventoryItems) {
               oninput="onSearchPrimaryMedicineInput('${row.id}', this.value)"
               onfocus="this.select()"
             />
-            <datalist id="medList_${row.id}">
-              <option value="+ Custom / Unlisted Medicine...">+ Custom / Unlisted Medicine...</option>
-              ${inventoryItems.map(item => {
-    const congP = Number(item.congPrice || 0);
-    const sellP = Number(item.sellingPrice || 0);
-    const displayPrice = congP > 0 ? `Cong: ₱${congP.toFixed(2)}` : `₱${sellP.toFixed(2)}`;
-    return `
-                <option value="${escapeHtml(getMedicineDisplayName(item))}" data-id="${item.id}">
-                  [${item.currentStock > 0 ? item.currentStock + ' in stock' : 'OUT OF STOCK'}] ${displayPrice}
-                </option>
-              `;
-  }).join('')}
-            </datalist>
           </div>
 
           <!-- Custom medicine text input if selected -->
@@ -1086,7 +1090,7 @@ function renderMedRowHtml(row, idx, inventoryItems) {
                 <div style="display: flex; gap: 0.35rem; align-items: center;">
                   <input 
                     type="text"
-                    list="subList_${row.id}"
+                    list="sharedSubstituteMedList"
                     id="subSearchInput_${row.id}"
                     class="form-input" 
                     placeholder="🔍 Search or type substitute medicine..."
@@ -1095,20 +1099,6 @@ function renderMedRowHtml(row, idx, inventoryItems) {
                     oninput="onSearchActualSubstituteInput('${row.id}', this.value)"
                     onfocus="this.select()"
                   />
-                  <datalist id="subList_${row.id}">
-                    ${inventoryItems
-        .filter(item => item.id !== row.selectedMedId)
-        .map(item => {
-          const congP = Number(item.congPrice || 0);
-          const sellP = Number(item.sellingPrice || 0);
-          const priceLabel = congP > 0 ? `Cong: ₱${congP.toFixed(2)}` : `₱${sellP.toFixed(2)}`;
-          return `
-                        <option value="${escapeHtml(getMedicineDisplayName(item))}" data-id="${item.id}">
-                          (${item.currentStock} in stock, ${priceLabel})
-                        </option>
-                      `;
-        }).join('')}
-                  </datalist>
                 </div>
                 ${actualItem ? `
                   <div style="font-size: 0.7rem; color: #047857; margin-top: 3px; font-weight: 600; display: inline-flex; align-items: center; gap: 0.25rem;">
