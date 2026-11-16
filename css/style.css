@@ -128,22 +128,26 @@ body {
 }
 
 /* Full logo shown by default, icon hidden */
-.brand-logo-full { display: block; }
+/* Swap logos when collapsed: cross-fade instead of display toggle */
+.brand-logo-wrapper { position: relative; }
+.brand-logo-full { display: block; opacity: 1; transition: opacity 0.2s ease-out, transform 0.2s ease; }
 .brand-logo-icon {
-  display: none;
+  display: block;
+  position: absolute;
+  top: 0;
+  left: 50%;
+  margin-left: -24px;
+  opacity: 0;
+  pointer-events: none;
   max-width: 48px;
   width: 48px;
   height: 48px;
   object-fit: contain;
   border-radius: 8px;
-  transition: transform 0.15s ease;
+  transition: opacity 0.2s ease-out 0.08s, transform 0.15s ease;
 }
-
-/* Swap logos when collapsed */
-.sidebar.collapsed .brand-logo-full { display: none; }
-.sidebar.collapsed .brand-logo-icon { 
-  display: block; 
-}
+.sidebar.collapsed .brand-logo-full { opacity: 0; pointer-events: none; }
+.sidebar.collapsed .brand-logo-icon { opacity: 1; pointer-events: auto; }
 .sidebar.collapsed .brand-logo-wrapper:hover .brand-logo-icon {
   transform: scale(1.08);
 }
@@ -163,8 +167,10 @@ body {
   padding: 3px 10px;
   border-radius: var(--radius-full);
   border: 1px solid var(--primary-border);
-  transition: opacity 0.2s ease, max-height 0.25s ease;
+  transition: opacity 0.2s ease-out, max-height 0.28s cubic-bezier(0.4, 0, 0.2, 1), margin-top 0.28s cubic-bezier(0.4, 0, 0.2, 1), padding 0.28s cubic-bezier(0.4, 0, 0.2, 1);
   white-space: nowrap;
+  max-height: 30px;
+  overflow: hidden;
 }
 
 /* Hide tagline when collapsed */
@@ -172,8 +178,8 @@ body {
   opacity: 0;
   max-height: 0;
   margin-top: 0;
-  padding: 0;
-  border: none;
+  padding-top: 0;
+  padding-bottom: 0;
   pointer-events: none;
 }
 
@@ -233,17 +239,29 @@ body {
   overflow: hidden;
 }
 
-/* Collapsed nav item: centre icon */
-.sidebar.collapsed .nav-item {
-  justify-content: center;
-  padding: 0.65rem;
-  gap: 0;
+/* Collapsed nav item: icon stays put; labels fade out and are clipped by the shrinking width */
+.nav-item .nav-label,
+.nav-item .badge-pill {
+  transition: opacity 0.2s ease-out 0.1s;
 }
 
-/* Hide text labels when collapsed */
 .sidebar.collapsed .nav-item .nav-label,
 .sidebar.collapsed .nav-item .badge-pill {
-  display: none;
+  opacity: 0;
+  pointer-events: none;
+  transition-delay: 0s;
+}
+
+.sidebar.collapsed .nav-item.active {
+  border-left-color: transparent;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sidebar,
+  .sidebar *,
+  .nav-item {
+    transition: none !important;
+  }
 }
 
 /* Tooltip on hover in collapsed state */
@@ -286,7 +304,6 @@ body {
 
 /* Remove left border in collapsed active state so icon stays centred */
 .sidebar.collapsed .nav-item.active {
-  border-left: none;
   border-radius: var(--radius-sm);
 }
 
@@ -1568,8 +1585,10 @@ body.dark-mode .data-table tr.selected td.cong-price-col {
   transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
+.theme-toggle-switch { transition: background 0.25s ease, opacity 0.15s ease-out; }
 .sidebar.collapsed .theme-toggle-switch {
-  display: none;
+  opacity: 0;
+  pointer-events: none;
 }
 
 /* ── Dark Mode Theme Token Overrides ── */
