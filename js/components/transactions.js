@@ -2419,12 +2419,15 @@ function renderHourlyTabHtml(allTxns) {
   `;
 }
 
-// Compute Daily Aggregations
+// Compute Daily Aggregations (excludes Refunded, uses Asia/Manila date & shared COGS helper)
 function computeDailyInOutData(allTxns) {
   const dayMap = {};
+  const store = window.pharmacyStore;
+  const itemsLookup = store ? new Map(store.getItems().map(i => [i.id, i])) : new Map();
 
   allTxns.forEach(t => {
-    const rawDate = t.date || (window.pharmacyStore ? window.pharmacyStore.getManilaDateStr() : new Date().toISOString().split('T')[0]);
+    if (t.status === 'Refunded') return;
+    const rawDate = (t.date ? String(t.date).slice(0, 10) : '') || (store ? store.getManilaDateStr() : '');
     if (!dayMap[rawDate]) {
       dayMap[rawDate] = {
         date: rawDate,
@@ -2433,7 +2436,6 @@ function computeDailyInOutData(allTxns) {
         totalSales: 0,
         totalBudget: 0,
         totalCogs: 0,
-        refundedCount: 0,
         barangays: new Set(),
         medMap: {}
       };
@@ -2443,22 +2445,26 @@ function computeDailyInOutData(allTxns) {
     dObj.txnCount += 1;
     dObj.totalSales += Number(t.netTotal || 0);
     dObj.totalBudget += Number(t.budget || 0);
-    if (t.status === 'Refunded') dObj.refundedCount += 1;
     if (t.barangay) dObj.barangays.add(t.barangay);
 
     if (Array.isArray(t.items)) {
       t.items.forEach(item => {
         const q = Number(item.qty || 0);
         dObj.unitsDispensed += q;
-        dObj.totalCogs += (Number(item.unitPrice || 0) * q);
+        const unitCost = store ? store.getItemCostForSale(item, itemsLookup) : Number(item.unitPrice || 0);
+        dObj.totalCogs += unitCost * q;
         const medName = item.actualSuppliedName || item.name || 'Medicine';
         dObj.medMap[medName] = (dObj.medMap[medName] || 0) + q;
       });
     }
   });
 
-  // Sort dates descending
+  // Sort dates descending (newest day first)
   return Object.values(dayMap).sort((a, b) => b.date.localeCompare(a.date));
+}
+
+function renderDailyTabHtml(allTxns) {
+  return renderDailyInOutViewHtml(computeDailyInOutData(allTxns));
 }
 
 function renderDailyInOutViewHtml(dailyData) {
@@ -2534,28 +2540,25 @@ function renderDailyInOutViewHtml(dailyData) {
               <th style="font-weight: 700; color: var(--brand-charcoal);">Date</th>
               <th style="font-weight: 700; color: var(--brand-charcoal); text-align: center;">Transactions</th>
               <th style="font-weight: 700; color: var(--brand-charcoal); text-align: center;">Units Dispensed</th>
-              <th style="font-weight: 700; color: var(--brand-charcoal);">Barangays Covered</th>
-              <th style="font-weight: 700; color: var(--brand-charcoal);">Top Medicine Moving</th>
-              <th style="font-weight: 700; color: var(--brand-charcoal); text-align: right;">Total Sales</th>
-              <th style="font-weight: 700; color: var(--brand-charcoal); text-align: right;">Gross Margin</th>
+              <th style="font-weight: 700; color: var(--brand-charcoal);">Top Product Movements</th>
+              <th style="font-weight: 700; color: var(--brand-charcoal); text-align: right;">Total Sales (₱)</th>
+              <th style="font-weight: 700; color: var(--brand-charcoal); text-align: right;">Gross Profit (₱)</th>
             </tr>
           </thead>
           <tbody>
             ${totalDays === 0 ? `
               <tr>
-                <td colspan="7" style="text-align: center; padding: 2.5rem; color: var(--text-muted);">
+                <td colspan="6" style="text-align: center; padding: 2.5rem; color: var(--text-muted);">
                   No daily transaction data recorded yet.
                 </td>
               </tr>
             ` : dailyData.map(d => {
     const topMeds = Object.entries(d.medMap)
       .sort((a, b) => b[1] - a[1])
-      .slice(0, 2)
+      .slice(0, 3)
       .map(([name, qty]) => `${name} (x${qty})`)
       .join(', ');
-    const grossProfit = d.totalSales - d.totalCogs;
-    const marginPct = d.totalSales > 0 ? ((grossProfit / d.totalSales) * 100).toFixed(1) : 0;
-    const brgyList = Array.from(d.barangays).slice(0, 2).join(', ');
+    const gp = d.totalSales - d.totalCogs;
 
     return `
                 <tr>
@@ -2569,22 +2572,18 @@ function renderDailyInOutViewHtml(dailyData) {
                   </td>
                   <td style="text-align: center; font-weight: 600; color: var(--text-main);">
                     ${d.txnCount}
-                    ${d.refundedCount > 0 ? `<div style="font-size: 0.68rem; color: #ef4444;">(${d.refundedCount} ref)</div>` : ''}
                   </td>
                   <td style="text-align: center; font-weight: 700; color: var(--primary);">
                     ${d.unitsDispensed}
                   </td>
-                  <td style="font-size: 0.8rem; color: #475569;">
-                    ${brgyList || 'Walk-in'}
-                  </td>
-                  <td style="font-size: 0.8rem; color: var(--text-muted); max-width: 260px;">
+                  <td style="font-size: 0.8rem; color: var(--text-muted); max-width: 320px;">
                     ${topMeds || '—'}
                   </td>
-                  <td style="text-align: right; font-weight: 800; font-size: 0.92rem; color: var(--text-main);">
+                  <td style="text-align: right; font-weight: 800; font-size: 0.94rem; color: var(--text-main);">
                     ₱${d.totalSales.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                   </td>
-                  <td style="text-align: right; font-size: 0.82rem; font-weight: 700; color: ${marginPct >= 0 ? '#047857' : '#dc2626'};">
-                    ${marginPct}%
+                  <td style="text-align: right; font-weight: 700; font-size: 0.88rem; color: ${gp >= 0 ? '#047857' : '#dc2626'};">
+                    ₱${gp.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                   </td>
                 </tr>
               `;
@@ -2596,19 +2595,20 @@ function renderDailyInOutViewHtml(dailyData) {
   `;
 }
 
-// Compute Monthly Aggregations
+// Compute Monthly Aggregations (excludes Refunded, uses Asia/Manila date & shared COGS helper)
 function computeMonthlyInOutData(allTxns) {
   const monthMap = {};
+  const store = window.pharmacyStore;
+  const itemsLookup = store ? new Map(store.getItems().map(i => [i.id, i])) : new Map();
 
   allTxns.forEach(t => {
-    let ym = '2026-10';
-    if (t.date && t.date.length >= 7) {
-      ym = t.date.slice(0, 7);
-    }
+    if (t.status === 'Refunded') return;
+    const rawDate = (t.date ? String(t.date).slice(0, 10) : '') || (store ? store.getManilaDateStr() : '');
+    const ym = rawDate.length >= 7 ? rawDate.slice(0, 7) : '2026-10';
     if (!monthMap[ym]) {
       const [year, month] = ym.split('-');
-      const monthDate = new Date(parseInt(year, 10), parseInt(month, 10) - 1, 1);
-      const label = monthDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+      const monthDate = new Date(Date.UTC(parseInt(year, 10), parseInt(month, 10) - 1, 1));
+      const label = monthDate.toLocaleDateString('en-US', { timeZone: 'UTC', month: 'long', year: 'numeric' });
       monthMap[ym] = {
         ym,
         label,
@@ -2628,7 +2628,8 @@ function computeMonthlyInOutData(allTxns) {
       t.items.forEach(item => {
         const q = Number(item.qty || 0);
         mObj.unitsDispensed += q;
-        mObj.totalCogs += (Number(item.unitPrice || 0) * q);
+        const unitCost = store ? store.getItemCostForSale(item, itemsLookup) : Number(item.unitPrice || 0);
+        mObj.totalCogs += unitCost * q;
         const medName = item.actualSuppliedName || item.name || 'Medicine';
         mObj.medMap[medName] = (mObj.medMap[medName] || 0) + q;
       });

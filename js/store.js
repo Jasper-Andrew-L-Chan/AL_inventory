@@ -886,6 +886,25 @@ class PharmacyStore {
     return new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Manila', year: 'numeric', month: '2-digit', day: '2-digit' }).format(d);
   }
 
+  getItemCostForSale(sold, itemsLookup) {
+    if (!sold) return 0;
+    if (Number(sold.unitPrice) > 0) return Number(sold.unitPrice);
+    const targetId = sold.actualInventoryId || sold.id;
+    const originalItem = itemsLookup instanceof Map
+      ? itemsLookup.get(targetId)
+      : (Array.isArray(itemsLookup) ? itemsLookup.find(i => i.id === targetId) : null);
+    if (originalItem && Number(originalItem.costPrice) > 0) return Number(originalItem.costPrice);
+    return 0;
+  }
+
+  getTransactionCogs(txn, itemsLookup) {
+    if (!txn || txn.status === 'Refunded' || !Array.isArray(txn.items)) return 0;
+    return txn.items.reduce((sum, sold) => {
+      const qty = Number(sold.qty || 0);
+      return sum + (this.getItemCostForSale(sold, itemsLookup) * qty);
+    }, 0);
+  }
+
   // --- Financial & Dashboard Aggregates ---
   // dateStr (YYYY-MM-DD, Manila time) limits every figure to that single day (12:00 AM - 11:59 PM).
   getDashboardMetrics(dateStr) {
@@ -895,6 +914,7 @@ class PharmacyStore {
     const txns = allNonRefunded.filter(t => String(t.date || '').slice(0, 10) === day);
     const refundedToday = everyTxn.filter(t => t.status === 'Refunded' && String(t.date || '').slice(0, 10) === day);
     const items = this.getItems();
+    const itemsLookup = new Map(items.map(i => [i.id, i]));
 
     let totalNetSales = 0;
     let totalDiscounts = 0;
@@ -924,12 +944,7 @@ class PharmacyStore {
       t.items.forEach(sold => {
         const qty = Number(sold.qty || 0);
         totalItemsDispensed += qty;
-        const targetId = sold.actualInventoryId || sold.id;
-        const originalItem = items.find(i => i.id === targetId);
-        const cost = Number(sold.unitPrice) > 0 
-          ? Number(sold.unitPrice) 
-          : (originalItem && Number(originalItem.costPrice) > 0 ? Number(originalItem.costPrice) : Number(sold.price || sold.sellingPrice || 0) * 0.65);
-        costOfGoods += cost * qty;
+        costOfGoods += this.getItemCostForSale(sold, itemsLookup) * qty;
       });
     });
 
@@ -1008,7 +1023,14 @@ class PharmacyStore {
 
   // --- Settings ---
   getSettings() {
-    return JSON.parse(localStorage.getItem(STORAGE_KEYS.SETTINGS)) || INITIAL_SETTINGS;
+    const s = JSON.parse(localStorage.getItem(STORAGE_KEYS.SETTINGS)) || { ...INITIAL_SETTINGS };
+    if (s.branch === 'Main Branch - Pasig City') {
+      s.branch = INITIAL_SETTINGS.branch;
+      if (s.address === '128 Mabini St, Kapasigan, Pasig City, Metro Manila') {
+        s.address = INITIAL_SETTINGS.address;
+      }
+    }
+    return s;
   }
 
   saveSettings(settings) {
