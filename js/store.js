@@ -86,18 +86,8 @@ class PharmacyStore {
     const ensure = (key, value) => {
       if (!localStorage.getItem(key)) localStorage.setItem(key, JSON.stringify(value));
     };
-    const seedVer = window.IMPORTED_MEDICINES_VERSION || '';
     const seedItems = Array.isArray(window.IMPORTED_MEDICINES_SEED) ? window.IMPORTED_MEDICINES_SEED : [];
-    if (seedVer && seedItems.length > 0 && localStorage.getItem('al_inventory_seed_ver') !== seedVer) {
-      try {
-        localStorage.setItem(STORAGE_KEYS.ITEMS, JSON.stringify(seedItems));
-        localStorage.setItem('al_inventory_seed_ver', seedVer);
-      } catch (e) {
-        console.warn('[AffordaLabs Seed] Could not write seed items:', e.message);
-      }
-    } else {
-      ensure(STORAGE_KEYS.ITEMS, seedItems);
-    }
+    ensure(STORAGE_KEYS.ITEMS, seedItems);
     ensure(STORAGE_KEYS.TRANSACTIONS, []);
     ensure(STORAGE_KEYS.SETTINGS, INITIAL_SETTINGS);
     ensure(STORAGE_KEYS.STAFF, INITIAL_STAFF);
@@ -160,20 +150,24 @@ class PharmacyStore {
         this.setStatus('ok');
         return false;
       }
-      // If the central database does not yet have the verified Excel seed (2,691 records), push it now.
+      // Only seed the central database if it is completely empty (0 items).
+      // Never overwrite existing server items so user price/detail edits are permanently preserved.
       const seedVer = window.IMPORTED_MEDICINES_VERSION || '';
       const seedItems = Array.isArray(window.IMPORTED_MEDICINES_SEED) ? window.IMPORTED_MEDICINES_SEED : [];
-      if (seedVer && seedItems.length > 0 && data.seedVer !== seedVer) {
+      if (seedItems.length > 0 && (!Array.isArray(data.items) || data.items.length === 0)) {
         try {
-          await window.alApi('/api/migrate', {
-            method: 'POST',
-            body: { items: seedItems, replaceItems: true, seedVersion: seedVer }
-          });
+          for (let i = 0; i < seedItems.length; i += 400) {
+            const chunk = seedItems.slice(i, i + 400);
+            const isLast = (i + 400) >= seedItems.length;
+            await window.alApi('/api/migrate', {
+              method: 'POST',
+              body: { items: chunk, replaceItems: false, seedVersion: isLast ? seedVer : '' }
+            });
+          }
           data.items = seedItems;
           data.seedVer = seedVer;
         } catch (migErr) {
-          console.warn('[AffordaLabs Seed] Remote seed sync deferred:', migErr.message);
-          data.items = seedItems;
+          console.warn('[AffordaLabs Seed] Initial seed sync deferred:', migErr.message);
         }
       }
       // The user changed something while we were fetching: discard, the next poll fetches fresh data.
@@ -384,26 +378,50 @@ class PharmacyStore {
   }
 
   // --- Medicine Item Methods ---
+  _getSeedLookupMap() {
+    if (!this._seedLookupMap) {
+      this._seedLookupMap = new Map();
+      const seedItems = Array.isArray(window.IMPORTED_MEDICINES_SEED) ? window.IMPORTED_MEDICINES_SEED : [];
+      seedItems.forEach(s => {
+        if (s && s.id) this._seedLookupMap.set(s.id, s);
+      });
+    }
+    return this._seedLookupMap;
+  }
+
   getItems() {
     const items = JSON.parse(localStorage.getItem(STORAGE_KEYS.ITEMS)) || [];
+    const seedMap = this._getSeedLookupMap();
     return items.map(item => {
+      const seedItem = seedMap.get(item.id);
       const name = this.formatItemName(item);
       const cost = Number(item.unitPrice !== undefined ? item.unitPrice : (item.costPrice || 0));
       const netPrice = Number(item.netPrice !== undefined ? item.netPrice : 0);
       const qtyPerBox = Number(item.qtyPerBox !== undefined ? item.qtyPerBox : 0);
       const sellingPrice = Number(item.sellingPrice || 0);
-      const congUnitPrice = Number(item.congUnitPrice || 0);
+      const hasCongUnit = item.congUnitPrice !== undefined && item.congUnitPrice !== null && (Number(item.congUnitPrice) > 0 || item.rawCongUnitPrice !== undefined);
+      const congUnitPrice = hasCongUnit
+        ? Number(item.congUnitPrice || 0)
+        : (seedItem ? Number(seedItem.congUnitPrice || 0) : 0);
+      const rawCongUnitPrice = item.rawCongUnitPrice !== undefined
+        ? item.rawCongUnitPrice
+        : (seedItem && seedItem.rawCongUnitPrice !== undefined ? seedItem.rawCongUnitPrice : String(congUnitPrice || ''));
       const congPrice = Number(item.congPrice || 0);
+      const expiryDate = (seedItem && /^2026-\d{2}-(2[7-9]|3[01])$/.test(String(item.expiryDate || '')))
+        ? seedItem.expiryDate
+        : item.expiryDate;
 
       return {
         ...item,
         name,
+        expiryDate,
         costPrice: cost,
         unitPrice: cost,
         netPrice,
         qtyPerBox,
         sellingPrice,
         congUnitPrice,
+        rawCongUnitPrice,
         congPrice
       };
     });
@@ -855,9 +873,19 @@ class PharmacyStore {
     return true;
   }
 
+  /** Calendar date (YYYY-MM-DD) in Philippine time (Asia/Manila). */
+  getManilaDateStr(d = new Date()) {
+    return new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Manila', year: 'numeric', month: '2-digit', day: '2-digit' }).format(d);
+  }
+
   // --- Financial & Dashboard Aggregates ---
-  getDashboardMetrics() {
-    const txns = this.getTransactions().filter(t => t.status !== 'Refunded');
+  // dateStr (YYYY-MM-DD, Manila time) limits every figure to that single day (12:00 AM - 11:59 PM).
+  getDashboardMetrics(dateStr) {
+    const day = dateStr || this.getManilaDateStr();
+    const everyTxn = this.getTransactions();
+    const allNonRefunded = everyTxn.filter(t => t.status !== 'Refunded');
+    const txns = allNonRefunded.filter(t => String(t.date || '').slice(0, 10) === day);
+    const refundedToday = everyTxn.filter(t => t.status === 'Refunded' && String(t.date || '').slice(0, 10) === day);
     const items = this.getItems();
 
     let totalNetSales = 0;
@@ -934,13 +962,15 @@ class PharmacyStore {
       costOfGoods: costOfGoods,
       itemsDispensed: totalItemsDispensed,
       grossProfit: grossProfit,
-      totalRefunds: 0.00,
+      totalRefunds: refundedToday.reduce((s, t) => s + Number(t.netTotal || 0), 0),
+      selectedDate: day,
       lowStockCount,
       expiringSoonCount,
       paymentTotals,
       totalSKUs: items.length,
       recentSold: recentSoldList,
-      allCompletedTxns: txns
+      allCompletedTxns: txns,
+      allTxnsAnyDate: allNonRefunded
     };
   }
 

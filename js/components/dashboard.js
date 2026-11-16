@@ -27,20 +27,58 @@ let currentChartPeriod = 'hourly';
 let dashboardFeedPage = 1;
 const DASHBOARD_FEED_PAGE_SIZE = 10;
 let dashboardFeedFilter = '';
+let dashboardSelectedDate = ''; // YYYY-MM-DD (Asia/Manila); '' = today
+
+function dashboardTodayStr() {
+  return window.pharmacyStore.getManilaDateStr();
+}
+
+function dashboardActiveDate() {
+  const today = dashboardTodayStr();
+  if (!dashboardSelectedDate || dashboardSelectedDate > today) dashboardSelectedDate = today;
+  return dashboardSelectedDate;
+}
+
+function dashboardShiftDate(dateStr, days) {
+  const [y, m, d] = dateStr.split('-').map(Number);
+  const dt = new Date(Date.UTC(y, m - 1, d + days));
+  return dt.toISOString().slice(0, 10);
+}
+
+function dashboardLongDate(dateStr) {
+  const [y, m, d] = dateStr.split('-').map(Number);
+  return new Date(Date.UTC(y, m - 1, d)).toLocaleDateString('en-US', { timeZone: 'UTC', weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' });
+}
+
+window.setDashboardDate = function (dateStr) {
+  const today = dashboardTodayStr();
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(dateStr || '')) return;
+  dashboardSelectedDate = dateStr > today ? today : dateStr;
+  dashboardFeedPage = 1;
+  renderDashboardView(document.getElementById('main-content'));
+};
+
+window.shiftDashboardDate = function (days) {
+  window.setDashboardDate(dashboardShiftDate(dashboardActiveDate(), days));
+};
 
 function renderDashboardView(container) {
   const settings = window.pharmacyStore.getSettings();
-  const metrics = window.pharmacyStore.getDashboardMetrics();
+  const selDate = dashboardActiveDate();
+  const todayStr = dashboardTodayStr();
+  const isToday = selDate === todayStr;
+  const metrics = window.pharmacyStore.getDashboardMetrics(selDate);
   const now = new Date();
   const timeStr = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+  const dateLabel = dashboardLongDate(selDate);
 
   const session = window.authStore ? window.authStore.getSession() : null;
   const userName = session ? session.firstName : 'Pharmacist';
   const hour = now.getHours();
-  const greeting = hour < 12 ? 'Good morning' : (hour < 18 ? 'Good afternoon' : 'Good evening');
+  const greeting = isToday ? (hour < 12 ? 'Good morning' : (hour < 18 ? 'Good afternoon' : 'Good evening')) : 'Viewing';
 
   const txns = metrics.allCompletedTxns || [];
-  const chartData = generateDashboardChartData(txns, currentChartPeriod);
+  const chartData = generateDashboardChartData(currentChartPeriod === 'hourly' ? txns : (metrics.allTxnsAnyDate || []), currentChartPeriod, selDate);
 
   // Filter sold items feed
   const allSoldItems = metrics.recentSold || [];
@@ -191,7 +229,7 @@ function renderDashboardView(container) {
           <div class="kpi-val kpi-val-teal">${metrics.transactionCount} <span style="font-size: 0.9rem; font-weight: 600; color: var(--text-muted);">logs</span></div>
           <div class="kpi-footnote">
             <i data-lucide="clock" style="width: 13px; height: 13px;"></i>
-            <span>Across current shift window</span>
+            <span>${isToday ? 'Across current shift window' : 'On ' + dateLabel}</span>
           </div>
         </div>
 
@@ -206,7 +244,7 @@ function renderDashboardView(container) {
           <div class="kpi-val kpi-val-purple">₱${metrics.totalRefunds.toFixed(2)}</div>
           <div class="kpi-footnote">
             <i data-lucide="smile" style="width: 13px; height: 13px; color: #16a34a;"></i>
-            <span>Zero customer return issues today</span>
+            <span>${isToday ? 'Zero customer return issues today' : (metrics.totalRefunds > 0 ? 'Voided / refunded on this date' : 'No returns on this date')}</span>
           </div>
         </div>
 
@@ -223,7 +261,7 @@ function renderDashboardView(container) {
             <span style="font-size: 0.8rem; font-weight: 700; color: var(--primary); margin-left: 6px;">View →</span>
           </div>
           <div class="kpi-footnote">
-            <span>${metrics.expiringSoonCount} Expiring Soon • ${metrics.lowStockCount} Needs Restock</span>
+            <span>${metrics.expiringSoonCount} Expiring Soon • ${metrics.lowStockCount} Needs Restock • <strong>Current</strong></span>
           </div>
         </div>
       </div>
@@ -234,19 +272,25 @@ function renderDashboardView(container) {
       <h3 style="font-size: 1.05rem; font-weight: 800; color: var(--text-main); margin: 0; display: flex; align-items: center; gap: 6px;">
         <span>${greeting},</span>
         <span style="color: var(--primary);">${userName}!</span>
-        <span style="font-size: 0.82rem; font-weight: 600; color: var(--text-muted);">Counter station ready at ${settings.pharmacyName} (${settings.branch})</span>
+        <span style="font-size: 0.82rem; font-weight: 600; color: var(--text-muted);">${isToday ? `Counter station ready at ${settings.pharmacyName} (${settings.branch})` : `${dateLabel} &middot; ${settings.pharmacyName} (${settings.branch})`}</span>
       </h3>
-      <div style="display: flex; align-items: center; gap: 0.6rem;">
-        <div style="background: var(--bg-card); border: 1px solid var(--border-color); border-radius: var(--radius-sm); padding: 0.4rem 0.85rem; display: flex; align-items: center; gap: 0.5rem; font-size: 0.82rem; color: var(--text-muted); box-shadow: var(--shadow-sm);">
+      <div style="display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap;">
+        <div style="background: var(--bg-card); border: 1px solid var(--border-color); border-radius: var(--radius-sm); padding: 0.3rem 0.5rem; display: flex; align-items: center; gap: 0.4rem; font-size: 0.82rem; color: var(--text-muted); box-shadow: var(--shadow-sm);">
           <span>Date Filter:</span>
-          <strong style="color: var(--text-main);">Today (12:00am - 11:59pm)</strong>
-          <i data-lucide="calendar" style="width: 14px; height: 14px; color: var(--text-muted);"></i>
+          <button type="button" onclick="shiftDashboardDate(-1)" class="btn-outline" style="padding: 2px 7px; font-size: 0.9rem; font-weight: 800; line-height: 1;" title="Previous day">‹</button>
+          <input type="date" id="dashboardDatePicker" value="${selDate}" max="${todayStr}" onchange="setDashboardDate(this.value)" style="background: var(--bg-card); color: var(--text-main); border: 1px solid var(--border-color); border-radius: 4px; padding: 3px 6px; font-size: 0.8rem; font-weight: 700; color-scheme: light dark;" title="Pick a date (12:00am - 11:59pm)" />
+          <button type="button" onclick="shiftDashboardDate(1)" class="btn-outline" ${isToday ? 'disabled' : ''} style="padding: 2px 7px; font-size: 0.9rem; font-weight: 800; line-height: 1; ${isToday ? 'opacity: 0.4; cursor: not-allowed;' : ''}" title="Next day">›</button>
+          <button type="button" onclick="setDashboardDate('${todayStr}')" class="btn-outline" ${isToday ? 'disabled' : ''} style="padding: 3px 9px; font-size: 0.76rem; font-weight: 700; ${isToday ? 'opacity: 0.5; cursor: default;' : 'color: var(--primary); border-color: var(--primary);'}" title="Jump to today">Today</button>
         </div>
         <div style="background: var(--bg-card); border: 1px solid var(--border-color); border-radius: var(--radius-sm); padding: 0.4rem 0.75rem; font-size: 0.78rem; color: var(--text-muted);">
-          Synced at <strong>${timeStr}</strong>
+          ${isToday ? '' : `${dateLabel} &middot; `}Synced at <strong>${timeStr}</strong>
         </div>
       </div>
     </div>
+${metrics.transactionCount === 0 ? `
+    <div style="background: var(--bg-card); border: 1px dashed var(--border-color); border-radius: var(--radius-sm); padding: 0.55rem 1rem; margin: -0.5rem 0 1.25rem; font-size: 0.8rem; color: var(--text-muted); display: flex; align-items: center; gap: 6px;">
+      <i data-lucide="info" style="width: 14px; height: 14px;"></i> No transactions for ${dateLabel}. Figures below are zero; Batch &amp; Stock Alerts show current inventory.
+    </div>` : ''}
 
     <!-- Middle Section: Sales Area Chart (Left) + Top Selling Medicines & Payment Breakdown (Right) -->
     <div style="display: grid; grid-template-columns: 1.55fr 1fr; gap: 1.25rem; align-items: start; margin-bottom: 1.5rem;">
@@ -259,7 +303,7 @@ function renderDashboardView(container) {
               <span>Sales by Date Trend</span>
             </h4>
             <div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 2px;">
-              ${currentChartPeriod === 'hourly' ? 'Hourly Pharmacy POS & In-Out Volume Today' : (currentChartPeriod === 'daily' ? 'Past 5 Days Daily Sales Trend' : 'Past 5 Months Sales Volume')}
+              ${currentChartPeriod === 'hourly' ? `Hourly Pharmacy POS &amp; In-Out Volume &middot; ${isToday ? 'Today' : dateLabel}` : (currentChartPeriod === 'daily' ? `5-Day Trend ending ${dateLabel}` : `5-Month Trend ending ${dateLabel}`)}
             </div>
           </div>
           <!-- Time Interval Toggles -->
@@ -284,7 +328,7 @@ function renderDashboardView(container) {
                 <i data-lucide="flame" style="width: 17px; height: 17px; color: #ea580c;"></i>
                 <span>Fast-Moving Medicines</span>
               </h4>
-              <div style="font-size: 0.72rem; color: var(--text-muted);">Top dispensing SKUs today</div>
+              <div style="font-size: 0.72rem; color: var(--text-muted);">Top dispensing SKUs ${isToday ? 'today' : 'on ' + dateLabel}</div>
             </div>
             <button onclick="window.appRouter.navigate('inventory')" class="btn-outline" style="font-size: 0.7rem; padding: 2px 8px;" title="View in Inventory">
               Inventory →
@@ -311,7 +355,7 @@ function renderDashboardView(container) {
               return `
                 <div style="text-align: center; padding: 1.25rem 0.5rem; color: var(--text-muted); font-size: 0.78rem;">
                   <i data-lucide="package" style="width: 24px; height: 24px; opacity: 0.4; margin-bottom: 4px;"></i>
-                  <div>No medicines dispensed yet today</div>
+                  <div>No medicines dispensed ${isToday ? 'yet today' : 'on this date'}</div>
                 </div>
               `;
             }
@@ -356,7 +400,7 @@ function renderDashboardView(container) {
             </span>
           </div>
           <div style="font-size: 0.72rem; color: var(--text-muted); margin-bottom: 0.9rem;">
-            Collected methods across counter registers today
+            Collected methods across counter registers ${isToday ? 'today' : 'on ' + dateLabel}
           </div>
 
           <div style="display: flex; flex-direction: column; gap: 0.75rem;">
@@ -450,7 +494,7 @@ function renderDashboardView(container) {
             </span>
           </h4>
           <div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 2px;">
-            Full report of all customer purchases and stock out transactions.
+            Customer purchases and stock-out transactions for ${dateLabel}.
           </div>
         </div>
 
@@ -576,7 +620,7 @@ function renderDashboardView(container) {
         </div>
       ` : `
         <div style="text-align: center; padding: 2.5rem 1rem; color: var(--text-muted); font-size: 0.86rem;">
-          ${dashboardFeedFilter ? `No purchases found matching "<strong>${escapeHtml(dashboardFeedFilter)}</strong>"` : 'No customer purchases recorded yet. Complete a transaction in In - Out or POS and it will show here immediately!'}
+          ${dashboardFeedFilter ? `No purchases found matching "<strong>${escapeHtml(dashboardFeedFilter)}</strong>"` : `No transactions for this date (${escapeHtml(dateLabel)}).`}
         </div>
       `}
     </div>
@@ -601,7 +645,7 @@ window.handleDashboardFeedSearch = function(query) {
 };
 
 // Generate dynamic chart points based on actual transactions
-function generateDashboardChartData(txns, period) {
+function generateDashboardChartData(txns, period, selDate) {
   if (period === 'hourly') {
     // 5 time buckets: 8:00 AM, 10:00 AM, 12:00 PM, 2:00 PM, 4:00 PM
     const buckets = [
@@ -636,27 +680,25 @@ function generateDashboardChartData(txns, period) {
 
     return buckets;
   } else if (period === 'daily') {
-    // Past 5 days
+    // 5 days ending on the selected date
     const days = [];
     for (let i = 4; i >= 0; i--) {
-      const d = new Date();
-      d.setDate(d.getDate() - i);
-      const str = d.toISOString().split('T')[0];
-      const label = d.toLocaleDateString('en-US', { weekday: 'short', month: 'numeric', day: 'numeric' });
+      const str = dashboardShiftDate(selDate, -i);
+      const label = dashboardLongDate(str).replace(/,? \d{4}$/, '');
       const dayTotal = txns
-        .filter(t => t.date === str)
+        .filter(t => String(t.date || '').slice(0, 10) === str)
         .reduce((sum, t) => sum + Number(t.netTotal || 0), 0);
       days.push({ label, total: dayTotal });
     }
     return days;
   } else {
-    // Past 5 months
+    // 5 months ending on the selected date's month
     const months = [];
+    const [sy, sm] = selDate.split('-').map(Number);
     for (let i = 4; i >= 0; i--) {
-      const d = new Date();
-      d.setMonth(d.getMonth() - i);
+      const d = new Date(Date.UTC(sy, sm - 1 - i, 1));
       const mStr = d.toISOString().slice(0, 7);
-      const label = d.toLocaleDateString('en-US', { month: 'short' });
+      const label = d.toLocaleDateString('en-US', { timeZone: 'UTC', month: 'short' });
       const mTotal = txns
         .filter(t => (t.date || '').startsWith(mStr))
         .reduce((sum, t) => sum + Number(t.netTotal || 0), 0);
