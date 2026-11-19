@@ -160,17 +160,32 @@ class PharmacyStore {
       // Never overwrite existing server items so user price/detail edits are permanently preserved.
       const seedVer = window.IMPORTED_MEDICINES_VERSION || '';
       const seedItems = Array.isArray(window.IMPORTED_MEDICINES_SEED) ? window.IMPORTED_MEDICINES_SEED : [];
-      if (seedItems.length > 0 && (!Array.isArray(data.items) || data.items.length === 0)) {
+      const existingItems = Array.isArray(data.items) ? data.items : [];
+      const needsSeed = seedItems.length > 0 && (
+        existingItems.length === 0 ||
+        (seedVer && data.seedVer !== seedVer && existingItems.length < seedItems.length)
+      );
+      if (needsSeed) {
         try {
-          for (let i = 0; i < seedItems.length; i += 400) {
-            const chunk = seedItems.slice(i, i + 400);
-            const isLast = (i + 400) >= seedItems.length;
+          const existingIds = new Set(existingItems.map(it => it && it.id).filter(Boolean));
+          const pendingItems = existingIds.size > 0
+            ? seedItems.filter(it => it && !existingIds.has(it.id))
+            : seedItems;
+          for (let i = 0; i < pendingItems.length; i += 400) {
+            const chunk = pendingItems.slice(i, i + 400);
+            const isLast = (i + 400) >= pendingItems.length;
             await window.alApi('/api/migrate', {
               method: 'POST',
               body: { items: chunk, replaceItems: false, seedVersion: isLast ? seedVer : '' }
             });
           }
-          data.items = seedItems;
+          if (pendingItems.length === 0 && seedVer && data.seedVer !== seedVer) {
+            await window.alApi('/api/migrate', {
+              method: 'POST',
+              body: { items: [], replaceItems: false, seedVersion: seedVer }
+            });
+          }
+          data.items = existingItems.concat(pendingItems);
           data.seedVer = seedVer;
         } catch (migErr) {
           console.warn('[AffordaLabs Seed] Initial seed sync deferred:', migErr.message);
