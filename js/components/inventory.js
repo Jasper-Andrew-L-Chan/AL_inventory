@@ -141,7 +141,13 @@ function renderInventoryView(container) {
         </button>
       </div>
 
-      <div style="display: flex; gap: 0.5rem;">
+      <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
+        ${items.length > 0 ? `
+          <button onclick="confirmClearAllInventory()" class="btn-outline" style="color: #dc2626; border-color: #fca5a5; display: flex; align-items: center; gap: 0.4rem;" title="Remove all medicines from inventory to start fresh">
+            <i data-lucide="trash-2" style="width: 15px; height: 15px;"></i>
+            <span>Clear All Meds</span>
+          </button>
+        ` : ''}
         <button onclick="openAddMedicineModal()" class="btn-primary" style="background: var(--primary); display: flex; align-items: center; gap: 0.4rem;">
           <i data-lucide="plus" style="width: 15px; height: 15px;"></i>
           <span>Detailed Medicine / Batch Form</span>
@@ -498,6 +504,18 @@ function renderInventoryView(container) {
     lucide.createIcons();
   }
 }
+
+window.confirmClearAllInventory = function() {
+  const count = window.pharmacyStore.getItems().length;
+  if (count === 0) return;
+  if (confirm(`Remove ALL ${count.toLocaleString()} medicines from inventory so you can start fresh?\n\nYour transaction history, staff accounts, and settings will be kept.`)) {
+    window.pharmacyStore.clearAllItems();
+    selectedInventoryItemIds.clear();
+    lastClickedItemId = null;
+    inventoryCurrentPage = 1;
+    renderInventoryView(document.getElementById('main-content'));
+  }
+};
 
 // ── Quick Selection Shortcuts (Shift + Left Click) ───────────────────────────
 
